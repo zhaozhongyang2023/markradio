@@ -1,0 +1,85 @@
+import OpenAI from 'openai';
+import { config } from './config.js';
+import { assertServiceAvailable, markServiceFailure, markServiceSuccess } from './circuit-breaker.js';
+
+export function parseDjJson(text) {
+  const trimmed = text.trim();
+  const fenced = trimmed.match(/```(?:json)?\s*([\s\S]*?)```/i);
+  const source = fenced ? fenced[1] : trimmed;
+  const start = source.indexOf('{');
+  const end = source.lastIndexOf('}');
+  if (start === -1 || end === -1) throw new Error('模型没有返回 JSON 对象');
+  const parsed = JSON.parse(source.slice(start, end + 1));
+  return normalizePlan(parsed);
+}
+
+export function normalizePlan(plan) {
+  const trackReasons = {};
+  const playIds = [];
+  if (Array.isArray(plan.play)) {
+    for (const item of plan.play) {
+      if (typeof item === 'string') {
+        playIds.push(item);
+      } else if (item && typeof item === 'object' && item.id) {
+        playIds.push(String(item.id));
+        if (item.reason) trackReasons[String(item.id)] = String(item.reason);
+      }
+    }
+  }
+  return {
+    say: String(plan.say || '夜色缓缓铺开，声音是最好的陪伴。我们从一首契合此刻的歌开始。'),
+    play: playIds.slice(0, 8),
+    trackReasons,
+    reason: String(plan.reason || '根据当前心情和你的听歌习惯生成。'),
+    segue: String(plan.segue || '下一首，同一个夜晚，另一种心情。'),
+    mood: String(plan.mood || '平静'),
+    tags: Array.isArray(plan.tags) ? plan.tags.map(String).slice(0, 8) : [],
+    voiceStyle: String(plan.voiceStyle || '语速适中，温柔克制，停顿自然。')
+  };
+}
+
+export async function generateDjPlan({ messages, fallbackTracks, mood }) {
+  if (!config.aiApiKey) {
+    return demoPlan(fallbackTracks, mood, '未配置 AI API Key，使用 Demo DJ 计划。');
+  }
+
+  assertServiceAvailable(config.aiProvider);
+  const client = new OpenAI({
+    apiKey: config.aiApiKey,
+    ...(config.aiBaseUrl ? { baseURL: config.aiBaseUrl } : {})
+  });
+  let completion;
+  try {
+    completion = await client.chat.completions.create({
+      model: config.aiModel,
+      messages,
+      temperature: 0.88,
+      response_format: { type: 'json_object' }
+    }, { timeout: 15000 });
+    markServiceSuccess(config.aiProvider);
+  } catch (error) {
+    markServiceFailure(config.aiProvider);
+    throw error;
+  }
+
+  const text = completion.choices?.[0]?.message?.content || '';
+  const plan = parseDjJson(text);
+  if (!plan.play.length) plan.play = fallbackTracks.slice(0, 4).map((track) => track.id);
+  return plan;
+}
+
+export function demoPlan(fallbackTracks, mood, reason = 'Demo 模式') {
+  const first = fallbackTracks[0];
+  const title = first?.title || '这首歌';
+  const artist = first?.artist || '';
+  return {
+    say: `窗外夜色正好。此刻的${mood}，让人想起一些声音。${artist ? artist + '的' : ''}《${title}》，是一首适合这个时间的歌。`,
+    play: fallbackTracks.slice(0, 4).map((track) => track.id),
+    trackReasons: first ? { [first.id]: `${artist ? artist + '——' : ''}《${title}》。${mood}的质地，藏在旋律的间隙里。` } : {},
+    reason,
+    segue: '下一首，同样的夜晚，不同的光影。',
+    mood,
+    tags: [mood, '私人电台', '记忆'],
+    voiceStyle: '语速偏慢，温柔克制，句尾自然停顿，像在耳边说话。'
+  };
+}

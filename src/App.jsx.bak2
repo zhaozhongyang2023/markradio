@@ -1,0 +1,1461 @@
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { api, apiAssetUrl, streamUrl } from './api.js';
+
+const moodLabels = [
+  { name: '开心', icon: '☺', en: 'Joy' },
+  { name: '欢乐', icon: '✦', en: 'Fun' },
+  { name: '悲伤', icon: '☾', en: 'Blue' },
+  { name: '平静', icon: '◌', en: 'Calm' },
+  { name: '焦虑', icon: '⌁', en: 'Tense' },
+  { name: '愤怒', icon: '◆', en: 'Fire' }
+];
+
+const moodIcon = {
+  开心: '☺',
+  欢乐: '◆',
+  悲伤: '☂',
+  平静: '◌',
+  焦虑: '▧',
+  愤怒: '▣'
+};
+
+const BED_VOLUME = 0.3;
+const SPECTRUM_BARS = 76;
+const PARTICLE_BARS = 72;
+
+function formatTime(seconds = 0) {
+  const safe = Math.max(0, Math.floor(seconds));
+  return `${String(Math.floor(safe / 60)).padStart(1, '0')}:${String(safe % 60).padStart(2, '0')}`;
+}
+
+function weatherIcon(condition = '') {
+  if (condition.includes('雨')) return '☔';
+  if (condition.includes('雪')) return '✳';
+  if (condition.includes('云')) return '☁';
+  if (condition.includes('晴')) return '☀';
+  return '✦';
+}
+
+function pixelCafe() {
+  return (
+    <div className="pixel-cup" aria-hidden="true">
+      <span />
+      <i />
+    </div>
+  );
+}
+
+function segmentText(value) {
+  const source = String(value || '').trim();
+  if (!source) return [];
+  if (typeof Intl !== 'undefined' && Intl.Segmenter) {
+    return [...new Intl.Segmenter('zh-CN', { granularity: 'word' }).segment(source)]
+      .map((item) => item.segment)
+      .filter((item) => item.trim());
+  }
+  return source.match(/[\u4e00-\u9fa5]{1,2}|[a-zA-Z0-9]+|[^\s]/g) || [];
+}
+
+function segmentTextWithOffsets(value) {
+  const source = String(value || '').trim();
+  const tokens = segmentText(source);
+  let cursor = 0;
+  return tokens.map((token) => {
+    const start = source.indexOf(token, cursor);
+    const safeStart = start >= 0 ? start : cursor;
+    const end = safeStart + token.length;
+    cursor = end;
+    return { token, start: safeStart, end };
+  });
+}
+
+function activeTokenIndex(segments, charCount) {
+  if (!segments.length) return 0;
+  const index = segments.findIndex((segment) => charCount < segment.end);
+  return index === -1 ? segments.length - 1 : Math.max(0, index);
+}
+
+function currentLyricIndex(lyrics, seconds) {
+  if (!lyrics?.length) return 0;
+  let index = 0;
+  for (let i = 0; i < lyrics.length; i += 1) {
+    if (lyrics[i].time <= seconds) index = i;
+    else break;
+  }
+  return index;
+}
+
+function isCreditLine(text = '') {
+  return /^(作词|作曲|编曲|制作人|词|曲)\s*[:：]/.test(String(text).trim());
+}
+
+function normalizeTitleText(value = '') {
+  return String(value).toLowerCase().replace(/[\s《》"“”'’‘()（）\-_/]+/g, '');
+}
+
+function fallbackLyrics({ introText, plan }) {
+  return [
+    { time: 0, text: introText || '这里是十三哥的音乐之声。' },
+    { time: 8, text: plan?.plan?.reason || '这首歌来自此刻的天气、心情和你的音乐记忆。' },
+    { time: 16, text: plan?.plan?.segue || '下一句旋律，继续慢慢往前。' }
+  ];
+}
+
+function buildTrackIntroText({ isPlanIntroTrack, plan, queueIndex, track, ttsText }) {
+  if (isPlanIntroTrack && ttsText) return ttsText;
+  const song = track?.title ? `接下来是《${track.title}》。` : '';
+  const reason = plan?.plan?.reason || '这首歌来自此刻的天气、心情和你的音乐记忆。';
+  const segue = plan?.plan?.segue || '下一首，继续把情绪慢慢放平。';
+  if (queueIndex === 1) return `${reason} ${song}`.replace(/\s+/g, ' ').trim();
+  return `${segue} ${song}`.replace(/\s+/g, ' ').trim();
+}
+
+function buildLevelsFromFrequency(data, count) {
+  return Array.from({ length: count }, (_, index) => {
+    const curveStart = Math.pow(index / count, 1.35);
+    const curveEnd = Math.pow((index + 1) / count, 1.35);
+    const start = Math.floor(curveStart * data.length);
+    const end = Math.max(start + 1, Math.floor(curveEnd * data.length));
+    let total = 0;
+    for (let i = start; i < end; i += 1) total += data[i] || 0;
+    const value = total / (end - start) / 255;
+    const shaped = Math.max(0, value - 0.025) * (index < count * 0.18 ? 0.72 : 1.22);
+    return Math.max(0.08, Math.min(0.96, 0.08 + shaped * 1.72));
+  });
+}
+
+function buildFallbackLevels(seconds, count) {
+  return Array.from({ length: count }, (_, index) => {
+    const slow = Math.sin(seconds * 2.1 + index * 0.24);
+    const fast = Math.sin(seconds * 5.8 - index * 0.11);
+    const beat = Math.max(0, Math.sin(seconds * 3.2 + index * 0.05));
+    return Math.max(0.08, Math.min(0.95, 0.2 + Math.abs(slow) * 0.32 + Math.abs(fast) * 0.18 + beat * 0.22));
+  });
+}
+
+function paintLevels(container, levels) {
+  if (!container) return;
+  const bars = container.querySelectorAll('span');
+  bars.forEach((bar, index) => {
+    const level = levels?.[index] ?? 0.18;
+    bar.style.setProperty('--level', level.toFixed(3));
+  });
+}
+
+// ── 7-segment style 5×7 pixel digit patterns (1=on, 0=off, row-major) ──
+const PX = {
+  size: 10,  // pixel square side in px
+  gap: 4,    // gap between pixels
+  cols: 5,
+  rows: 7,
+  cell: 14,  // size + gap
+  digits: {
+    '0': [1,1,1,1,1, 1,0,0,0,1, 1,0,0,0,1, 1,0,0,0,1, 1,0,0,0,1, 1,0,0,0,1, 1,1,1,1,1],
+    '1': [0,0,1,0,0, 0,1,1,0,0, 0,0,1,0,0, 0,0,1,0,0, 0,0,1,0,0, 0,0,1,0,0, 1,1,1,1,1],
+    '2': [1,1,1,1,1, 0,0,0,0,1, 0,0,0,0,1, 1,1,1,1,1, 1,0,0,0,0, 1,0,0,0,0, 1,1,1,1,1],
+    '3': [1,1,1,1,1, 0,0,0,0,1, 0,0,0,0,1, 0,1,1,1,1, 0,0,0,0,1, 0,0,0,0,1, 1,1,1,1,1],
+    '4': [1,0,0,0,1, 1,0,0,0,1, 1,0,0,0,1, 1,1,1,1,1, 0,0,0,0,1, 0,0,0,0,1, 0,0,0,0,1],
+    '5': [1,1,1,1,1, 1,0,0,0,0, 1,0,0,0,0, 1,1,1,1,1, 0,0,0,0,1, 0,0,0,0,1, 1,1,1,1,1],
+    '6': [1,1,1,1,1, 1,0,0,0,0, 1,0,0,0,0, 1,1,1,1,1, 1,0,0,0,1, 1,0,0,0,1, 1,1,1,1,1],
+    '7': [1,1,1,1,1, 0,0,0,0,1, 0,0,0,0,1, 0,0,0,1,0, 0,0,1,0,0, 0,1,0,0,0, 0,1,0,0,0],
+    '8': [1,1,1,1,1, 1,0,0,0,1, 1,0,0,0,1, 1,1,1,1,1, 1,0,0,0,1, 1,0,0,0,1, 1,1,1,1,1],
+    '9': [1,1,1,1,1, 1,0,0,0,1, 1,0,0,0,1, 1,1,1,1,1, 0,0,0,0,1, 0,0,0,0,1, 1,1,1,1,1],
+  },
+  // top-left origin for each element in cell units
+  layout: {
+    padX: 3, padY: 3,
+    digitW: 5, digitH: 7,
+    gapW: 2,
+    colonW: 1,
+    // computed layout: D0 gap D1 gap colon gap D2 gap D3
+    // x offsets in cells: 3, 8, 10, 15, 17, 18, 20, 25, 27
+  },
+  canvasW: 3 + 5 + 2 + 5 + 2 + 1 + 2 + 5 + 2 + 5 + 3, // = 35 cells
+  canvasH: 3 + 7 + 3, // = 13 cells
+};
+
+function drawBgDots(ctx, w, h) {
+  const c = PX.cell;
+  ctx.fillStyle = '#1a1a1a';
+  for (let y = c / 2; y < h; y += c) {
+    for (let x = c / 2; x < w; x += c) {
+      ctx.beginPath();
+      ctx.arc(x, y, 0.8, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+}
+
+function drawPixelDigit(ctx, ox, oy, ch) {
+  const { size, gap, cols, rows, digits, cell } = PX;
+  const pattern = digits[ch] || digits['0'];
+  ctx.fillStyle = '#ffffff';
+  ctx.shadowColor = 'rgba(255,255,255,0.18)';
+  ctx.shadowBlur = 5;
+  for (let row = 0; row < rows; row++) {
+    for (let col = 0; col < cols; col++) {
+      if (pattern[row * cols + col]) {
+        const x = ox + col * cell;
+        const y = oy + row * cell;
+        ctx.fillRect(x, y, size, size);
+      }
+    }
+  }
+  ctx.shadowBlur = 0;
+}
+
+function PixelClockCanvas({ hours, minutes }) {
+  const canvasRef = useRef(null);
+  const [tick, setTick] = useState(0);
+
+  useEffect(() => {
+    const id = setInterval(() => setTick(t => t + 1), 100);
+    return () => clearInterval(id);
+  }, []);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const dpr = window.devicePixelRatio || 1;
+    const { cell, canvasW, canvasH } = PX;
+    const logicalW = canvasW * cell;
+    const logicalH = canvasH * cell;
+    canvas.width = logicalW * dpr;
+    canvas.height = logicalH * dpr;
+    canvas.style.width = logicalW + 'px';
+    canvas.style.height = logicalH + 'px';
+    const ctx = canvas.getContext('2d');
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.imageSmoothingEnabled = false;
+
+    // background
+    ctx.fillStyle = '#050505';
+    ctx.fillRect(0, 0, logicalW, logicalH);
+    drawBgDots(ctx, logicalW, logicalH);
+
+    const hh = String(hours).padStart(2, '0');
+    const mm = String(minutes).padStart(2, '0');
+    const chars = [hh[0], hh[1], ':', mm[0], mm[1]];
+
+    // x positions for each element (cell units)
+    const xPos = [
+      PX.layout.padX,
+      PX.layout.padX + PX.layout.digitW + PX.layout.gapW,
+      0, // colon placeholder
+      PX.layout.padX + 2 * PX.layout.digitW + 3 * PX.layout.gapW,
+      PX.layout.padX + 3 * PX.layout.digitW + 4 * PX.layout.gapW,
+    ];
+    // colon x center
+    const colonX = xPos[1] + PX.layout.digitW + PX.layout.gapW;
+
+    // draw digits
+    for (let i = 0; i < 5; i++) {
+      if (chars[i] === ':') continue;
+      drawPixelDigit(ctx, xPos[i] * cell, PX.layout.padY * cell, chars[i]);
+    }
+
+    // draw colon (two squares, blink together)
+    const t = Date.now() / 1000;
+    const blinkAlpha = 0.2 + 0.8 * (0.5 + 0.5 * Math.cos(t * Math.PI / 1.5)); // 1Hz breathing
+    ctx.globalAlpha = blinkAlpha;
+    ctx.fillStyle = '#ffffff';
+    ctx.shadowColor = 'rgba(255,255,255,0.18)';
+    ctx.shadowBlur = 5;
+    // top dot at row 2, bottom dot at row 4
+    const colCY = PX.layout.padY * cell;
+    ctx.fillRect(colonX * cell, colCY + 2 * cell, PX.size, PX.size);
+    ctx.fillRect(colonX * cell, colCY + 4 * cell, PX.size, PX.size);
+    ctx.shadowBlur = 0;
+    ctx.globalAlpha = 1;
+  }, [hours, minutes, tick]);
+
+  return <canvas ref={canvasRef} className="pixel-clock-canvas" aria-hidden="true" />;
+}
+
+function Spectrum({ active, progressRatio, visualRef }) {
+  const bars = useMemo(() => {
+    return Array.from({ length: SPECTRUM_BARS }, (_, index) => {
+      const phase = Math.sin(index * 0.35 + progressRatio * 8);
+      const wave = Math.sin(index * 0.14 - progressRatio * 12);
+      const sparkle = index % 13 === Math.floor(progressRatio * 13);
+      return {
+        height: 12 + Math.abs(phase * 24) + Math.abs(wave * 15),
+        speed: `${820 + (index % 11) * 46}ms`,
+        sparkle
+      };
+    });
+  }, [progressRatio]);
+
+  return (
+    <div className={`spectrum ${active ? 'is-active' : ''}`} aria-hidden="true" ref={visualRef}>
+      {bars.map((bar, index) => (
+        <span
+          className={bar.sparkle ? 'sparkle' : ''}
+          key={index}
+          style={{ '--i': index, '--h': `${bar.height}px`, '--speed': bar.speed }}
+        />
+      ))}
+    </div>
+  );
+}
+
+function ParticleWave({ progressRatio, active, onSeek, onPreview, onCommit, onSeekStart, visualRef }) {
+  return (
+    <div className={`particle-wave ${active ? 'is-active' : ''}`} ref={visualRef}>
+      <div className="particle-bars" aria-hidden="true">
+        {Array.from({ length: PARTICLE_BARS }, (_, index) => {
+          const played = index / PARTICLE_BARS <= progressRatio;
+          return (
+            <span
+              className={played ? 'played' : ''}
+              key={index}
+              style={{ '--i': index, '--h': `${8 + ((index * 7) % 18)}px` }}
+            />
+          );
+        })}
+      </div>
+      <input
+        aria-label="拖动播放进度"
+        max="1000"
+        min="0"
+        onBlur={(event) => onCommit?.(Number(event.currentTarget.value) / 1000)}
+        onChange={(event) => (onPreview || onSeek)(Number(event.currentTarget.value) / 1000)}
+        onInput={(event) => onPreview?.(Number(event.currentTarget.value) / 1000)}
+        onKeyUp={(event) => onCommit?.(Number(event.currentTarget.value) / 1000)}
+        onPointerDown={onSeekStart}
+        onPointerUp={(event) => onCommit?.(Number(event.currentTarget.value) / 1000)}
+        type="range"
+        value={Math.round(progressRatio * 1000)}
+      />
+    </div>
+  );
+}
+
+function DjFeed({ introSegments, lyrics, lyricIndex, plan, queue, reading, readWordIndex, showLyrics, readingCardIndex, introText, introDoneFor, cardSegments, cardWordIndex }) {
+  const currentLyric = lyrics[lyricIndex]?.text || '旋律正在流动。';
+  const displayTracks = queue?.slice(0, 2) || [];
+  const djText = introText || plan?.plan?.say || '';
+  const showIntroPara = !showLyrics && djText && (
+    (!reading && introDoneFor === null) || (reading && readingCardIndex === -1)
+  );
+  const activeCardIndex = reading && readingCardIndex >= 0 ? readingCardIndex : null;
+  const visibleCards = (() => {
+    if (activeCardIndex !== null) {
+      // 正在朗读某张卡片：只显示该卡片
+      return displayTracks.filter((_, idx) => idx === activeCardIndex);
+    }
+    // 未朗读时：如果有歌曲已播完（introDoneFor 非空），仅显示当前活跃的卡片
+    if (introDoneFor) {
+      return displayTracks.filter((t) => t?.id === introDoneFor);
+    }
+    return displayTracks;
+  })();
+  return (
+    <div className={reading ? 'dj-feed is-reading' : 'dj-feed'}>
+      {showLyrics ? (
+        <p className="lyric-feed">
+          <span className="feed-meta">MarkRadio · {formatTime(lyrics[lyricIndex]?.time || 0)}</span>
+          <span className="typing-line lyric-current-line">{currentLyric}</span>
+        </p>
+      ) : (
+        <>
+          {showIntroPara ? (
+          <p>
+            <span className="feed-meta">MarkRadio · 0:01</span>
+            <span className="typing-line word-line">
+              {reading && readingCardIndex === -1 ? (
+                introSegments.map((segment, index) => (
+                  <span
+                    className={
+                      reading && index === readWordIndex
+                        ? 'word active'
+                        : index < readWordIndex
+                          ? 'word read'
+                          : 'word pending'
+                    }
+                    key={`${segment.token}-${index}`}
+                  >
+                    {segment.token}
+                    {reading && index === readWordIndex ? <b className="cursor">▌</b> : null}
+                  </span>
+                ))
+              ) : (
+                <span>{djText}</span>
+              )}
+            </span>
+          </p>
+          ) : null}
+          {visibleCards.map((track, i) => {
+            const actualIndex = activeCardIndex !== null ? activeCardIndex : i;
+            const title = track?.title ? `《${track.title}》${track.artist ? ' - ' + track.artist : ''}` : '';
+            const isReadingThis = reading && readingCardIndex === actualIndex;
+            const reason = track?.reason || plan?.plan?.segue || '';
+            const isFinished = !isReadingThis && introDoneFor && track?.id !== introDoneFor;
+            return (
+              <div className={`dj-track-card${isReadingThis ? ' is-reading-card' : ''}${isFinished ? ' is-finished' : ''}`} key={track.id || i}>
+                {reason ? (
+                <p className={i === 0 ? 'soft-line' : 'muted-line'}>
+                  <span className="feed-meta">MarkRadio · {i === 0 ? '0:08' : '0:14'}</span>
+                  <span>
+                    {isReadingThis && cardSegments.length > 0 ? (
+                      cardSegments.map((segment, idx) => (
+                        <span
+                          className={
+                            idx === cardWordIndex
+                              ? 'word active'
+                              : idx < cardWordIndex
+                                ? 'word read'
+                                : 'word pending'
+                          }
+                          key={`card-${segment.token}-${idx}`}
+                        >
+                          {segment.token}
+                          {idx === cardWordIndex ? <b className="cursor">▌</b> : null}
+                        </span>
+                      ))
+                    ) : (
+                      <>{isReadingThis ? <b className="cursor">▌</b> : null}{reason}</>
+                    )}
+                  </span>
+                </p>
+                ) : null}
+                {title ? <p className="dj-track-title">{title}</p> : null}
+              </div>
+            );
+          })}
+        </>
+      )}
+    </div>
+  );
+}
+
+function QueuePreview({ queue, currentId, onRefresh, busy }) {
+  return (
+    <div className={busy ? 'queue-preview is-refreshing' : 'queue-preview'}>
+      <div className="queue-title">
+        <span>Next Signal</span>
+        <button aria-label="刷新推荐" disabled={busy} onClick={onRefresh}>{busy ? '…' : '↻'}</button>
+      </div>
+      {queue.slice(0, 2).map((item) => (
+        <div className={item.id === currentId ? 'queue-item current' : 'queue-item'} key={item.id}>
+          <span>{item.title}</span>
+          <small>{item.artist}</small>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+export default function App() {
+  const [state, setState] = useState(null);
+  const [status, setStatus] = useState(null);
+  const [selectedMood, setSelectedMood] = useState('平静');
+  const [busy, setBusy] = useState(false);
+  const [clock, setClock] = useState(new Date());
+  const [netease, setNetease] = useState({ loggedIn: false, profile: null });
+  const [qr, setQr] = useState(null);
+  const [qrMessage, setQrMessage] = useState('');
+  const [castDevices, setCastDevices] = useState([]);
+  const [castDevice, setCastDevice] = useState(null);
+  const [castState, setCastState] = useState('idle');
+  const [showCastPanel, setShowCastPanel] = useState(false);
+  const [castDiscovering, setCastDiscovering] = useState(false);
+  const [localProgress, setLocalProgress] = useState(0);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [reading, setReading] = useState(false);
+  const [readProgress, setReadProgress] = useState(0);
+  const [introDoneFor, setIntroDoneFor] = useState(null);
+  const [readingCardIndex, setReadingCardIndex] = useState(-1);
+  const [volumeTarget, setVolumeTarget] = useState(1);
+  const [pendingPlay, setPendingPlay] = useState(false);
+  const audioRef = useRef(null);
+  const djAudioRef = useRef(null);
+  const spectrumRef = useRef(null);
+  const particleRef = useRef(null);
+  const audioContextRef = useRef(null);
+  const analyserRef = useRef(null);
+  const analyserDataRef = useRef(null);
+  const mediaSourcesRef = useRef(new Map());
+  const visualFrameRef = useRef(null);
+  const typeTimerRef = useRef(null);
+  const fadeTimerRef = useRef(null);
+  const readRafRef = useRef(null);
+  const seekCommitTimerRef = useRef(null);
+  const introAudioCacheRef = useRef(new Map());
+  const autoplayOptionsRef = useRef({ skipIntro: false });
+  const [autoplayToken, setAutoplayToken] = useState(0);
+  const [seekDraftRatio, setSeekDraftRatio] = useState(null);
+
+  function syncReadProgress(ratio) {
+    const safeRatio = Math.min(1, Math.max(0, ratio));
+    setReadProgress(safeRatio);
+  }
+
+  useEffect(() => {
+    let mounted = true;
+    Promise.all([api.status(), api.now(), api.neteaseStatus()]).then(([statusData, nowData, neteaseData]) => {
+      if (!mounted) return;
+      setStatus(statusData);
+      setState(nowData);
+      setNetease(neteaseData);
+      setSelectedMood(nowData.now?.mood || '平静');
+    }).catch(() => {});
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    const timer = setInterval(() => setClock(new Date()), 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  useEffect(() => {
+    let socket;
+    try {
+      socket = new WebSocket(streamUrl());
+      socket.onmessage = (event) => {
+        const message = JSON.parse(event.data);
+        if (message.event === 'now') setState(message.payload);
+        if (message.event === 'plan') setState((current) => ({ ...(current || {}), plan: message.payload }));
+        if (message.event === 'mood') setSelectedMood(message.payload.current);
+      };
+    } catch {
+      return undefined;
+    }
+    return () => socket?.close();
+  }, []);
+
+  const now = state?.now || {};
+  const plan = state?.plan;
+  const queue = plan?.queue || [];
+  const track = now.track || queue[0] || {};
+  const queueIndex = queue.findIndex((item) => item.id === track.id);
+  const trackUrl = apiAssetUrl(track.url || '');
+  const ttsText = plan?.tts?.text || '';
+  const isPlanIntroTrack = Boolean(queue[0]?.id && track.id === queue[0].id);
+  const ttsMatchesTrack = Boolean(
+    ttsText && track.title && normalizeTitleText(ttsText).includes(normalizeTitleText(track.title))
+  );
+  const planDjUrl = isPlanIntroTrack && Boolean(plan?.tts?.url) && (ttsMatchesTrack || !ttsText)
+    ? apiAssetUrl(plan.tts.url)
+    : '';
+  const duration = audioRef.current?.duration && Number.isFinite(audioRef.current.duration)
+    ? audioRef.current.duration
+    : track.duration || 207;
+  const progress = trackUrl ? localProgress : now.progress || 0;
+  const progressRatio = Math.min(1, Math.max(0, progress / duration));
+  const displayProgressRatio = seekDraftRatio ?? progressRatio;
+  const weather = plan?.weather || {};
+  const metaLine = `${weather.city || '本地'} | ${weatherIcon(weather.condition)} ${weather.temperature ? `${Math.round(weather.temperature)}°` : weather.condition || '天气'} | ${moodIcon[selectedMood]} ${selectedMood} | 电台`;
+  const introText = useMemo(() => {
+    return buildTrackIntroText({ isPlanIntroTrack, plan, queueIndex, track, ttsText });
+  }, [isPlanIntroTrack, plan, queueIndex, track, ttsText]);
+  const readingSequence = useMemo(() => {
+    const parts = [{ text: introText, cardIndex: -1 }];
+    if (queue[0]?.reason) parts.push({ text: queue[0].reason, cardIndex: 0 });
+    if (queue[1]?.reason) parts.push({ text: queue[1].reason, cardIndex: 1 });
+    const fullText = parts.map((p) => p.text).filter(Boolean).join('\n');
+    const boundaries = [];
+    let total = 0;
+    for (const p of parts) { total += (p.text || '').length; boundaries.push(total); }
+    return { parts, fullText, boundaries, totalLength: fullText.length };
+  }, [introText, queue]);
+  const introSegments = useMemo(() => segmentTextWithOffsets(introText), [introText]);
+  const readCharCount = Math.ceil(introText.length * readProgress);
+  const readWordIndex = activeTokenIndex(introSegments, readCharCount);
+
+  const cardSegments = useMemo(() => {
+    if (readingCardIndex < 0 || !queue[readingCardIndex]?.reason) return [];
+    return segmentTextWithOffsets(queue[readingCardIndex].reason);
+  }, [readingCardIndex, queue]);
+  const cardReadCharCount = useMemo(() => {
+    if (!cardSegments.length) return 0;
+    return Math.ceil((queue[readingCardIndex]?.reason || '').length * readProgress);
+  }, [cardSegments, readProgress, readingCardIndex, queue]);
+  const cardWordIndex = useMemo(() => {
+    if (!cardSegments.length) return 0;
+    return activeTokenIndex(cardSegments, cardReadCharCount);
+  }, [cardSegments, cardReadCharCount]);
+
+  const lyrics = useMemo(() => {
+    const source = track.lyric?.length ? track.lyric : fallbackLyrics({ introText, plan });
+    return source.filter((line) => line.text?.trim() && !isCreditLine(line.text));
+  }, [introText, plan, track.lyric]);
+  const lyricIndex = currentLyricIndex(lyrics, progress);
+  const showLyrics = introDoneFor === track.id && !reading;
+
+  useEffect(() => {
+    clearInterval(typeTimerRef.current);
+    clearInterval(fadeTimerRef.current);
+    cancelAnimationFrame(readRafRef.current);
+    stopAudioVisuals();
+    clearTimeout(seekCommitTimerRef.current);
+    setLocalProgress(0);
+    setSeekDraftRatio(null);
+    setReading(false);
+    setReadProgress(0);
+    setIntroDoneFor(null);
+    setVolumeTarget(1);
+    if (audioRef.current) audioRef.current.volume = 1;
+    if (djAudioRef.current) {
+      djAudioRef.current.pause();
+      djAudioRef.current.removeAttribute('src');
+    }
+    setReadingCardIndex(-1);
+  }, [track.id]);
+
+  useEffect(() => {
+    if (!autoplayToken || !track.id || !trackUrl) return undefined;
+    const options = autoplayOptionsRef.current;
+    const timer = setTimeout(() => startPlayback(options), 220);
+    return () => clearTimeout(timer);
+  }, [autoplayToken, track.id, trackUrl]);
+
+  useEffect(() => () => {
+    clearInterval(typeTimerRef.current);
+    clearInterval(fadeTimerRef.current);
+    cancelAnimationFrame(readRafRef.current);
+    stopAudioVisuals();
+    clearTimeout(seekCommitTimerRef.current);
+  }, []);
+
+  async function chooseMood(mood) {
+    setSelectedMood(mood);
+    setBusy(true);
+    try {
+      await api.setMood(mood);
+      await refreshPlan(mood, true);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function refreshPlan(mood = selectedMood, autoplay = false) {
+    setBusy(true);
+    try {
+      await pausePlayback();
+      const nextPlan = await api.planToday(mood);
+      const nextNow = await api.now();
+      setState({ ...nextNow, plan: nextPlan });
+      if (autoplay) {
+        autoplayOptionsRef.current = { skipIntro: false };
+        setAutoplayToken((value) => value + 1);
+      }
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function playback() {
+    if (pendingPlay) return;
+    if (isPlaying || reading) {
+      await pausePlayback();
+      return;
+    }
+    await startPlayback();
+  }
+
+  async function pausePlayback() {
+    clearInterval(typeTimerRef.current);
+    clearInterval(fadeTimerRef.current);
+    cancelAnimationFrame(readRafRef.current);
+    stopAudioVisuals();
+    audioRef.current?.pause();
+    djAudioRef.current?.pause();
+    setIsPlaying(false);
+    setReading(false);
+    await api.playback('pause').catch(() => {});
+  }
+
+  async function startPlayback(options = {}) {
+    if (pendingPlay) return;
+    setPendingPlay(true);
+    const audio = audioRef.current;
+    try {
+      if (!audio) return;
+      if (trackUrl && audio.src !== trackUrl) audio.src = trackUrl;
+      audio.onended = handleEnded;
+      const needsIntro = !options.skipIntro && introDoneFor !== track.id;
+      if (trackUrl) {
+        if (audio.src !== trackUrl) audio.src = trackUrl;
+        const startVolume = needsIntro ? 0 : (options.skipIntro || introDoneFor === track.id ? 1 : BED_VOLUME);
+        audio.volume = startVolume;
+        setVolumeTarget(needsIntro ? 0 : BED_VOLUME);
+        await audio.play().catch(() => {});
+        if (!needsIntro) {
+          setIsPlaying(true);
+          startAudioVisuals(audio);
+        }
+      }
+      await api.playback('play').catch(() => {});
+      if (options.skipIntro) {
+        setReading(false);
+        setReadProgress(1);
+        setIntroDoneFor(track.id);
+        fadeToFullVolume();
+        return;
+      }
+      if (needsIntro) await runIntro();
+    } finally {
+      setPendingPlay(false);
+    }
+  }
+
+  async function resolveCardAudioUrl(index) {
+    const cardTts = plan?.cardTts?.[index];
+    // 优先使用预生成的 TTS
+    if (cardTts?.ok && cardTts.url) {
+      return apiAssetUrl(cardTts.url);
+    }
+    // 回退：调用 API 生成
+    const reason = queue[index]?.reason;
+    if (!reason) return '';
+    const cached = introAudioCacheRef.current.get(reason);
+    if (cached) return cached;
+    const result = await api.voicePreview({ text: reason, mood: selectedMood }).catch(() => null);
+    const url = result?.ok && result.url ? apiAssetUrl(result.url) : '';
+    if (url) introAudioCacheRef.current.set(reason, url);
+    return url;
+  }
+  
+    async function resolveIntroAudioUrl() {
+    if (!introText) return '';
+    if (planDjUrl) return planDjUrl;
+    const cached = introAudioCacheRef.current.get(introText);
+    if (cached) return cached;
+    const result = await api.voicePreview({ text: introText, mood: selectedMood }).catch(() => null);
+    const url = result?.ok && result.url ? apiAssetUrl(result.url) : '';
+    if (url) introAudioCacheRef.current.set(introText, url);
+    return url;
+  }
+
+  function fadeMusicIn() {
+    const audio = audioRef.current;
+    if (!audio) return;
+    const start = Math.max(BED_VOLUME, audio.volume);
+    let step = 0;
+    const totalSteps = 20;
+    clearInterval(fadeTimerRef.current);
+    fadeTimerRef.current = setInterval(() => {
+      step += 1;
+      const next = Math.min(1, start + (1 - start) * (step / totalSteps));
+      audio.volume = next;
+      setVolumeTarget(next);
+      if (step >= totalSteps) {
+        clearInterval(fadeTimerRef.current);
+        audio.volume = 1;
+        setVolumeTarget(1);
+      }
+    }, 120);
+  }
+
+  function setMusicVolume(vol) {
+    const audio = audioRef.current;
+    if (audio) {
+      audio.volume = Math.max(0, Math.min(1, vol));
+    }
+  }
+
+  async function runIntro() {
+    clearInterval(typeTimerRef.current);
+    clearInterval(fadeTimerRef.current);
+    cancelAnimationFrame(readRafRef.current);
+    setReading(true);
+    setReadProgress(0);
+
+    // 第二首歌起：跳过完整导播 TTS，只读该歌导读，背景音乐低音量铺垫
+    if (queueIndex > 0) {
+      if (audioRef.current) {
+        setMusicVolume(BED_VOLUME);
+        audioRef.current.volume = BED_VOLUME;
+        setVolumeTarget(BED_VOLUME);
+      }
+      setReadingCardIndex(queueIndex);
+      const reason = queue[queueIndex]?.reason;
+      if (reason) await readTextSegment(reason);
+      await finishIntro();
+      return;
+    }
+
+    setReadingCardIndex(-1);
+    // 主导读期间背景音乐已暂停
+    if (audioRef.current) {
+      audioRef.current.onended = null;
+      clearInterval(fadeTimerRef.current);
+    }
+    const djAudio = djAudioRef.current;
+    const introAudioUrl = await resolveIntroAudioUrl();
+    if (introAudioUrl && djAudio) {
+      djAudio.pause();
+      djAudio.removeAttribute('src');
+      djAudio.load();
+      djAudio.src = introAudioUrl;
+      djAudio.currentTime = 0;
+      djAudio.onended = finishIntro;
+      djAudio.onerror = finishIntro;
+      djAudio.volume = 1.0;
+      djAudio.play()
+        .then(() => {
+          startDjProgressLoop(djAudio);
+          startAudioVisuals(djAudio);
+        })
+        .catch(() => finishIntro());
+      return;
+    }
+    runTextOnlyIntro();
+  }
+
+  async function readCurrentSongReason() {
+    // TTS 读完 intro 后，朗读当前歌曲的导读文案
+    const reason = queue[queueIndex]?.reason;
+    if (reason) {
+      setReadingCardIndex(queueIndex >= 0 ? queueIndex : 0);
+      await readTextSegment(reason);
+    }
+    finishIntro();
+  }
+
+    function speakCardReason(text) {
+    if (!text || typeof speechSynthesis === 'undefined') return null;
+    speechSynthesis.cancel();
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.lang = 'zh-CN';
+    utterance.rate = 0.85;
+    utterance.pitch = 1.0;
+    utterance.volume = 0.9;
+    let voices = speechSynthesis.getVoices();
+    if (!voices.length) {
+      // 语音列表异步加载，延迟再次获取
+      speechSynthesis.onvoiceschanged = () => {
+        const v2 = speechSynthesis.getVoices();
+        const zh = v2.find(v => v.lang.startsWith('zh'));
+        if (zh) utterance.voice = zh;
+      };
+    } else {
+      const zhVoice = voices.find(v => v.lang.startsWith('zh'));
+      if (zhVoice) utterance.voice = zhVoice;
+    }
+    speechSynthesis.speak(utterance);
+    return utterance;
+  }
+  
+  async function readTextSegment(text) {
+    return new Promise((resolve) => {
+      const totalMs = Math.max(3000, text.length * 180);
+      const startedAt = performance.now();
+      setReadProgress(0);
+      setReading(true);
+      const timer = setInterval(() => {
+        const elapsed = performance.now() - startedAt;
+        const ratio = Math.min(1, elapsed / totalMs);
+        setReadProgress(ratio);
+        if (ratio >= 1) {
+          clearInterval(timer);
+          resolve();
+        }
+      }, 30);
+    });
+  }
+
+  function startDjProgressLoop(djAudio) {
+    cancelAnimationFrame(readRafRef.current);
+    const fallbackTotalMs = Math.max(6000, introText.length * 220);
+    const fallbackStartedAt = performance.now() - Math.max(0, djAudio.currentTime || 0) * 1000;
+    const tick = () => {
+      const hasDuration = djAudio.duration && Number.isFinite(djAudio.duration);
+      const ratio = hasDuration
+        ? djAudio.currentTime / djAudio.duration
+        : (performance.now() - fallbackStartedAt) / fallbackTotalMs;
+      syncReadProgress(ratio);
+      if (!djAudio.paused && !djAudio.ended && ratio < 1) {
+        readRafRef.current = requestAnimationFrame(tick);
+      }
+    };
+    tick();
+  }
+
+  async function runTextOnlyIntro() {
+    // 无 TTS 时
+    if (queueIndex > 0) {
+      // 非第一首歌：只读该歌导读
+      if (audioRef.current) audioRef.current.volume = BED_VOLUME;
+      setReadingCardIndex(queueIndex);
+      const reason = queue[queueIndex]?.reason;
+      if (reason) await readTextSegment(reason);
+      await finishIntro();
+      return;
+    }
+    // 第一首歌：朗读主导读（无背景音乐）→ 启动背景音乐 → 读卡片
+    setReadingCardIndex(-1);
+    await readTextSegment(introText);
+    // 启动背景音乐
+    const audio = audioRef.current;
+    if (audio && trackUrl) {
+      audio.src = trackUrl;
+      audio.volume = BED_VOLUME;
+      audio.play().catch(() => {});
+      setIsPlaying(true);
+      startAudioVisuals(audio);
+    }
+    const reason = queue[0]?.reason;
+    if (reason) {
+      setReadingCardIndex(0);
+      const cardUrl = await resolveCardAudioUrl(0);
+      const djAudio = djAudioRef.current;
+      if (cardUrl && djAudio) {
+        djAudio.src = cardUrl;
+        djAudio.volume = 1;
+        djAudio.play().catch(() => {});
+      }
+      await readTextSegment(reason);
+      if (djAudio) djAudio.pause();
+    }
+    finishIntro();
+  }
+
+  async function finishIntro() {
+    clearInterval(typeTimerRef.current);
+    cancelAnimationFrame(readRafRef.current);
+    stopAudioVisuals();
+    // 主导读 TTS 结束后（第一首歌）：调高背景音乐音量并朗读第一首歌导读卡片
+    if (queueIndex === 0 && readingCardIndex === -1) {
+      const audio = audioRef.current;
+      if (audio) {
+        audio.volume = BED_VOLUME;
+        setVolumeTarget(BED_VOLUME);
+        setIsPlaying(true);
+        startAudioVisuals(audio);
+      }
+      const firstReason = queue[0]?.reason;
+      if (firstReason) {
+        setReadingCardIndex(0);
+        const cardUrl = await resolveCardAudioUrl(0);
+        const djAudio = djAudioRef.current;
+        if (cardUrl && djAudio) {
+          djAudio.src = cardUrl;
+          djAudio.volume = 1;
+          djAudio.play().catch(() => {});
+          // 用 TTS 时长或估算
+          const totalMs = djAudio.duration && Number.isFinite(djAudio.duration)
+            ? djAudio.duration * 1000
+            : Math.max(5000, firstReason.length * 200);
+          await readTextSegment(firstReason);
+          djAudio.pause();
+        } else {
+          await readTextSegment(firstReason);
+        }
+        setReading(false);
+        setReadingCardIndex(null);
+        setReadProgress(1);
+        setIntroDoneFor(track.id);
+        resumeMusicAfterIntro();
+        return;
+      }
+    }
+    setReading(false);
+    setReadingCardIndex(null);
+    setReadProgress(1);
+    setIntroDoneFor(track.id);
+    resumeMusicAfterIntro();
+  }
+
+  function resumeMusicAfterIntro() {
+    const audio = audioRef.current;
+    if (!audio || !trackUrl) {
+      fadeToFullVolume();
+      return;
+    }
+    if (audio.src !== trackUrl) audio.src = trackUrl;
+    audio.onended = handleEnded;
+    // If track already ended during DJ intro, skip to next
+    if (audio.ended || (audio.duration && audio.currentTime >= audio.duration - 0.3)) {
+      setMusicVolume(1);
+      setVolumeTarget(1);
+      handleEnded();
+      return;
+    }
+    setVolumeTarget(1);
+    clearInterval(fadeTimerRef.current);
+    audio.play()
+      .then(() => {
+        setIsPlaying(true);
+        startAudioVisuals(audio);
+        fadeMusicIn();
+        api.playback('play').catch(() => {});
+      })
+      .catch(() => {
+        setIsPlaying(false);
+        setMusicVolume(1);
+      });
+  }
+
+  function fadeToFullVolume() {
+    clearInterval(fadeTimerRef.current);
+    const audio = audioRef.current;
+    if (!audio) return;
+    fadeTimerRef.current = setInterval(() => {
+      const next = Math.min(1, audio.volume + 0.035);
+      audio.volume = next;
+      setVolumeTarget(next);
+      if (next >= 1) clearInterval(fadeTimerRef.current);
+    }, 160);
+  }
+
+  async function handleEnded() {
+    const audio = audioRef.current;
+    if (!audio || handleEnded._busy) return;
+    handleEnded._busy = true;
+    try {
+      const currentIndex = queue.findIndex((item) => item.id === track.id);
+      if (currentIndex >= 0 && currentIndex < queue.length - 1) {
+        const nextTrack = queue[currentIndex + 1];
+        if (nextTrack?.url) {
+          stopAudioVisuals();
+          const nextUrl = apiAssetUrl(nextTrack.url);
+          // 加载下一首歌并作为背景音乐低音量播放
+          audio.src = nextUrl;
+          audio.load();
+          setLocalProgress(0);
+          audio.volume = BED_VOLUME;
+          setVolumeTarget(BED_VOLUME);
+          audio.play().catch(() => {});
+          setIsPlaying(true);
+          startAudioVisuals(audio);
+          // 朗读导读（Fish Audio TTS）
+          setReading(true);
+          setReadingCardIndex(currentIndex + 1);
+          const reason = nextTrack.reason;
+          if (reason) {
+            const cardUrl = await resolveCardAudioUrl(currentIndex + 1);
+            const djAudio = djAudioRef.current;
+            if (cardUrl && djAudio) {
+              djAudio.src = cardUrl;
+              djAudio.volume = 1;
+              djAudio.play().catch(() => {});
+            }
+            await readTextSegment(reason);
+            if (djAudio) djAudio.pause();
+          }
+          // 读完后渐入全音量
+          setReading(false);
+          setReadingCardIndex(null);
+          setIntroDoneFor(nextTrack.id);
+          setIsPlaying(true);
+          startAudioVisuals(audio);
+          fadeToFullVolume();
+          audio.onended = handleEnded;
+          await api.playback('next').catch(() => {});
+          handleEnded._busy = false;
+          return;
+        }
+      }
+      await refreshPlan(selectedMood, true);
+    } finally {
+      handleEnded._busy = false;
+    }
+  }
+
+  function seekTo(ratio) {
+    commitTrackSeek(ratio);
+  }
+
+  function beginTrackSeek() {
+    setSeekDraftRatio(progressRatio);
+  }
+
+  function previewTrackSeek(ratio) {
+    const safeRatio = Math.min(1, Math.max(0, ratio));
+    setSeekDraftRatio(safeRatio);
+    if (duration) setLocalProgress(safeRatio * duration);
+  }
+
+  function commitTrackSeek(ratio) {
+    const safeRatio = Math.min(1, Math.max(0, ratio));
+    const audio = audioRef.current;
+    if (!audio || !duration) return;
+    audio.currentTime = safeRatio * duration;
+    setLocalProgress(audio.currentTime);
+    setSeekDraftRatio(null);
+    api.playback('seek', { progress: audio.currentTime }).catch(() => {});
+  }
+
+  function seekIntroTo(ratio) {
+    const safeRatio = Math.min(1, Math.max(0, ratio));
+    const djAudio = djAudioRef.current;
+    if (djAudio?.duration && Number.isFinite(djAudio.duration)) {
+      djAudio.currentTime = safeRatio * djAudio.duration;
+    }
+    syncReadProgress(safeRatio);
+  }
+
+  function seekBottomProgress(ratio) {
+    if (reading) {
+      seekIntroTo(ratio);
+      return;
+    }
+    commitTrackSeek(ratio);
+  }
+
+  function startAudioVisuals(mediaElement) {
+    stopAudioVisuals();
+    if (!mediaElement) return;
+    const analyser = setupAnalyser(mediaElement);
+    const frequencyData = analyser ? new Uint8Array(analyser.frequencyBinCount) : null;
+    const startedAt = performance.now();
+    const tick = () => {
+      let levels = null;
+      if (analyser && frequencyData) {
+        analyser.getByteFrequencyData(frequencyData);
+        levels = buildLevelsFromFrequency(frequencyData, SPECTRUM_BARS);
+      }
+      if (!levels || levels.every((level) => level < 0.02)) {
+        levels = buildFallbackLevels(mediaElement.currentTime || (performance.now() - startedAt) / 1000, SPECTRUM_BARS);
+      }
+      paintLevels(spectrumRef.current, levels);
+      paintLevels(particleRef.current, levels.slice(0, PARTICLE_BARS));
+      if (!mediaElement.paused && !mediaElement.ended) {
+        visualFrameRef.current = requestAnimationFrame(tick);
+      }
+    };
+    tick();
+  }
+
+  function stopAudioVisuals() {
+    cancelAnimationFrame(visualFrameRef.current);
+    paintLevels(spectrumRef.current, null);
+    paintLevels(particleRef.current, null);
+  }
+
+  function setupAnalyser(mediaElement) {
+    try {
+      const AudioContext = window.AudioContext || window.webkitAudioContext;
+      if (!AudioContext) return null;
+      const context = audioContextRef.current || new AudioContext();
+      audioContextRef.current = context;
+      if (context.state === 'suspended') context.resume().catch(() => {});
+      let sourceEntry = mediaSourcesRef.current.get(mediaElement);
+      if (!sourceEntry) {
+        sourceEntry = { source: context.createMediaElementSource(mediaElement), connected: false };
+        mediaSourcesRef.current.set(mediaElement, sourceEntry);
+      }
+      const analyser = analyserRef.current || context.createAnalyser();
+
+      analyser.fftSize = 256;
+      analyser.smoothingTimeConstant = 0.72;
+      if (!sourceEntry.connected) {
+        const isDj = mediaElement === djAudioRef.current;
+        // Always connect to destination so audio plays
+        sourceEntry.source.connect(context.destination);
+        // Tap for visualizer
+        sourceEntry.source.connect(analyser);
+        sourceEntry.connected = true;
+        sourceEntry._isDj = isDj;
+      }
+      if (!analyserRef.current) analyser.connect(context.destination);
+      analyserRef.current = analyser;
+      analyserDataRef.current = new Uint8Array(analyser.frequencyBinCount);
+      return analyser;
+    } catch {
+      return null;
+    }
+  }
+
+  async function handleCastDiscover() {
+    setCastDiscovering(true);
+    try {
+      const result = await api.castDevices();
+      setCastDevices(result.devices || []);
+    } catch (err) {
+      setCastDevices([]);
+    } finally {
+      setCastDiscovering(false);
+    }
+  }
+
+  async function handleCastConnect(device) {
+    try {
+      await api.castConnect(device.host, device.port);
+      setCastDevice(device);
+      setCastState('idle');
+      if (track?.originalUrl) {
+        await api.castPlay(track.originalUrl, {
+          title: track.title || '',
+          artist: track.artist || '',
+          album: track.album || ''
+        });
+        setCastState('playing');
+        if (audioRef.current) audioRef.current.pause();
+        setIsPlaying(false);
+      }
+    } catch (err) {
+      setCastDevice(null);
+      setCastState('idle');
+    }
+  }
+
+  async function handleCastDisconnect() {
+    try {
+      await api.castAction('stop');
+      await api.castAction('disconnect');
+    } catch (_) { /* ignore */ }
+    setCastDevice(null);
+    setCastState('idle');
+  }
+
+  useEffect(() => {
+    if (showCastPanel && castDevices.length === 0 && !castDiscovering) {
+      handleCastDiscover();
+    }
+  }, [showCastPanel]);
+
+  async function startNeteaseLogin() {
+    setQrMessage('');
+    try {
+      const nextQr = await api.neteaseQrCreate();
+      setQr(nextQr);
+      setQrMessage('请用网易云音乐 App 扫码');
+    } catch (error) {
+      setQr(null);
+      setQrMessage(`扫码登录失败：${error.message}`);
+    }
+  }
+
+  useEffect(() => {
+    if (!qr?.key) return undefined;
+    let stopped = false;
+    const timer = setInterval(async () => {
+      const result = await api.neteaseQrCheck(qr.key).catch(() => null);
+      if (!result || stopped) return;
+      setQrMessage(result.message || '');
+      if (result.loggedIn) {
+        stopped = true;
+        clearInterval(timer);
+        const statusData = await api.neteaseStatus();
+        setNetease(statusData);
+        setQr(null);
+        setQrMessage('网易云已登录');
+        await refreshPlan(selectedMood, false);
+      }
+      if (result.code === 800) {
+        stopped = true;
+        clearInterval(timer);
+        setQrMessage('二维码已过期，请重新生成');
+      }
+    }, 2200);
+    return () => {
+      stopped = true;
+      clearInterval(timer);
+    };
+  }, [qr, selectedMood]);
+
+  return (
+    <main className="shell">
+      <section className="stage" aria-label="十三哥的音乐之声播放器">
+        <div className="aura" />
+        <div className="phone">
+          <audio
+            crossOrigin="anonymous"
+            ref={audioRef}
+            src={trackUrl || undefined}
+            preload="auto"
+            onEnded={handleEnded}
+            onPause={() => setIsPlaying(false)}
+            onPlay={() => setIsPlaying(true)}
+            onTimeUpdate={(event) => setLocalProgress(event.currentTarget.currentTime)}
+          />
+          <audio crossOrigin="anonymous" ref={djAudioRef} preload="auto" />
+          <header className="hero-panel">
+            <div className="topline">
+              <div className="brand-lockup">
+                <button className="avatar" onClick={startNeteaseLogin} title="网易云登录">
+                  {netease.loggedIn && netease.profile?.avatarUrl ? (
+                    <img alt="网易云头像" src={netease.profile.avatarUrl} />
+                  ) : pixelCafe()}
+                </button>
+                <div>
+                  <h1>MarkRadio</h1>
+                  <div className="speaking">
+                    <span />
+                    {reading ? 'Speaking...' : isPlaying ? 'Playing...' : 'Ready'}
+                  </div>
+                </div>
+              </div>
+              <div className="top-status">
+                <div className="icon-row">
+                  <button
+                    className={netease.loggedIn ? 'icon-btn on' : 'icon-btn'}
+                    onClick={startNeteaseLogin}
+                    title={netease.loggedIn ? '网易云已连接' : '网易云未连接'}
+                  >
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                      <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
+                    </svg>
+                  </button>
+                  <button
+                    className={castState === 'playing' ? 'icon-btn on' : 'icon-btn'}
+                    onClick={() => setShowCastPanel(true)}
+                    title={castState === 'playing' ? `投屏中: ${castDevice?.name || ''}` : '投屏到智能音箱'}
+                  >
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M5 12.55a11 11 0 0 1 14.08 0"/>
+                      <path d="M1.42 9a16 16 0 0 1 21.16 0"/>
+                      <path d="M8.53 16.11a6 6 0 0 1 6.95 0"/>
+                      <circle cx="12" cy="20" r="1"/>
+                    </svg>
+                  </button>
+                </div>
+                <time>{formatTime(progress || clock.getSeconds())}</time>
+              </div>
+            </div>
+            {( () => {
+              const weekdays = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+              const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+              return (
+                <div className="hero-clock">
+                  <PixelClockCanvas hours={clock.getHours()} minutes={clock.getMinutes()} />
+                  <p className="hero-clock-weekday">{weekdays[clock.getDay()]}</p>
+                  <p className="hero-clock-date">{clock.getDate()} {months[clock.getMonth()]} {clock.getFullYear()}</p>
+                  <div className="hero-clock-status">
+                    <span className="status-dot" />
+                    <span className="status-text">ON AIR</span>
+                  </div>
+                </div>
+              );
+            })()}
+            <Spectrum active={isPlaying || reading} progressRatio={displayProgressRatio} visualRef={spectrumRef} />
+          </header>
+
+          <section className="card">
+            <div className="song-head">
+              <div>
+                <p className="eyebrow">{metaLine}</p>
+                <h2>{track.title || 'Monday Night Exhale'}</h2>
+                <p>{track.artist || 'Bread'}</p>
+                {!track.url ? <span className="source-note">Demo / 暂无可播放音源</span> : null}
+              </div>
+            </div>
+
+            <div className="track-row">
+              <button className="tiny-play" onClick={playback} aria-label="播放或暂停">
+                {pendingPlay ? '…' : isPlaying || reading ? 'Ⅱ' : '▶'}
+              </button>
+              <div className="progress draggable">
+                <span style={{ width: `${displayProgressRatio * 100}%` }} />
+                <input
+                  aria-label="拖动歌曲进度"
+                  max="1000"
+                  min="0"
+                  onBlur={(event) => commitTrackSeek(Number(event.currentTarget.value) / 1000)}
+                  onChange={(event) => previewTrackSeek(Number(event.currentTarget.value) / 1000)}
+                  onInput={(event) => previewTrackSeek(Number(event.currentTarget.value) / 1000)}
+                  onKeyUp={(event) => commitTrackSeek(Number(event.currentTarget.value) / 1000)}
+                  onPointerDown={beginTrackSeek}
+                  onPointerUp={(event) => commitTrackSeek(Number(event.currentTarget.value) / 1000)}
+                  type="range"
+                  value={Math.round(displayProgressRatio * 1000)}
+                />
+              </div>
+              <span className="duration">{formatTime(progress)} / {formatTime(duration)}</span>
+            </div>
+
+            <DjFeed
+              introSegments={introSegments}
+              lyricIndex={lyricIndex}
+              lyrics={lyrics}
+              plan={plan}
+              queue={queue}
+              reading={reading}
+              readWordIndex={readWordIndex}
+              showLyrics={showLyrics}
+              readingCardIndex={readingCardIndex}
+              introText={introText}
+              introDoneFor={introDoneFor}
+              cardSegments={cardSegments}
+              cardWordIndex={cardWordIndex}
+            />
+
+            <QueuePreview busy={busy} currentId={track.id} onRefresh={() => refreshPlan(selectedMood, false)} queue={queue} />
+
+            <div className="mood-strip" aria-label="选择心情">
+              {moodLabels.map((mood) => (
+                <button
+                  className={mood.name === selectedMood ? 'active' : ''}
+                  disabled={busy}
+                  key={mood.name}
+                  onClick={() => chooseMood(mood.name)}
+                  title={mood.name}
+                >
+                  <b>{mood.icon}</b>
+                  <small>{mood.en}</small>
+                </button>
+              ))}
+            </div>
+
+            <footer className="bottom-player">
+              <span>{formatTime(progress)}</span>
+              <ParticleWave
+                active={reading || isPlaying}
+                onCommit={reading ? seekIntroTo : commitTrackSeek}
+                onPreview={reading ? seekIntroTo : previewTrackSeek}
+                onSeek={seekBottomProgress}
+                onSeekStart={reading ? undefined : beginTrackSeek}
+                progressRatio={reading ? readProgress : displayProgressRatio}
+                visualRef={particleRef}
+              />
+              <button onClick={playback} aria-label="播放或暂停">
+                {busy || pendingPlay ? '…' : isPlaying || reading ? 'Ⅱ' : '▶'}
+              </button>
+            </footer>
+          </section>
+        </div>
+{showCastPanel ? (
+          <div className="qr-backdrop" role="dialog" aria-modal="true" aria-label="投屏设备选择">
+            <div className="qr-card cast-card">
+              <h3>投屏到智能音箱</h3>
+              {castDiscovering ? (
+                <p>正在搜索 UPnP/DLNA 设备...</p>
+              ) : castDevices.length === 0 ? (
+                <p>未发现设备，请确保音箱在同一网络。</p>
+              ) : (
+                <div className="cast-list">
+                  {castDevices.map((device) => (
+                    <button
+                      key={device.usn}
+                      className={castDevice?.usn === device.usn ? 'active' : ''}
+                      onClick={() => handleCastConnect(device)}
+                    >
+                      <span>⬢</span>
+                      <div>
+                        <strong>{device.name}</strong>
+                        <small>{device.host}:{device.port}</small>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              )}
+              <div className="cast-actions">
+                <button onClick={handleCastDiscover}>再搜</button>
+                {castDevice ? (
+                  <button onClick={handleCastDisconnect}>断开</button>
+                ) : null}
+                <button onClick={() => setShowCastPanel(false)}>关闭</button>
+              </div>
+            </div>
+          </div>
+        ) : null}
+
+        {qr ? (
+          <div className="qr-backdrop" role="dialog" aria-modal="true" aria-label="网易云扫码登录">
+            <div className="qr-card">
+              <h3>网易云扫码登录</h3>
+              {qr.qrimg ? <img src={qr.qrimg} alt="网易云登录二维码" /> : null}
+              <p>{qrMessage}</p>
+              <button onClick={() => setQr(null)}>关闭</button>
+            </div>
+          </div>
+        ) : null}
+      </section>
+    </main>
+  );
+}
