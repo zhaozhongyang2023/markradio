@@ -561,11 +561,13 @@ p {
 }
 
 .v4-live-row {
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
-  justify-content: space-between;
   min-width: 0;
   min-height: 58px;
+  max-width: 100%;
+  overflow: hidden;
   padding: 0 22px;
   background: rgba(255, 255, 255, 0.035);
   color: rgba(255, 255, 255, 0.7);
@@ -578,6 +580,7 @@ p {
   display: flex;
   align-items: center;
   min-width: 0;
+  max-width: 100%;
   overflow: hidden;
   gap: 12px;
   text-overflow: ellipsis;
@@ -586,14 +589,18 @@ p {
 
 .v4-live-row div.v4-live-lyric {
   display: block;
+  grid-column: 1 / -1;
+  min-width: 0;
   width: 100%;
   max-width: 100%;
+  contain: inline-size;
   overflow: hidden;
   color: rgba(255, 255, 255, 0.84);
   font-size: 18px;
   line-height: 1.35;
   text-overflow: ellipsis;
   white-space: nowrap;
+  word-break: normal;
 }
 
 .v4-live-row div span {
@@ -1899,6 +1906,7 @@ p {
   }
 
   .v4-live-row div.v4-live-lyric {
+    max-width: calc(100vw - 48px);
     font-size: 16px;
   }
 
