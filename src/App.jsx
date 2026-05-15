@@ -649,6 +649,7 @@ function V4RadioView({
   onRefresh,
   onSelectTrack,
   onSpeechInput,
+  onToggleFavorite,
   playback,
   pendingPlay,
   plan,
@@ -661,7 +662,8 @@ function V4RadioView({
   setChatInput,
   speechMessage,
   speechState,
-  track
+  track,
+  trackIsFavorite
 }) {
   const weekdays = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
   const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -754,7 +756,15 @@ function V4RadioView({
             <button onClick={playback} aria-label="播放或暂停">{pendingPlay && !reading ? '…' : isPlaying || reading ? 'Ⅱ' : '▶'}</button>
             <button onClick={nextTrack} aria-label="下一首">›</button>
             <button onClick={onRefresh} aria-label="刷新下一组">↻</button>
-            <button aria-label="收藏">♡</button>
+            <button
+              aria-label={trackIsFavorite ? '取消收藏' : '收藏'}
+              aria-pressed={trackIsFavorite}
+              className={trackIsFavorite ? 'is-favorite' : ''}
+              onClick={onToggleFavorite}
+              type="button"
+            >
+              {trackIsFavorite ? '♥' : '♡'}
+            </button>
           </div>
           <div className="v4-volume">
             <span>VOL</span>
@@ -893,6 +903,7 @@ export default function App() {
   const [pendingPlay, setPendingPlay] = useState(false);
   const [chatInput, setChatInput] = useState('');
   const [chatBusy, setChatBusy] = useState(false);
+  const [favoriteTrackIds, setFavoriteTrackIds] = useState([]);
   const [chatMessages, setChatMessages] = useState(() => [{
     id: 'hello',
     role: 'dj',
@@ -1187,6 +1198,7 @@ export default function App() {
   }, [introText, plan, track.lyric]);
   const lyricIndex = currentLyricIndex(lyrics, progress);
   const showLyrics = introDoneFor === track.id && !reading;
+  const trackIsFavorite = Boolean(track.id && favoriteTrackIds.includes(track.id));
 
   // V3: pulse only on song switch / refresh / load, not periodic
 
@@ -1712,6 +1724,41 @@ export default function App() {
     setAutoplayToken((value) => value + 1);
   }
 
+  async function toggleFavoriteTrack() {
+    if (!track.id) return;
+    const nextFavorite = !favoriteTrackIds.includes(track.id);
+    if (!netease.loggedIn) {
+      setChatMessages((items) => [
+        ...items,
+        { id: `fav-login-${Date.now()}`, role: 'system', text: '请先登录网易云音乐，再同步收藏。', meta: 'FAV' }
+      ]);
+      startNeteaseLogin();
+      return;
+    }
+    try {
+      const result = await api.neteaseLike(track, nextFavorite);
+      setFavoriteTrackIds((ids) => (
+        result.liked
+          ? [...new Set([...ids, track.id])]
+          : ids.filter((id) => id !== track.id)
+      ));
+      setChatMessages((items) => [
+        ...items,
+        {
+          id: `fav-${Date.now()}`,
+          role: 'system',
+          text: `${result.liked ? '已同步到网易云喜欢音乐' : '已从网易云喜欢音乐移除'}: ${track.title}${track.artist ? ` · ${track.artist}` : ''}`,
+          meta: 'FAV'
+        }
+      ]);
+    } catch (error) {
+      setChatMessages((items) => [
+        ...items,
+        { id: `fav-error-${Date.now()}`, role: 'system', text: `网易云收藏失败：${error.message}`, meta: 'ERROR' }
+      ]);
+    }
+  }
+
   async function selectQueueTrack(index, trackId = '') {
     if (refreshingRef.current || busy || pendingPlay) return;
     const item = queue.find((track) => track.id === trackId) || queue[index];
@@ -2172,6 +2219,7 @@ function seekTo(ratio) {
           onRefresh={() => refreshPlan(selectedMood, false)}
           onSelectTrack={selectQueueTrack}
           onSpeechInput={startSpeechInput}
+          onToggleFavorite={toggleFavoriteTrack}
           playback={playback}
           pendingPlay={pendingPlay}
           plan={plan}
@@ -2185,6 +2233,7 @@ function seekTo(ratio) {
           speechMessage={speechMessage}
           speechState={speechState}
           track={track}
+          trackIsFavorite={trackIsFavorite}
         />
         {modalNodes}
       </>

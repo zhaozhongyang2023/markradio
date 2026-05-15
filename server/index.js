@@ -82,6 +82,27 @@ app.post('/api/netease/qr/check', async (request) => {
   return checkNeteaseQr(store, key);
 });
 
+app.post('/api/netease/like', async (request, reply) => {
+  const status = await getNeteaseLoginStatus(store).catch(() => ({ loggedIn: false }));
+  if (!status.loggedIn) {
+    return reply.code(401).send({ ok: false, message: '请先登录网易云音乐' });
+  }
+
+  const track = request.body?.track || {};
+  const id = String(track.sourceId || '').trim() || String(track.id || '').replace(/^netease-/, '').trim();
+  const isNeteaseTrack = track.source === 'netease' || String(track.id || '').startsWith('netease-');
+  if (!id || !isNeteaseTrack) {
+    return reply.code(400).send({ ok: false, message: '当前歌曲不是网易云音乐来源，不能同步收藏' });
+  }
+
+  const like = request.body?.like !== false;
+  const result = await callNetease('like', { id, like, timestamp: Date.now() }, store);
+  if (result?.code && result.code !== 200) {
+    return reply.code(502).send({ ok: false, message: result.message || '网易云收藏失败', result });
+  }
+  return { ok: true, liked: like, trackId: `netease-${id}`, result };
+});
+
 app.get('/api/now', async () => publicNow());
 
 app.get('/api/mood', async () => ({

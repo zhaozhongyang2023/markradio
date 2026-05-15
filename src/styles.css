@@ -480,6 +480,12 @@ p {
   opacity: 0.38;
 }
 
+.v4-controls button.is-favorite {
+  border-color: rgba(66, 216, 178, 0.48);
+  color: #42d8b2;
+  text-shadow: 0 0 12px rgba(66, 216, 178, 0.38);
+}
+
 .v4-volume {
   display: flex;
   align-items: center;

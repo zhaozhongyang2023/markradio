@@ -56,6 +56,11 @@ export const api = {
       method: 'POST',
       body: JSON.stringify({ key })
     }),
+  neteaseLike: (track, like) =>
+    request('/api/netease/like', {
+      method: 'POST',
+      body: JSON.stringify({ track, like })
+    }),
   castDevices: () => request('/api/cast/devices'),
   castConnect: (host, port) =>
     request('/api/cast/connect', {
