@@ -853,10 +853,7 @@ function V4RadioView({
         </section>
         <section className="v4-live-row">
           {liveLyricLine ? (
-            <>
-              <div className="v4-live-lyric"><span />{liveLyricLine}</div>
-              <strong>LYRIC</strong>
-            </>
+            <div className="v4-live-lyric">{liveLyricLine}</div>
           ) : (
             <>
               <div><span /> MarkRadio</div>
