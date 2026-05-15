@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import { api, apiAssetUrl, streamUrl } from './api.js';
 
 const moodLabels = [
@@ -46,6 +46,49 @@ function pixelCafe() {
       <span />
       <i />
     </div>
+  );
+}
+
+function V4PersonaAvatar({ role }) {
+  const id = useId();
+  const isUser = role === 'user';
+  const coreId = `${id}-core`;
+  const ringId = `${id}-ring`;
+  return (
+    <svg
+      className={`v4-avatar-glyph ${isUser ? 'user' : 'dj'}`}
+      viewBox="0 0 48 48"
+      aria-hidden="true"
+    >
+      <defs>
+        <radialGradient id={coreId} cx="50%" cy="38%" r="68%">
+          <stop offset="0%" stopColor={isUser ? '#f4f0ff' : '#fff8df'} />
+          <stop offset="54%" stopColor={isUser ? '#7d8dff' : '#42d8b2'} />
+          <stop offset="100%" stopColor={isUser ? '#151a3b' : '#071510'} />
+        </radialGradient>
+        <linearGradient id={ringId} x1="6" y1="6" x2="42" y2="42">
+          <stop offset="0%" stopColor={isUser ? '#f6f3ff' : '#f5d98e'} />
+          <stop offset="45%" stopColor={isUser ? '#8ea0ff' : '#42d8b2'} />
+          <stop offset="100%" stopColor={isUser ? '#44d8ff' : '#f6f3ec'} />
+        </linearGradient>
+      </defs>
+      <circle cx="24" cy="24" r="21" fill={`url(#${coreId})`} />
+      <circle cx="24" cy="24" r="20.2" fill="none" stroke={`url(#${ringId})`} strokeWidth="1.8" />
+      <circle cx="24" cy="24" r="14.5" fill="rgba(0,0,0,0.42)" stroke="rgba(255,255,255,0.2)" strokeWidth="1" />
+      {isUser ? (
+        <>
+          <path d="M10 29c6.5-8.8 19-14.4 29-11.8" fill="none" stroke="rgba(255,255,255,0.64)" strokeWidth="1.25" strokeLinecap="round" strokeDasharray="2 4" />
+          <path d="M15 32V18l9 8 9-8v14" fill="none" stroke="#f7f5ff" strokeWidth="3.1" strokeLinecap="round" strokeLinejoin="round" />
+          <circle cx="37" cy="17" r="2.2" fill="#44d8ff" />
+        </>
+      ) : (
+        <>
+          <path d="M15 31h18M18 31l6-17 6 17M20 24h8" fill="none" stroke="#f7f0d8" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" />
+          <path d="M12 18c3-3.8 6.9-5.8 12-5.8S33 14.2 36 18M15 21c2.2-2.5 5.2-3.8 9-3.8s6.8 1.3 9 3.8" fill="none" stroke="#42d8b2" strokeWidth="1.8" strokeLinecap="round" />
+          <circle cx="24" cy="14" r="2.6" fill="#f5d98e" />
+        </>
+      )}
+    </svg>
   );
 }
 
@@ -848,7 +891,7 @@ function V4RadioView({
           {lastMessages.map((message) => (
             <article className={`v4-message ${message.role}`} key={message.id}>
               <div className="v4-message-avatar">
-                {message.role === 'user' ? 'M' : pixelCafe()}
+                <V4PersonaAvatar role={message.role} />
               </div>
               <div>
                 <span>{message.role === 'user' ? 'MMGUO' : 'MARKRADIO'}</span>
