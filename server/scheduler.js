@@ -1,5 +1,5 @@
 import { buildDjContext, buildMessages } from './context.js';
-import { buildQueue, getCandidateTracks } from './music.js';
+import { buildQueue, detectLanguageIntent, getCandidateTracks, trackMatchesLanguage } from './music.js';
 import { MAX_AI_PLAN_TRACKS, demoPlan, generateDjPlan } from './openai.js';
 import { synthesizeVoice } from './voice.js';
 import { getWeather } from './weather.js';
@@ -31,8 +31,12 @@ export async function createRadioPlan({ store, mood: requestedMood = null, nowPl
   });
   store.set('mood', { current: mood, updatedAt: new Date().toISOString() });
 
-  const freshCandidates = await getCandidateTracks({ store, mood });
-  const candidates = mergeCandidateTracks(currentPlan?.queue || [], freshCandidates);
+  const languageIntent = detectLanguageIntent(userRequest);
+  const currentQueue = languageIntent
+    ? (currentPlan?.queue || []).filter((track) => trackMatchesLanguage(track, languageIntent))
+    : currentPlan?.queue || [];
+  const freshCandidates = await getCandidateTracks({ store, mood, userRequest });
+  const candidates = mergeCandidateTracks(currentQueue, freshCandidates);
   const context = buildDjContext({
     taste,
     mood,

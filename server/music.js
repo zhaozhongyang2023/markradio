@@ -4,8 +4,9 @@ import { scoreTrackForMood } from './mood.js';
 import { assertServiceAvailable, markServiceFailure, markServiceSuccess } from './circuit-breaker.js';
 import { callNetease, getNeteaseLoginStatus } from './netease-auth.js';
 
-export async function getCandidateTracks({ store, mood }) {
-  const neteaseTracks = await getNeteaseCandidates(store, mood).catch(() => []);
+export async function getCandidateTracks({ store, mood, userRequest = '' }) {
+  const languageIntent = detectLanguageIntent(userRequest);
+  const neteaseTracks = await getNeteaseCandidates(store, mood, languageIntent).catch(() => []);
   const tracks = neteaseTracks.length ? neteaseTracks : store.get('tracks') || demoTracks;
   const recent = new Set(store.recentPlays(100).map((item) => item.trackId));
   // 直接剔除已推荐/播放过的歌曲，保证每组都是新歌
@@ -17,14 +18,16 @@ export async function getCandidateTracks({ store, mood }) {
         ...track,
         score: scoreTrackForMood(track, mood) + (recent.has(track.id) ? -0.4 : 0)
       }))
-      .sort((a, b) => b.score - a.score);
+      .sort((a, b) => b.score - a.score)
+      .sort((a, b) => languageScore(b, languageIntent) - languageScore(a, languageIntent));
   }
   return fresh
     .map((track) => ({
       ...track,
       score: scoreTrackForMood(track, mood)
     }))
-    .sort((a, b) => b.score - a.score);
+    .sort((a, b) => b.score - a.score)
+    .sort((a, b) => languageScore(b, languageIntent) - languageScore(a, languageIntent));
 }
 
 export async function buildQueue(tracks, store, limit = 4) {
@@ -32,11 +35,15 @@ export async function buildQueue(tracks, store, limit = 4) {
   return queue.map((track, index) => ({ ...track, queueIndex: index }));
 }
 
-async function getNeteaseCandidates(store, mood) {
+async function getNeteaseCandidates(store, mood, languageIntent = null) {
   if (!config.neteaseApiBase) return [];
   assertServiceAvailable('netease');
   const tracks = [];
   const status = await getNeteaseLoginStatus(store).catch(() => ({ loggedIn: false, profile: null }));
+
+  if (languageIntent === 'english') {
+    tracks.push(...(await getEndpointTracks(store, 'top/song', { type: 96 }, mood, '网易云欧美新歌榜')));
+  }
 
   if (status.profile?.userId) {
     tracks.push(...(await getLikedTracks(store, status.profile.userId, mood)));
@@ -45,7 +52,9 @@ async function getNeteaseCandidates(store, mood) {
 
   tracks.push(...(await getEndpointTracks(store, 'recommend/songs', {}, mood, '网易云每日推荐')));
   tracks.push(...(await getEndpointTracks(store, 'personalized/newsong', { limit: 30 }, mood, '网易云新歌推荐')));
-  tracks.push(...(await getEndpointTracks(store, 'top/song', { type: 7 }, mood, '网易云热歌推荐')));
+  if (languageIntent !== 'english') {
+    tracks.push(...(await getEndpointTracks(store, 'top/song', { type: 7 }, mood, '网易云热歌推荐')));
+  }
 
   const unique = uniqueTracks(tracks);
   if (unique.length) markServiceSuccess('netease');
@@ -110,11 +119,44 @@ function normalizeNeteaseResponse(data, mood, sourceLabel = '网易云音乐') {
         artist: artists.map((artist) => artist.name).filter(Boolean).join(' / ') || '未知歌手',
         album: album.name || '网易云音乐',
         duration: Math.max(30, Math.round((song.dt || song.duration || 210000) / 1000)),
+        language: inferTrackLanguage({ title: song.name, artist: artists.map((artist) => artist.name).filter(Boolean).join(' / '), sourceLabel }),
         mood: [mood, '平静'],
         energy: estimateEnergy(song),
         reason: `来自${sourceLabel}，结合当前心情重新排序。`
       };
     });
+}
+
+export function detectLanguageIntent(text = '') {
+  const value = String(text).toLowerCase();
+  if (/(英文|英语|欧美|英伦|english|western|american|british)/i.test(value)) return 'english';
+  if (/(中文|国语|华语|粤语|chinese|mandarin|cantonese)/i.test(value)) return 'chinese';
+  return null;
+}
+
+export function trackMatchesLanguage(track, languageIntent) {
+  if (!languageIntent) return true;
+  const language = String(track?.language || '').toLowerCase();
+  if (language === languageIntent) return true;
+  if (languageIntent === 'english') return inferTrackLanguage(track) === 'english';
+  if (languageIntent === 'chinese') return inferTrackLanguage(track) === 'chinese';
+  return false;
+}
+
+function languageScore(track, languageIntent) {
+  if (!languageIntent) return 0;
+  return trackMatchesLanguage(track, languageIntent) ? 1 : 0;
+}
+
+function inferTrackLanguage({ title = '', artist = '', sourceLabel = '' } = {}) {
+  const source = String(sourceLabel);
+  if (/欧美|英文|英语/i.test(source)) return 'english';
+  if (/华语|中文|国语|粤语/i.test(source)) return 'chinese';
+
+  const text = `${title} ${artist}`;
+  if (/[\u4e00-\u9fff]/.test(text)) return 'chinese';
+  if (/[a-z]/i.test(text)) return 'english';
+  return '';
 }
 
 function uniqueTracks(tracks) {

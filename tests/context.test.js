@@ -17,8 +17,11 @@ test('buildDjContext includes chat userRequest', () => {
   });
 
   assert.equal(context.userRequest, '今晚想听安静一点的英文老歌');
+  assert.equal(context.languageIntent, 'english');
   assert.match(context.system, /userRequest/);
+  assert.match(context.system, /languageIntent 是 english/);
 
   const messages = buildMessages(context);
   assert.match(messages[1].content, /英文老歌/);
+  assert.match(messages[1].content, /"languageIntent": "english"/);
 });
