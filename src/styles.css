@@ -490,19 +490,28 @@ p {
   display: flex;
   align-items: center;
   gap: 8px;
-  min-width: 78px;
+  min-width: 104px;
   color: rgba(255, 255, 255, 0.44);
   font-family: "Courier New", ui-monospace, monospace;
   font-size: 11px;
   font-weight: 800;
 }
 
-.v4-volume i {
+.v4-volume input {
+  width: 62px;
+  accent-color: #f5f2eb;
+  cursor: pointer;
+}
+
+.v4-volume input::-webkit-slider-runnable-track {
   display: block;
-  width: 44px;
   height: 3px;
   border-radius: 99px;
   background: linear-gradient(90deg, rgba(255, 255, 255, 0.28), #f5f2eb);
+}
+
+.v4-volume input::-webkit-slider-thumb {
+  margin-top: -6px;
 }
 
 .v4-progress-row {
@@ -1798,7 +1807,18 @@ p {
   }
 
   .v4-volume {
-    display: none;
+    grid-column: 2 / -1;
+    justify-self: end;
+    min-width: 118px;
+    margin-top: -3px;
+  }
+
+  .v4-volume span {
+    font-size: 10px;
+  }
+
+  .v4-volume input {
+    width: 76px;
   }
 
   .v4-controls {
@@ -1895,6 +1915,14 @@ p {
 
   .v4-player-strip {
     grid-template-columns: 30px minmax(0, 1fr) auto;
+  }
+
+  .v4-volume {
+    min-width: 100px;
+  }
+
+  .v4-volume input {
+    width: 62px;
   }
 
   .v4-now-eq {
@@ -2292,7 +2320,7 @@ p {
   }
 
   .v4-player-strip {
-    grid-template-columns: 56px minmax(0, 1fr) auto 86px;
+    grid-template-columns: 56px minmax(0, 1fr) auto 118px;
     gap: 14px;
     min-height: 96px;
     padding: 18px 20px 14px;

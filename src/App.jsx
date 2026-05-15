@@ -650,6 +650,7 @@ function V4RadioView({
   onSelectTrack,
   onSpeechInput,
   onToggleFavorite,
+  onVolumeChange,
   playback,
   pendingPlay,
   plan,
@@ -663,7 +664,8 @@ function V4RadioView({
   speechMessage,
   speechState,
   track,
-  trackIsFavorite
+  trackIsFavorite,
+  userVolume
 }) {
   const weekdays = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
   const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -768,7 +770,15 @@ function V4RadioView({
           </div>
           <div className="v4-volume">
             <span>VOL</span>
-            <i />
+            <input
+              aria-label="音量"
+              max="100"
+              min="0"
+              onChange={(event) => onVolumeChange(Number(event.currentTarget.value) / 100)}
+              onInput={(event) => onVolumeChange(Number(event.currentTarget.value) / 100)}
+              type="range"
+              value={Math.round(userVolume * 100)}
+            />
           </div>
         </section>
 
@@ -899,6 +909,7 @@ export default function App() {
   const [readProgress, setReadProgress] = useState(0);
   const [introDoneFor, setIntroDoneFor] = useState(null);
   const [readingCardIndex, setReadingCardIndex] = useState(-1);
+  const [userVolume, setUserVolume] = useState(1);
   const [volumeTarget, setVolumeTarget] = useState(1);
   const [pendingPlay, setPendingPlay] = useState(false);
   const [chatInput, setChatInput] = useState('');
@@ -1202,6 +1213,25 @@ export default function App() {
 
   // V3: pulse only on song switch / refresh / load, not periodic
 
+  function applyMusicVolume(ratio = 1) {
+    const nextVolume = Math.max(0, Math.min(1, userVolume * ratio));
+    const audio = audioRef.current;
+    if (audio) audio.volume = nextVolume;
+    setVolumeTarget(nextVolume);
+    return nextVolume;
+  }
+
+  function changeVolume(nextVolume) {
+    const safeVolume = Math.max(0, Math.min(1, nextVolume));
+    setUserVolume(safeVolume);
+    const audio = audioRef.current;
+    if (audio) {
+      const bedRatio = reading ? BED_VOLUME : 1;
+      audio.volume = Math.max(0, Math.min(1, safeVolume * bedRatio));
+      setVolumeTarget(audio.volume);
+    }
+  }
+
   useEffect(() => {
     clearInterval(typeTimerRef.current);
     clearInterval(fadeTimerRef.current);
@@ -1212,8 +1242,7 @@ export default function App() {
     setSeekDraftRatio(null);
     setReading(false);
     setReadProgress(0);
-    setVolumeTarget(1);
-    if (audioRef.current) audioRef.current.volume = 1;
+    applyMusicVolume(1);
     if (djAudioRef.current) {
       djAudioRef.current.pause();
       djAudioRef.current.removeAttribute('src');
@@ -1235,6 +1264,16 @@ export default function App() {
     planDjUrlRef.current = planDjUrl;
     planIdRef.current = plan?.id || null;
   }, [plan, planDjUrl]);
+
+  useEffect(() => {
+    const likedIds = (plan?.queue || [])
+      .filter((item) => item?.source === 'netease' && /我喜欢的音乐/.test(`${item.album || ''} ${item.reason || ''}`))
+      .map((item) => item.id)
+      .filter(Boolean);
+    if (likedIds.length) {
+      setFavoriteTrackIds((ids) => [...new Set([...ids, ...likedIds])]);
+    }
+  }, [plan?.id, plan?.queue]);
 
   useEffect(() => () => {
     clearInterval(typeTimerRef.current);
@@ -1338,8 +1377,7 @@ export default function App() {
         if (queue.length > 0) await runCardIntro(idx);
         // Phase 3: Fade music to full, show lyrics
         if (audio) {
-          audio.volume = 1;
-          setVolumeTarget(1);
+          applyMusicVolume(1);
           setIsPlaying(true);
           startAudioVisuals(audio);
         }
@@ -1351,8 +1389,7 @@ export default function App() {
         // Resume: play music directly
         if (trackUrl) {
           if (audio.src !== trackUrl) audio.src = trackUrl;
-          audio.volume = 1;
-          setVolumeTarget(1);
+          applyMusicVolume(1);
           await audio.play().catch(() => {});
           setIsPlaying(true);
           startAudioVisuals(audio);
@@ -1439,18 +1476,18 @@ export default function App() {
     const audio = audioRef.current;
     if (!audio) return;
     const start = audio.volume;
+    const target = userVolume;
     let step = 0;
     const totalSteps = 20;
     clearInterval(fadeTimerRef.current);
     fadeTimerRef.current = setInterval(() => {
       step += 1;
-      const next = Math.min(1, start + (1 - start) * (step / totalSteps));
+      const next = Math.min(target, start + (target - start) * (step / totalSteps));
       audio.volume = next;
       setVolumeTarget(next);
       if (step >= totalSteps) {
         clearInterval(fadeTimerRef.current);
-        audio.volume = 1;
-        setVolumeTarget(1);
+        applyMusicVolume(1);
       }
     }, 120);
   }
@@ -1584,8 +1621,7 @@ export default function App() {
     const audio = audioRef.current;
     if (audio && trackUrl) {
       if (audio.src !== trackUrl) audio.src = trackUrl;
-      audio.volume = BED_VOLUME;
-      setVolumeTarget(BED_VOLUME);
+      applyMusicVolume(BED_VOLUME);
       audio.play().catch(() => {});
       setIsPlaying(true);
       startAudioVisuals(audio);
@@ -1642,12 +1678,11 @@ export default function App() {
     if (audio.src !== trackUrl) audio.src = trackUrl;
     audio.onended = handleEnded;
     if (audio.ended || (audio.duration && audio.currentTime >= audio.duration - 0.3)) {
-      setMusicVolume(1);
-      setVolumeTarget(1);
+      applyMusicVolume(1);
       handleEnded();
       return;
     }
-    setVolumeTarget(1);
+    applyMusicVolume(1);
     clearInterval(fadeTimerRef.current);
     audio.play()
       .then(() => {
@@ -1658,7 +1693,7 @@ export default function App() {
       })
       .catch(() => {
         setIsPlaying(false);
-        setMusicVolume(1);
+        applyMusicVolume(1);
       });
   }
 
@@ -2220,6 +2255,7 @@ function seekTo(ratio) {
           onSelectTrack={selectQueueTrack}
           onSpeechInput={startSpeechInput}
           onToggleFavorite={toggleFavoriteTrack}
+          onVolumeChange={changeVolume}
           playback={playback}
           pendingPlay={pendingPlay}
           plan={plan}
@@ -2234,6 +2270,7 @@ function seekTo(ratio) {
           speechState={speechState}
           track={track}
           trackIsFavorite={trackIsFavorite}
+          userVolume={userVolume}
         />
         {modalNodes}
       </>
