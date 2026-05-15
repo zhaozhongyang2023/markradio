@@ -684,6 +684,7 @@ function V4RadioView({
   duration,
   handleChatSubmit,
   isPlaying,
+  liveLyricLine,
   netease,
   nextTrack,
   onBack,
@@ -851,8 +852,17 @@ function V4RadioView({
           <span>{queueCount} TRACKS</span>
         </section>
         <section className="v4-live-row">
-          <div><span /> MarkRadio</div>
-          <strong>{servicesOk ? 'LIVE' : 'LOCAL'}</strong>
+          {liveLyricLine ? (
+            <>
+              <div className="v4-live-lyric"><span />{liveLyricLine}</div>
+              <strong>LYRIC</strong>
+            </>
+          ) : (
+            <>
+              <div><span /> MarkRadio</div>
+              <strong>{servicesOk ? 'LIVE' : 'LOCAL'}</strong>
+            </>
+          )}
         </section>
 
         {queue?.length ? (
@@ -1252,6 +1262,7 @@ export default function App() {
   }, [introText, plan, track.lyric]);
   const lyricIndex = currentLyricIndex(lyrics, progress);
   const showLyrics = introDoneFor === track.id && !reading;
+  const liveLyricLine = showLyrics && isPlaying ? lyrics[lyricIndex]?.text || '' : '';
   const trackIsFavorite = Boolean(track.id && favoriteTrackIds.includes(track.id));
 
   // V3: pulse only on song switch / refresh / load, not periodic
@@ -2289,6 +2300,7 @@ function seekTo(ratio) {
           duration={duration}
           handleChatSubmit={handleChatSubmit}
           isPlaying={isPlaying}
+          liveLyricLine={liveLyricLine}
           netease={netease}
           nextTrack={nextTrack}
           onBack={() => setViewMode('v3')}

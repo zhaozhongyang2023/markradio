@@ -577,10 +577,23 @@ p {
   display: flex;
   align-items: center;
   min-width: 0;
+  overflow: hidden;
   gap: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.v4-live-row div.v4-live-lyric {
+  overflow: hidden;
+  color: rgba(255, 255, 255, 0.84);
+  font-size: 18px;
+  line-height: 1.35;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .v4-live-row div span {
+  flex: 0 0 auto;
   width: 18px;
   height: 18px;
   border-radius: 50%;
@@ -589,6 +602,7 @@ p {
 }
 
 .v4-live-row strong {
+  flex: 0 0 auto;
   color: #42d8b2;
   font-size: 12px;
 }
@@ -1880,6 +1894,10 @@ p {
     font-size: 17px;
   }
 
+  .v4-live-row div.v4-live-lyric {
+    font-size: 15px;
+  }
+
   .v4-chat-log {
     padding: 14px 16px 12px;
   }
@@ -2385,6 +2403,10 @@ p {
 
   .v4-live-row {
     min-height: 56px;
+  }
+
+  .v4-live-row div.v4-live-lyric {
+    font-size: 20px;
   }
 
   .v4-plan-panel {
