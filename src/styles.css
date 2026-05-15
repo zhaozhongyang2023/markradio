@@ -2298,7 +2298,7 @@ p {
   .v4-shell {
     width: 100%;
     max-width: 100%;
-    padding: 12px !important;
+    padding: 12px 24px 12px 12px !important;
     overflow: hidden;
   }
 
