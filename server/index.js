@@ -238,6 +238,17 @@ app.post('/api/playback/:action', async (request) => {
       store.addPlay(now.track, now.mood);
     }
   }
+  if (action === 'prev' && state.plan?.queue?.length) {
+    const currentIndex = state.plan.queue.findIndex((track) => track.id === now.track?.id);
+    const previousIndex = currentIndex > 0 ? currentIndex - 1 : 0;
+    const previousTrack = state.plan.queue[previousIndex];
+    if (previousTrack) {
+      now.track = previousTrack;
+      now.progress = 0;
+      now.playing = true;
+      store.addPlay(now.track, now.mood);
+    }
+  }
   if (action === 'next' && state.plan?.queue?.length) {
     const currentIndex = state.plan.queue.findIndex((track) => track.id === now.track?.id);
     if (currentIndex >= 0) {

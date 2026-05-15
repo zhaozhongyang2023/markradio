@@ -652,6 +652,7 @@ function V4RadioView({
   playback,
   pendingPlay,
   plan,
+  previousTrack,
   previewTrackSeek,
   progress,
   queue,
@@ -749,7 +750,7 @@ function V4RadioView({
             <small>{reading ? 'SPEAKING' : isPlaying ? 'PLAYING' : 'READY'}</small>
           </div>
           <div className="v4-controls">
-            <button disabled aria-label="上一首">‹</button>
+            <button onClick={previousTrack} aria-label="上一首">‹</button>
             <button onClick={playback} aria-label="播放或暂停">{pendingPlay && !reading ? '…' : isPlaying || reading ? 'Ⅱ' : '▶'}</button>
             <button onClick={nextTrack} aria-label="下一首">›</button>
             <button onClick={onRefresh} aria-label="刷新下一组">↻</button>
@@ -1695,6 +1696,22 @@ export default function App() {
     await refreshPlan(selectedMood, true);
   }
 
+  async function previousTrack() {
+    if (refreshingRef.current || busy || pendingPlay) return;
+    const currentIndex = queue.findIndex((item) => item.id === track.id);
+    if (currentIndex < 0) return;
+    triggerPixelPulse();
+    setIntroDoneFor(null);
+    setReading(false);
+    setReadProgress(0);
+    setReadingCardIndex(-1);
+    setLocalProgress(0);
+    const nextState = await api.playback('prev').catch(() => null);
+    if (nextState?.now) setState(nextState);
+    autoplayOptionsRef.current = { skipIntro: false };
+    setAutoplayToken((value) => value + 1);
+  }
+
   async function selectQueueTrack(index, trackId = '') {
     if (refreshingRef.current || busy || pendingPlay) return;
     const item = queue.find((track) => track.id === trackId) || queue[index];
@@ -2158,6 +2175,7 @@ function seekTo(ratio) {
           playback={playback}
           pendingPlay={pendingPlay}
           plan={plan}
+          previousTrack={previousTrack}
           previewTrackSeek={previewTrackSeek}
           progress={progress}
           queue={queue}
