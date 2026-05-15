@@ -1,11 +1,12 @@
 import { station } from './defaults.js';
 import { moodProfiles } from './mood.js';
-import { detectLanguageIntent } from './music.js';
+import { detectLanguageIntent, extractRequestedSongs } from './music.js';
 
 export function buildDjContext({ taste, mood, specialDates, weather, recentPlays, tracks, nowPlaying, voice, timeContext, userRequest = '', currentPlan = null }) {
   const profile = moodProfiles[mood];
   const request = String(userRequest || '').trim();
   const languageIntent = detectLanguageIntent(request);
+  const requestedSongs = extractRequestedSongs(request);
   return {
     station,
     system: [
@@ -14,6 +15,7 @@ export function buildDjContext({ taste, mood, specialDates, weather, recentPlays
       '输出必须是 JSON，不要 Markdown，不要额外解释。',
       '你自主判断用户是在新建计划、调整现有计划、替换某首、重排、追加、删除，还是只聊天。',
       '如果 userRequest 不为空，先理解用户想听的时间、情绪、年代、语言、歌手、场景和计划长度，并据此安排播出。',
+      '如果 requestedSongs 不为空，play 必须优先包含这些被点名的候选歌曲；用户点名歌曲比风格推荐优先级更高。',
       '如果 languageIntent 是 english，play 必须只选择英文/欧美候选歌曲；候选不足时宁可少返回，也不要混入中文、俄语、日语等非英文歌曲。',
       '如果 languageIntent 是 chinese，play 必须只选择中文/华语候选歌曲；候选不足时宁可少返回，也不要混入非中文歌曲。',
       'reply 是给用户的聊天回复，必须自然回应 userRequest，并简短说明接下来会怎么播。',
@@ -38,6 +40,7 @@ export function buildDjContext({ taste, mood, specialDates, weather, recentPlays
     timeContext,
     userRequest: request,
     languageIntent,
+    requestedSongs,
     currentPlan: currentPlan ? {
       id: currentPlan.id,
       mood: currentPlan.mood,

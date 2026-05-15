@@ -1,5 +1,5 @@
 import { buildDjContext, buildMessages } from './context.js';
-import { buildQueue, detectLanguageIntent, getCandidateTracks, trackMatchesLanguage } from './music.js';
+import { buildQueue, detectLanguageIntent, extractRequestedSongs, getCandidateTracks, trackMatchesLanguage, trackMatchesRequestedTitle } from './music.js';
 import { MAX_AI_PLAN_TRACKS, demoPlan, generateDjPlan } from './openai.js';
 import { synthesizeVoice } from './voice.js';
 import { getWeather } from './weather.js';
@@ -32,6 +32,7 @@ export async function createRadioPlan({ store, mood: requestedMood = null, nowPl
   store.set('mood', { current: mood, updatedAt: new Date().toISOString() });
 
   const languageIntent = detectLanguageIntent(userRequest);
+  const requestedSongs = extractRequestedSongs(userRequest);
   const currentQueue = languageIntent
     ? (currentPlan?.queue || []).filter((track) => trackMatchesLanguage(track, languageIntent))
     : currentPlan?.queue || [];
@@ -55,7 +56,7 @@ export async function createRadioPlan({ store, mood: requestedMood = null, nowPl
     demoPlan(candidates, mood, `GPT-5.5 暂不可用，已降级：${error.message}`)
   );
   const byId = new Map(candidates.map((track) => [track.id, track]));
-  const selected = plan.play.map((id, i) => {
+  let selected = plan.play.map((id, i) => {
     const track = byId.get(id);
     if (!track) return null;
     // Use AI-generated per-song intro; fallback to buildTrackReason
@@ -63,6 +64,13 @@ export async function createRadioPlan({ store, mood: requestedMood = null, nowPl
     track.reason = aiReason || buildTrackReason(track, i, plan, mood);
     return track;
   }).filter(Boolean);
+
+  const requestedTracks = requestedSongs
+    .map((title) => candidates.find((track) => trackMatchesRequestedTitle(track, title)))
+    .filter(Boolean);
+  if (requestedTracks.length) {
+    selected = mergeSelectedTracks(requestedTracks, selected);
+  }
 
   // Ensure every song has a proper AI-generated reason
   const genericPatterns = ['结合当前心情重新排序', '来自网易云', '每日推荐', '下一首，继续'];
@@ -77,7 +85,7 @@ export async function createRadioPlan({ store, mood: requestedMood = null, nowPl
       t.reason = buildTrackReason(t, idx, plan, mood);
     }
   }
-  const queueLimit = resolveQueueLimit(plan);
+  const queueLimit = resolveQueueLimit(plan, selected.length);
   const queueTracks = fillQueueTracks(selected, candidates, queueLimit);
   const queue = await buildQueue(queueTracks, store, queueLimit);
   const ttsText = buildIntroText({ plan, specialDates, track: queue[0] });
@@ -131,14 +139,23 @@ export async function createRadioPlan({ store, mood: requestedMood = null, nowPl
   return todayPlan;
 }
 
-function resolveQueueLimit(plan) {
+function resolveQueueLimit(plan, selectedCount = 0) {
   const requested = Array.isArray(plan?.play) && plan.play.length ? plan.play.length : DEFAULT_QUEUE_LIMIT;
-  return Math.max(1, Math.min(MAX_AI_PLAN_TRACKS, requested));
+  return Math.max(1, Math.min(MAX_AI_PLAN_TRACKS, Math.max(requested, selectedCount)));
 }
 
 function mergeCandidateTracks(currentQueue, candidates) {
   const byId = new Map();
   for (const track of [...(currentQueue || []), ...(candidates || [])]) {
+    if (!track?.id || byId.has(track.id)) continue;
+    byId.set(track.id, track);
+  }
+  return [...byId.values()];
+}
+
+function mergeSelectedTracks(priorityTracks, selectedTracks) {
+  const byId = new Map();
+  for (const track of [...(priorityTracks || []), ...(selectedTracks || [])]) {
     if (!track?.id || byId.has(track.id)) continue;
     byId.set(track.id, track);
   }

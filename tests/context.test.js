@@ -18,10 +18,33 @@ test('buildDjContext includes chat userRequest', () => {
 
   assert.equal(context.userRequest, '今晚想听安静一点的英文老歌');
   assert.equal(context.languageIntent, 'english');
+  assert.deepEqual(context.requestedSongs, []);
   assert.match(context.system, /userRequest/);
   assert.match(context.system, /languageIntent 是 english/);
 
   const messages = buildMessages(context);
   assert.match(messages[1].content, /英文老歌/);
   assert.match(messages[1].content, /"languageIntent": "english"/);
+});
+
+test('buildDjContext includes requested song names', () => {
+  const context = buildDjContext({
+    taste: {},
+    mood: '平静',
+    specialDates: [],
+    weather: {},
+    recentPlays: [],
+    tracks: [{ id: 'netease-1', title: '乌兰巴托的夜', artist: '谭维维', mood: ['平静'], energy: 0.4, reason: 'demo' }],
+    nowPlaying: null,
+    voice: { style: '温柔' },
+    timeContext: { local: '05-16 星期六 09:10' },
+    userRequest: '我想听：乌兰巴托的夜。这首歌'
+  });
+
+  assert.deepEqual(context.requestedSongs, ['乌兰巴托的夜']);
+  assert.match(context.system, /requestedSongs 不为空/);
+
+  const messages = buildMessages(context);
+  assert.match(messages[1].content, /"requestedSongs": \[/);
+  assert.match(messages[1].content, /乌兰巴托的夜/);
 });

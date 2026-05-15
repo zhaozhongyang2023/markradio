@@ -6,7 +6,8 @@ import { callNetease, getNeteaseLoginStatus } from './netease-auth.js';
 
 export async function getCandidateTracks({ store, mood, userRequest = '' }) {
   const languageIntent = detectLanguageIntent(userRequest);
-  const neteaseTracks = await getNeteaseCandidates(store, mood, languageIntent).catch(() => []);
+  const requestedSongs = extractRequestedSongs(userRequest);
+  const neteaseTracks = await getNeteaseCandidates(store, mood, { languageIntent, requestedSongs }).catch(() => []);
   const tracks = neteaseTracks.length ? neteaseTracks : store.get('tracks') || demoTracks;
   const recent = new Set(store.recentPlays(100).map((item) => item.trackId));
   // 直接剔除已推荐/播放过的歌曲，保证每组都是新歌
@@ -35,11 +36,15 @@ export async function buildQueue(tracks, store, limit = 4) {
   return queue.map((track, index) => ({ ...track, queueIndex: index }));
 }
 
-async function getNeteaseCandidates(store, mood, languageIntent = null) {
+async function getNeteaseCandidates(store, mood, { languageIntent = null, requestedSongs = [] } = {}) {
   if (!config.neteaseApiBase) return [];
   assertServiceAvailable('netease');
   const tracks = [];
   const status = await getNeteaseLoginStatus(store).catch(() => ({ loggedIn: false, profile: null }));
+
+  for (const title of requestedSongs) {
+    tracks.push(...(await searchNeteaseTracks(store, title, mood)));
+  }
 
   if (languageIntent === 'english') {
     tracks.push(...(await getEndpointTracks(store, 'top/song', { type: 96 }, mood, '网易云欧美新歌榜')));
@@ -59,6 +64,13 @@ async function getNeteaseCandidates(store, mood, languageIntent = null) {
   const unique = uniqueTracks(tracks);
   if (unique.length) markServiceSuccess('netease');
   return unique;
+}
+
+async function searchNeteaseTracks(store, title, mood) {
+  const params = { keywords: title, type: 1, limit: 8 };
+  const cloud = await getEndpointTracks(store, 'cloudsearch', params, mood, `网易云搜索：${title}`);
+  const results = cloud.length ? cloud : await getEndpointTracks(store, 'search', params, mood, `网易云搜索：${title}`);
+  return results.sort((a, b) => requestedSongScore(b, title) - requestedSongScore(a, title));
 }
 
 async function getLikedTracks(store, userId, mood) {
@@ -86,7 +98,7 @@ async function getEndpointTracks(store, endpoint, params, mood, sourceLabel) {
   return normalizeNeteaseResponse(data, mood, sourceLabel);
 }
 
-function normalizeNeteaseResponse(data, mood, sourceLabel = '网易云音乐') {
+export function normalizeNeteaseResponse(data, mood, sourceLabel = '网易云音乐') {
   const likedIds = Array.isArray(data?.ids) ? data.ids : [];
   if (likedIds.length) {
     return likedIds.slice(0, 40).map((id) => ({
@@ -103,7 +115,8 @@ function normalizeNeteaseResponse(data, mood, sourceLabel = '网易云音乐') {
     }));
   }
 
-  const rawSongs = data?.data?.dailySongs || data?.recommend || data?.result || data?.data || data?.songs || [];
+  const rawSongs = data?.data?.dailySongs || data?.recommend || data?.result?.songs || data?.result || data?.data || data?.songs || [];
+  if (!Array.isArray(rawSongs)) return [];
   return rawSongs
     .map((item) => item.song || item)
     .filter((song) => song?.id && song?.name)
@@ -134,6 +147,38 @@ export function detectLanguageIntent(text = '') {
   return null;
 }
 
+export function extractRequestedSongs(text = '') {
+  const value = String(text || '').trim();
+  if (!value) return [];
+
+  const titles = [];
+  for (const match of value.matchAll(/《([^》]{1,80})》/g)) {
+    titles.push(match[1]);
+  }
+
+  const directPattern = /(?:想听|要听|播放|放一下|放一首|放|来一首|点一首|点播|听一下|找一下)[:：\s]*(?:一首|歌曲|歌)?\s*([^，。！？,.!?；;\n]{2,60}?)(?:这首歌|这首|这歌|这首歌曲|$|[，。！？,.!?；;])/g;
+  for (const match of value.matchAll(directPattern)) {
+    titles.push(match[1]);
+  }
+
+  const seen = new Set();
+  return titles
+    .map(cleanRequestedSongTitle)
+    .filter(isSpecificSongTitle)
+    .filter((title) => {
+      const key = normalizeTitle(title);
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    })
+    .slice(0, 5);
+}
+
+export function trackMatchesRequestedTitle(track, requestedTitle) {
+  if (!requestedTitle) return false;
+  return requestedSongScore(track, requestedTitle) > 0;
+}
+
 export function trackMatchesLanguage(track, languageIntent) {
   if (!languageIntent) return true;
   const language = String(track?.language || '').toLowerCase();
@@ -146,6 +191,39 @@ export function trackMatchesLanguage(track, languageIntent) {
 function languageScore(track, languageIntent) {
   if (!languageIntent) return 0;
   return trackMatchesLanguage(track, languageIntent) ? 1 : 0;
+}
+
+function requestedSongScore(track, requestedTitle) {
+  const wanted = normalizeTitle(requestedTitle);
+  const title = normalizeTitle(track?.title || '');
+  if (!wanted || !title) return 0;
+  if (title === wanted) return 3;
+  if (title.startsWith(wanted)) return 2;
+  if (title.includes(wanted) || wanted.includes(title)) return 1;
+  return 0;
+}
+
+function cleanRequestedSongTitle(title) {
+  return String(title || '')
+    .replace(/^(?:我想|想|要|请|帮我|给我|推荐|播放|放|听|点播)\s*/, '')
+    .replace(/(?:这首歌|这首歌曲|这首|这歌|歌曲|歌)$/g, '')
+    .trim();
+}
+
+function isSpecificSongTitle(title) {
+  const value = cleanRequestedSongTitle(title);
+  if (value.length < 2) return false;
+  if (/(?:英文|英语|欧美|英伦|中文|国语|华语|粤语|老歌|新歌|安静一点|几首|一些|适合|推荐)/.test(value)) return false;
+  if (/^(?:英文|英语|欧美|英伦|中文|国语|华语|粤语|老歌|新歌|歌|歌曲|音乐|歌单|计划|英文歌|中文歌|粤语歌)$/.test(value)) return false;
+  return true;
+}
+
+function normalizeTitle(title) {
+  return String(title || '')
+    .toLowerCase()
+    .replace(/\([^)]*\)|（[^）]*）/g, '')
+    .replace(/[《》"'“”‘’\s·•.,，。！？!?;；:：_-]/g, '')
+    .trim();
 }
 
 function inferTrackLanguage({ title = '', artist = '', sourceLabel = '' } = {}) {
