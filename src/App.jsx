@@ -1365,11 +1365,11 @@ export default function App() {
       if (!audio) return;
       audio.onended = handleEnded;
       const needsIntro = !options.skipIntro && introDoneFor !== track.id;
+      const shouldReadStationIntro = !options.skipStationIntro && !introDoneFor;
 
       if (needsIntro) {
-        const isFirstPlay = !introDoneFor;
         // Phase 1: Pre-intro (first play only) — pause music, read pre-intro DJ text
-        if (isFirstPlay) {
+        if (shouldReadStationIntro) {
           await runPreIntro();
         }
         // Phase 2: Card intro — music at low volume, read song DJ text
@@ -1719,7 +1719,7 @@ export default function App() {
       const currentIndex = queue.findIndex((item) => item.id === track.id);
       if (currentIndex >= 0 && currentIndex < queue.length - 1) {
         await api.playback('next').catch(() => {});
-        autoplayOptionsRef.current = { skipIntro: false };
+        autoplayOptionsRef.current = { skipIntro: false, skipStationIntro: true };
         triggerPixelPulse();
         setAutoplayToken((value) => value + 1);
         return;
@@ -1736,7 +1736,7 @@ export default function App() {
     const currentIndex = queue.findIndex((item) => item.id === track.id);
     if (currentIndex >= 0 && currentIndex < queue.length - 1) {
       await api.playback('next').catch(() => {});
-      autoplayOptionsRef.current = { skipIntro: false };
+      autoplayOptionsRef.current = { skipIntro: false, skipStationIntro: true };
       setAutoplayToken((value) => value + 1);
       return;
     }
@@ -1755,7 +1755,7 @@ export default function App() {
     setLocalProgress(0);
     const nextState = await api.playback('prev').catch(() => null);
     if (nextState?.now) setState(nextState);
-    autoplayOptionsRef.current = { skipIntro: false };
+    autoplayOptionsRef.current = { skipIntro: false, skipStationIntro: true };
     setAutoplayToken((value) => value + 1);
   }
 
@@ -1810,7 +1810,7 @@ export default function App() {
       setLocalProgress(0);
       const nextState = await api.playback('select', { index: currentIndex, trackId: item.id });
       setState(nextState);
-      autoplayOptionsRef.current = { skipIntro: false };
+      autoplayOptionsRef.current = { skipIntro: false, skipStationIntro: true };
       setAutoplayToken((value) => value + 1);
       setChatMessages((items) => [
         ...items,
