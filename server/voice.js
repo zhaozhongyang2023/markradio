@@ -11,18 +11,24 @@ const cacheDir = path.resolve(process.cwd(), 'data/cache/tts');
 fs.mkdirSync(cacheDir, { recursive: true });
 const execAsync = promisify(exec);
 
-export function ttsHash(text, mood, voiceStyle) {
+export function ttsHash(text, mood, voiceStyle, nonce = '') {
   return crypto.createHash('sha256')
-    .update(`${text}\n${mood}\n${voiceStyle}\n${config.voiceProvider}\n${config.fishVoiceId}\n${config.localTtsSpeed}\n${config.localTtsNfeStep}\n${config.localTtsMaxCharsPerChunk}\nsmooth-sync-v2`)
+    .update(`${text}\n${mood}\n${voiceStyle}\n${config.voiceProvider}\n${config.fishVoiceId}\n${config.localTtsSpeed}\n${config.localTtsNfeStep}\n${config.localTtsMaxCharsPerChunk}\n${nonce}\nv3`)
     .digest('hex')
     .slice(0, 24);
 }
 
-export async function synthesizeVoice({ store, text, mood, voiceStyle }) {
-  const hash = ttsHash(text, mood, voiceStyle);
+export async function synthesizeVoice({ store, text, mood, voiceStyle, nonce = '' }) {
+  const hash = ttsHash(text, mood, voiceStyle, nonce);
   const cached = store.getTtsCache(hash);
   if (cached && fs.existsSync(cached.path)) {
-    return { ok: true, cached: true, url: `/tts/${hash}.mp3`, hash };
+    // 安全校验：缓存的文本必须与请求文本一致，防止哈希碰撞或脏数据
+    if (cached.text === text) {
+      return { ok: true, cached: true, url: `/tts/${hash}.mp3`, hash };
+    }
+    // 不匹配则清除脏缓存
+    fs.unlinkSync(cached.path);
+    store.db.prepare('DELETE FROM tts_cache WHERE hash = ?').run(hash);
   }
 
   const filePath = path.join(cacheDir, `${hash}.mp3`);
@@ -41,6 +47,7 @@ export async function synthesizeVoice({ store, text, mood, voiceStyle }) {
     };
   }
 
+  assertServiceAvailable("fish-audio");
   const requestBody = JSON.stringify({
     text,
     reference_id: config.fishVoiceId,
@@ -95,7 +102,7 @@ export async function synthesizeVoice({ store, text, mood, voiceStyle }) {
       break; // 成功，退出重试循环
     } catch (error) {
       lastError = error;
-      // 重试耗尽，由调用方处理
+      markServiceFailure("fish-audio");      // 重试耗尽，由调用方处理
     }
   }
 

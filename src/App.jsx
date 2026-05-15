@@ -2,26 +2,30 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { api, apiAssetUrl, streamUrl } from './api.js';
 
 const moodLabels = [
-  { name: '开心', iconKey: 'happy', icon: '☺', en: 'Joy' },
-  { name: '平静', iconKey: 'calm', icon: '◌', en: 'Calm' },
-  { name: '忧郁', iconKey: 'melancholy', icon: '☁', en: 'Melancholy' },
-  { name: '悲伤', iconKey: 'sad', icon: '☂', en: 'Blue' },
-  { name: '治愈', iconKey: 'heal', icon: '♥', en: 'Heal' },
-  { name: '愤怒', iconKey: 'anger', icon: '▣', en: 'Anger' }
+  { name: '开心', iconKey: 'happy', icon: '☼', en: 'Joy', tone: '#f0c96a' },
+  { name: '平静', iconKey: 'calm', icon: '∿', en: 'Calm', tone: '#74d8c4' },
+  { name: '忧郁', iconKey: 'melancholy', icon: '◐', en: 'Muse', tone: '#9daee8' },
+  { name: '悲伤', iconKey: 'sad', icon: '☂', en: 'Blue', tone: '#82b5df' },
+  { name: '治愈', iconKey: 'heal', icon: '✚', en: 'Heal', tone: '#82cf8b' },
+  { name: '愤怒', iconKey: 'anger', icon: '⚡', en: 'Fire', tone: '#ef8d62' }
 ];
 
 const moodIcon = {
-  开心: '☺',
-  平静: '◌',
-  忧郁: '☁',
+  开心: '☼',
+  平静: '∿',
+  忧郁: '◐',
   悲伤: '☂',
-  治愈: '♥',
-  愤怒: '▣'
+  治愈: '✚',
+  愤怒: '⚡'
 };
 
-const BED_VOLUME = 0.15;
+const BED_VOLUME = 0.10;
 const CARD_BED_VOLUME = 0.075;
 const PARTICLE_BARS = 48;
+const PULSE_PARTICLE_COUNT = 96;
+const PULSE_DAMPING = 0.98;
+const PULSE_PIXEL_SIZE = 10;
+const PULSE_RING_COUNT = 4;
 
 function formatTime(seconds = 0) {
   const safe = Math.max(0, Math.floor(seconds));
@@ -119,8 +123,10 @@ function buildLevelsFromFrequency(data, count) {
     let total = 0;
     for (let i = start; i < end; i += 1) total += data[i] || 0;
     const value = total / (end - start) / 255;
-    const shaped = Math.max(0, value - 0.025) * (index < count * 0.18 ? 0.72 : 1.22);
-    return Math.max(0.08, Math.min(0.96, 0.08 + shaped * 1.72));
+    const skyline = 0.78 + Math.sin(index * 0.53) * 0.16 + Math.sin(index * 0.21 + 1.4) * 0.1;
+    const accent = index % 11 === 0 || index % 17 === 5 ? 0.1 : 0;
+    const shaped = Math.max(0, value - 0.04) * (index < count * 0.18 ? 0.62 : 1.18);
+    return Math.max(0.12, Math.min(0.98, 0.16 + shaped * 1.65 * skyline + accent));
   });
 }
 
@@ -129,7 +135,16 @@ function buildFallbackLevels(seconds, count) {
     const slow = Math.sin(seconds * 2.1 + index * 0.24);
     const fast = Math.sin(seconds * 5.8 - index * 0.11);
     const beat = Math.max(0, Math.sin(seconds * 3.2 + index * 0.05));
-    return Math.max(0.18, Math.min(0.98, 0.38 + Math.abs(slow) * 0.28 + Math.abs(fast) * 0.16 + beat * 0.18));
+    const skyline = 0.8 + Math.sin(index * 0.47) * 0.16 + Math.sin(index * 0.19 + 1.7) * 0.12;
+    return Math.max(0.16, Math.min(0.98, (0.24 + Math.abs(slow) * 0.3 + Math.abs(fast) * 0.14 + beat * 0.2) * skyline));
+  });
+}
+
+function buildIdleSpectrumLevels(count) {
+  return Array.from({ length: count }, (_, index) => {
+    const wave = Math.sin(index * 0.46) * 0.24 + Math.sin(index * 0.18 + 1.6) * 0.18;
+    const cluster = index % 9 === 0 || index % 13 === 4 ? 0.18 : 0;
+    return Math.max(0.2, Math.min(0.92, 0.48 + wave + cluster));
   });
 }
 
@@ -138,29 +153,44 @@ const SPEC_PEAKS = {};
 function paintSpectrumCanvas(canvas, levels) {
   if (!canvas) return;
   const ctx = canvas.getContext('2d');
-  const dpr = window.devicePixelRatio || 1;
-  const card = document.querySelector('.card'); const cardW = card?.getBoundingClientRect()?.width || 0; const w = cardW || canvas.clientWidth || canvas.offsetWidth || window.innerWidth;
-  const h = canvas.clientHeight || 70;
+  const dpr = Math.min(window.devicePixelRatio || 1, 1.5);
+  const rect = canvas.getBoundingClientRect();
+  const w = Math.round(rect.width || canvas.clientWidth || window.innerWidth);
+  const h = Math.round(rect.height || canvas.clientHeight || 70);
   if (w <= 0 || h <= 0) return;
 
-  canvas.width = w * dpr;
-  canvas.height = h * dpr;
-  
-  
+  const nextWidth = Math.round(w * dpr);
+  const nextHeight = Math.round(h * dpr);
+  if (canvas.width !== nextWidth || canvas.height !== nextHeight) {
+    canvas.width = nextWidth;
+    canvas.height = nextHeight;
+  }
+
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   ctx.imageSmoothingEnabled = false;
 
-  ctx.fillStyle = '#050505';
-  ctx.fillRect(0, 0, w, h);
+  const pulse = levels?.length
+    ? levels.reduce((total, level) => total + level, 0) / levels.length
+    : 0.16;
+  ctx.clearRect(0, 0, w, h);
+  // Transparent background — let hero-panel bg show through
+  // Glow baseline
+  ctx.fillStyle = `rgba(0, 245, 212, ${0.06 + pulse * 0.09})`;
+  ctx.fillRect(0, Math.max(0, h - 14 - pulse * 8), w, 2);
 
-  const { size, gap, cell } = SPEC_PX;
-  const numBars = Math.max(1, Math.floor((w - 56) / cell));
+  // Smaller blocks on mobile portrait
+  const isMobilePortrait = window.innerWidth < 768 && window.innerHeight > window.innerWidth;
+  const sp = isMobilePortrait
+    ? { size: 10, gap: 6, cell: 16 }
+    : SPEC_PX;
+  const { size, gap, cell } = sp;
+  const numBars = Math.max(1, Math.floor((w - 24) / cell));
   const maxBlocks = Math.floor(h / cell);
-  const gravity = 0.06;
+  const gravity = 0.09;
 
-  const barLevels = levels || [];
+  const barLevels = levels?.length ? levels : buildIdleSpectrumLevels(numBars);
 
-  const insetX = 22;
+  const insetX = Math.max(8, Math.floor((w - numBars * cell) / 2));
   for (let i = 0; i < numBars; i++) {
     const level = barLevels[i] ?? 0.18;
     // Pulse factor: each bar breathes at a slightly different phase
@@ -179,21 +209,21 @@ function paintSpectrumCanvas(canvas, levels) {
       const y = h - (b + 1) * cell;
 
       if (b === peakBlock && b > blockCount) {
-        ctx.fillStyle = '#00f5d4';
-        ctx.shadowColor = 'rgba(0, 245, 212, 0.45)';
-        ctx.shadowBlur = 6;
+        ctx.fillStyle = '#d8fff3';
+        ctx.shadowColor = 'rgba(0, 245, 212, 0.28)';
+        ctx.shadowBlur = 4;
       } else if (b >= blockCount - 2 && b < blockCount && blockCount > 2) {
         const t = (b - (blockCount - 2)) / 2;
-        const cr = Math.round(255 * (1 - t));
-        const cg = Math.round(255 - 10 * t);
-        const cb = Math.round(255 - 43 * t);
+        const cr = Math.round(192 - 65 * t);
+        const cg = Math.round(245 - 14 * t);
+        const cb = Math.round(225 - 32 * t);
         ctx.fillStyle = `rgb(${cr},${cg},${cb})`;
-        ctx.shadowColor = 'rgba(255,255,255,0.12)';
+        ctx.shadowColor = 'rgba(0,245,212,0.16)';
         ctx.shadowBlur = 3;
       } else {
-        ctx.fillStyle = '#ffffff';
-        ctx.shadowColor = 'rgba(255,255,255,0.12)';
-        ctx.shadowBlur = 3;
+        ctx.fillStyle = '#8fdcca';
+        ctx.shadowColor = 'rgba(143,220,202,0.12)';
+        ctx.shadowBlur = 2;
       }
 
       ctx.fillRect(x + gap, y + gap, size, size);
@@ -210,6 +240,12 @@ function paintLevels(container, levels) {
     const level = levels?.[index] ?? 0.18;
     bar.style.setProperty('--level', level.toFixed(3));
   });
+}
+
+function lerpColor(start, end, ratio) {
+  const t = Math.max(0, Math.min(1, ratio));
+  const next = start.map((value, index) => Math.round(value + (end[index] - value) * t));
+  return `rgb(${next[0]},${next[1]},${next[2]})`;
 }
 
 // ── 7-segment style 5×7 pixel digit patterns (1=on, 0=off, row-major) ──
@@ -245,152 +281,36 @@ const PX = {
 };
 
 
-// ── 11×11 pixel mood icon matrices (1=on, 0=off, row-major) ──
-const ICON = {
-  size: PX.size,
-  gap: PX.gap,
-  cell: PX.cell,
-  cols: 11,
-  rows: 11,
-  // 6 mood icons: happy, fun, blue, calm, tense, fire
-  icons: {
-    happy: [
-      [0,0,0,1,1,1,1,1,0,0,0],
-      [0,0,1,0,0,0,0,0,1,0,0],
-      [0,1,0,0,0,0,0,0,0,1,0],
-      [0,1,0,1,0,0,0,1,0,1,0],
-      [0,1,0,0,0,0,0,0,0,1,0],
-      [0,1,0,0,0,0,0,0,0,1,0],
-      [0,0,1,0,0,0,0,0,1,0,0],
-      [0,0,0,1,0,0,0,1,0,0,0],
-      [0,0,0,0,1,1,1,0,0,0,0],
-      [0,0,0,0,0,0,0,0,0,0,0],
-      [0,0,0,0,0,0,0,0,0,0,0],
-    ],
-    calm: [
-      [0,0,0,0,0,0,0,0,0,0,0],
-      [1,1,1,1,1,1,0,0,0,0,0],
-      [1,1,1,1,1,1,0,0,0,0,0],
-      [0,0,0,0,0,0,1,1,1,1,0],
-      [0,0,0,0,0,0,1,1,1,1,0],
-      [1,1,1,1,1,1,1,1,0,0,0],
-      [1,1,1,1,1,1,1,1,0,0,0],
-      [0,0,0,0,0,1,1,1,1,1,0],
-      [0,0,0,0,0,1,1,1,1,1,0],
-      [0,0,0,0,0,0,0,0,0,0,0],
-      [0,0,0,0,0,0,0,0,0,0,0],
-    ],
-    melancholy: [
-      [0,0,0,0,0,0,0,0,0,0,0],
-      [0,0,1,0,0,0,0,1,0,0,0],
-      [0,0,0,1,0,0,0,0,1,0,0],
-      [0,0,0,0,1,0,0,0,0,1,0],
-      [0,0,0,0,0,1,0,0,0,0,0],
-      [0,0,0,0,0,0,0,0,0,0,0],
-      [1,0,0,0,0,0,0,0,0,0,0],
-      [0,1,0,0,0,0,1,0,0,0,0],
-      [0,0,1,0,0,0,0,1,0,0,0],
-      [0,0,0,1,0,0,0,0,0,0,0],
-      [0,0,0,0,0,0,0,0,0,0,0],
-    ],
-    sad: [
-      [0,0,0,1,1,1,1,1,0,0,0],
-      [0,0,1,0,0,0,0,0,1,0,0],
-      [0,1,0,0,0,0,0,0,0,1,0],
-      [0,1,0,1,0,0,0,1,0,1,0],
-      [0,1,0,0,0,0,0,0,0,1,0],
-      [0,1,0,0,0,0,0,0,0,1,0],
-      [0,0,1,0,0,0,0,0,1,0,0],
-      [0,0,0,1,1,1,1,1,0,0,0],
-      [0,0,0,0,1,0,0,1,0,0,0],
-      [0,0,0,0,0,1,1,0,0,0,0],
-      [0,0,0,0,0,0,0,0,0,0,0],
-    ],
-    heal: [
-      [0,0,0,0,0,0,0,0,0,0,0],
-      [0,0,0,1,0,0,0,1,0,0,0],
-      [0,0,1,1,1,0,1,1,1,0,0],
-      [0,1,1,1,1,1,1,1,1,1,0],
-      [0,1,1,1,1,1,1,1,1,1,0],
-      [0,0,1,1,1,1,1,1,1,0,0],
-      [0,0,0,1,1,1,1,1,0,0,0],
-      [0,0,0,0,1,1,1,0,0,0,0],
-      [0,0,0,0,0,1,0,0,0,0,0],
-      [0,0,0,0,0,0,0,0,0,0,0],
-      [0,0,0,0,0,0,0,0,0,0,0],
-    ],
-    anger: [
-      [0,0,0,0,0,0,0,0,0,0,0],
-      [0,0,0,1,1,1,0,0,0,0,0],
-      [0,0,0,0,1,1,1,0,0,0,0],
-      [0,0,0,0,1,1,0,0,0,0,0],
-      [0,0,0,1,1,1,0,0,0,0,0],
-      [0,0,0,0,1,1,1,0,0,0,0],
-      [0,0,0,0,1,1,0,0,0,0,0],
-      [0,0,0,0,1,1,0,0,0,0,0],
-      [0,0,0,1,1,1,1,0,0,0,0],
-      [0,0,0,0,0,0,0,0,0,0,0],
-      [0,0,0,0,0,0,0,0,0,0,0],
-    ],
-  },
-  canvasW: 11 * PX.cell - PX.gap,
-  canvasH: 11 * PX.cell - PX.gap,
+// 11x11 pixel mood icons (1=on, 0=off, row-major).
+// ── SVG 极简心情图标 ──
+const moodSvgs = {
+  happy: { viewBox: '0 0 24 24', path: 'M12 2a10 10 0 100 20 10 10 0 000-20zM8 9h.01M16 9h.01M8 13s2 3 4 3 4-3 4-3' },
+  calm:  { viewBox: '0 0 24 24', path: 'M2 8c2-3 4-3 6 0s4 3 6 0 4-3 6 0M2 13c2-2 4-2 6 0s4 2 6 0 4-2 6 0M2 18c2-2 4-2 6 0s4 2 6 0 4-2 6 0' },
+  melancholy: { viewBox: '0 0 24 24', path: 'M21 12.8A9 9 0 1111.2 3a7 7 0 009.8 9.8z' },
+  sad:   { viewBox: '0 0 24 24', path: 'M12 2a10 10 0 100 20 10 10 0 000-20zM8 9h.01M16 9h.01M8 15s2-2 4-2 4 2 4 2' },
+  heal:  { viewBox: '0 0 24 24', path: 'M12 21.4C8.5 18.1 2 13.3 2 8.5 2 5.4 4.4 3 7.5 3c1.7 0 3.4.8 4.5 2.1C13.1 3.8 14.8 3 16.5 3 19.6 3 22 5.4 22 8.5c0 4.8-6.5 9.6-10 12.9z' },
+  anger: { viewBox: '0 0 24 24', path: 'M13 2L4 14h5l-2 8 9-12h-5l2-8' },
 };
 
-function drawMoodIcon(ctx, iconKey, active, hover) {
-  const data = ICON.icons[iconKey];
-  if (!data) return;
-  const { size, gap, cell, rows, cols } = ICON;
-  ctx.imageSmoothingEnabled = false;
-  const onColor = '#ffffff';
-  const offColor = '#333333';
-  const isLit = active || hover;
-  for (let row = 0; row < rows; row++) {
-    for (let col = 0; col < cols; col++) {
-      if (data[row][col]) {
-        const x = col * cell;
-        const y = row * cell;
-        if (isLit) {
-          ctx.fillStyle = onColor;
-          ctx.shadowColor = 'rgba(255,255,255,0.22)';
-          ctx.shadowBlur = 4;
-        } else {
-          ctx.fillStyle = offColor;
-          ctx.shadowColor = 'transparent';
-          ctx.shadowBlur = 0;
-        }
-        ctx.fillRect(x, y, size, size);
-      }
-    }
-  }
-  ctx.shadowBlur = 0;
-}
-
-function PixelMoodIcon({ iconKey, active, hover }) {
-  const canvasRef = useRef(null);
-
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const dpr = window.devicePixelRatio || 1;
-    const logicalW = ICON.canvasW;
-    const logicalH = ICON.canvasH;
-    canvas.width = logicalW * dpr;
-    canvas.height = logicalH * dpr;
-    canvas.style.width = logicalW + 'px';
-    canvas.style.height = logicalH + 'px';
-    const ctx = canvas.getContext('2d');
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    ctx.clearRect(0, 0, logicalW, logicalH);
-    drawMoodIcon(ctx, iconKey, active, hover);
-  }, [iconKey, active, hover]);
-
+function MoodSvgIcon({ iconKey, active, hover, tone }) {
+  const svg = moodSvgs[iconKey];
+  if (!svg) return null;
+  const color = active ? tone : hover ? tone : '#888a8e';
   return (
-    <canvas
-      ref={canvasRef}
-      className="pixel-mood-icon"
+    <svg
+      className="mood-svg-icon"
+      viewBox={svg.viewBox}
+      fill="none"
+      stroke={color}
+      strokeWidth={active || hover ? 2.2 : 1.6}
+      strokeDasharray={active || hover ? 'none' : '1 3'}
+      strokeLinecap="round"
+      strokeLinejoin="round"
       aria-hidden="true"
-    />
+      style={{ transition: 'stroke 0.25s ease, stroke-width 0.25s ease', width: '100%', height: '100%' }}
+    >
+      <path d={svg.path} />
+    </svg>
   );
 }
 
@@ -430,29 +350,33 @@ function PixelClockCanvas({ hours, minutes }) {
   const [tick, setTick] = useState(0);
 
   useEffect(() => {
-    const id = setInterval(() => setTick(t => t + 1), 100);
+    const id = setInterval(() => setTick(t => t + 1), 500);
     return () => clearInterval(id);
   }, []);
 
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
-    const dpr = window.devicePixelRatio || 1;
+    const dpr = Math.min(window.devicePixelRatio || 1, 1.5);
     const { cell, canvasW, canvasH } = PX;
-    const logicalW = canvasW * cell;
-    const logicalH = canvasH * cell;
-    canvas.width = logicalW * dpr;
-    canvas.height = logicalH * dpr;
-    canvas.style.width = logicalW + 'px';
-    canvas.style.height = logicalH + 'px';
+    const baseW = canvasW * cell;
+    const baseH = canvasH * cell;
+    const fitW = Math.max(260, Math.min(window.innerWidth - 48, baseW));
+    const scale = Math.min(1, fitW / baseW);
+    const logicalW = Math.round(baseW * scale);
+    const logicalH = Math.round(baseH * scale);
+    canvas.width = Math.round(logicalW * dpr);
+    canvas.height = Math.round(logicalH * dpr);
+    canvas.style.width = `${logicalW}px`;
+    canvas.style.height = `${logicalH}px`;
     const ctx = canvas.getContext('2d');
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.setTransform(dpr * scale, 0, 0, dpr * scale, 0, 0);
     ctx.imageSmoothingEnabled = false;
 
     // background
     ctx.fillStyle = '#050505';
-    ctx.fillRect(0, 0, logicalW, logicalH);
-    drawBgDots(ctx, logicalW, logicalH);
+    ctx.fillRect(0, 0, baseW, baseH);
+    drawBgDots(ctx, baseW, baseH);
 
     const hh = String(hours).padStart(2, '0');
     const mm = String(minutes).padStart(2, '0');
@@ -496,9 +420,9 @@ function PixelClockCanvas({ hours, minutes }) {
 
 // ── 频谱像素块常量（匹配点阵时钟 PX 参数）──
 const SPEC_PX = {
-  size: 10,   // 方块边长 px
-  gap: 4,     // 方块间隙 px
-  cell: 14,   // 方块节距 = size + gap (14px → 6层=84px)
+  size: 13,
+  gap: 8,
+  cell: 21,
 };
 function Spectrum({ active, progressRatio, visualRef }) {
   return (
@@ -564,10 +488,21 @@ function DjFeed({ introSegments, lyrics, lyricIndex, plan, queue, reading, readW
   return (
     <div className={reading ? 'dj-feed is-reading' : 'dj-feed'}>
       {showLyrics ? (
-        <p className="lyric-feed">
+        <div className="lyrics-view">
           <span className="feed-meta">MarkRadio · {formatTime(lyrics[lyricIndex]?.time || 0)}</span>
-          <span className="typing-line lyric-current-line">{currentLyric}</span>
-        </p>
+          {[-1, 0, 1].map((offset) => {
+            const idx = lyricIndex + offset;
+            const line = lyrics[idx];
+            if (!line?.text) return null;
+            const dist = Math.abs(offset);
+            const cls = dist === 0 ? 'active' : `distance-${dist}`;
+            return (
+              <p key={idx} className={`lyric-line ${cls}`}>
+                {line.text}
+              </p>
+            );
+          })}
+        </div>
       ) : (
         <>
           {showIntroPara ? (
@@ -600,13 +535,7 @@ function DjFeed({ introSegments, lyrics, lyricIndex, plan, queue, reading, readW
             const actualIndex = activeCardIndex !== null ? activeCardIndex : i;
             const title = track?.title ? `《${track.title}》${track.artist ? ' - ' + track.artist : ''}` : '';
             const isReadingThis = reading && readingCardIndex === actualIndex;
-            const rawReason = track?.reason || '';
-            // Filter generic placeholder text — prefer AI-generated or constructed intros
-            const genericMarkers = ['结合当前心情重新排序', '来自网易云', '每日推荐'];
-            const isGeneric = !rawReason || genericMarkers.some(m => rawReason.includes(m));
-            const reason = isGeneric
-              ? (plan?.plan?.segue || `${track?.artist ? track.artist + '的' : ''}《${track?.title || '这首歌'}》`)
-              : rawReason;
+            const reason = track?.reason || plan?.plan?.segue || '';
             const isFinished = !isReadingThis && introDoneFor && track?.id !== introDoneFor;
             return (
               <div className={`dj-track-card${isReadingThis ? ' is-reading-card' : ''}${isFinished ? ' is-finished' : ''}`} key={track.id || i}>
@@ -662,10 +591,18 @@ function MoodStrip({ busy, chooseMood, selectedMood }) {
             onClick={() => chooseMood(mood.name)}
             onMouseEnter={() => setHoverKey(mood.iconKey)}
             onMouseLeave={() => setHoverKey(null)}
+            onTouchStart={() => setHoverKey(mood.iconKey)}
+            onTouchEnd={() => setHoverKey(null)}
+            style={{
+              '--mood-tone': mood.tone,
+              '--mood-tone-soft': `${mood.tone}26`,
+              '--mood-tone-mid': `${mood.tone}44`
+            }}
+            aria-label={`${mood.name} · ${mood.en}`}
             title={`${mood.name} · ${mood.en}`}
           >
-            <PixelMoodIcon iconKey={mood.iconKey} active={isActive} hover={isHover && !isActive} />
-            <small>{mood.name}</small>
+            <MoodSvgIcon iconKey={mood.iconKey} active={isActive} hover={isHover && !isActive} tone={mood.tone} />
+            <small>{mood.en}</small>
           </button>
         );
       })}
@@ -690,7 +627,248 @@ function QueuePreview({ queue, currentId, onRefresh, busy }) {
   );
 }
 
+function V4RadioView({
+  audioNodes,
+  beginTrackSeek,
+  busy,
+  castState,
+  chatBusy,
+  chatInput,
+  chatMessages,
+  clock,
+  commitTrackSeek,
+  displayProgressRatio,
+  duration,
+  handleChatSubmit,
+  isPlaying,
+  netease,
+  nextTrack,
+  onBack,
+  onCastOpen,
+  onLogin,
+  onRefresh,
+  onSelectTrack,
+  onSpeechInput,
+  playback,
+  pendingPlay,
+  plan,
+  previewTrackSeek,
+  progress,
+  queue,
+  reading,
+  servicesOk,
+  setChatInput,
+  speechMessage,
+  speechState,
+  track
+}) {
+  const weekdays = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  const currentTrack = track?.title ? `${track.title} - ${track.artist || 'Unknown'}` : '等待选曲';
+  const queueCount = queue?.length || 0;
+  const lastMessages = chatMessages.slice(-10);
+  const planTitle = plan?.plan?.planTitle || 'DJ SONG PLAN';
+  const planSummary = plan?.plan?.planSummary || plan?.plan?.reason || '';
+
+  const renderPlanCard = (messagePlan, keyPrefix = 'plan') => {
+    const planQueue = messagePlan?.queue || [];
+    if (!planQueue.length) return null;
+    return (
+      <div className="v4-plan-card">
+        <div className="v4-plan-title">
+          <span>{messagePlan.title || 'DJ SONG PLAN'}</span>
+          <small>{planQueue.length} TRACKS</small>
+        </div>
+        {messagePlan.summary ? <p>{messagePlan.summary}</p> : null}
+        {messagePlan.changes?.length ? (
+          <ul>
+            {messagePlan.changes.map((change, index) => <li key={`${keyPrefix}-change-${index}`}>{change}</li>)}
+          </ul>
+        ) : null}
+        <div className="v4-plan-list">
+          {planQueue.map((item, index) => {
+            const active = item.id === track?.id;
+            return (
+              <button
+                className={active ? 'active' : ''}
+                key={`${keyPrefix}-${item.id || index}`}
+                onClick={() => onSelectTrack(index, item.id)}
+                type="button"
+              >
+                <strong>{String(index + 1).padStart(2, '0')}</strong>
+                <span>
+                  <b>{item.title || '未知歌曲'}</b>
+                  <small>{item.artist || '未知歌手'}</small>
+                  {item.reason ? <em>{item.reason}</em> : null}
+                </span>
+                <i>{active ? 'ON AIR' : 'PLAY'}</i>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+    );
+  };
+
+  return (
+    <main className="v4-shell">
+      <section className="v4-radio" aria-label="MarkRadio V4 播放器聊天室">
+        {audioNodes}
+        <header className="v4-topbar">
+          <div className="v4-brand">
+            <button className="v4-avatar" onClick={onBack} title="返回 V3">
+              {netease.loggedIn && netease.profile?.avatarUrl ? (
+                <img alt="网易云头像" src={netease.profile.avatarUrl} />
+              ) : pixelCafe()}
+            </button>
+            <button className="v4-wordmark" onClick={onBack} title="返回 V3">MarkRadio</button>
+          </div>
+          <div className="v4-actions">
+            <button onClick={onLogin}>{netease.loggedIn ? 'LOGGED' : 'LOGIN'}</button>
+            <button className="active">DARK</button>
+            <button onClick={onCastOpen}>{castState === 'playing' ? 'CASTING' : 'CAST'}</button>
+          </div>
+        </header>
+
+        <section className="v4-clock-panel">
+          <PixelClockCanvas hours={clock.getHours()} minutes={clock.getMinutes()} />
+          <p>{weekdays[clock.getDay()]}</p>
+          <small>{clock.getDate()} · {months[clock.getMonth()].toUpperCase()} · {clock.getFullYear()}</small>
+          <div className={servicesOk ? 'v4-onair' : 'v4-onair idle'}>
+            <span />
+            {servicesOk ? 'ON AIR' : 'STANDBY'}
+          </div>
+        </section>
+
+        <section className="v4-player-strip">
+          <div className="v4-now-eq" aria-hidden="true">
+            {Array.from({ length: 5 }, (_, i) => <span key={i} style={{ '--i': i }} />)}
+          </div>
+          <div className="v4-now-text">
+            <strong>{currentTrack}</strong>
+            <small>{reading ? 'SPEAKING' : isPlaying ? 'PLAYING' : 'READY'}</small>
+          </div>
+          <div className="v4-controls">
+            <button disabled aria-label="上一首">‹</button>
+            <button onClick={playback} aria-label="播放或暂停">{pendingPlay && !reading ? '…' : isPlaying || reading ? 'Ⅱ' : '▶'}</button>
+            <button onClick={nextTrack} aria-label="下一首">›</button>
+            <button onClick={onRefresh} aria-label="刷新下一组">↻</button>
+            <button aria-label="收藏">♡</button>
+          </div>
+          <div className="v4-volume">
+            <span>VOL</span>
+            <i />
+          </div>
+        </section>
+
+        <div className="v4-progress-row">
+          <span>{formatTime(progress)}</span>
+          <div className="v4-progress">
+            <b style={{ width: `${displayProgressRatio * 100}%` }} />
+            <input
+              aria-label="拖动歌曲进度"
+              max="1000"
+              min="0"
+              onBlur={(event) => commitTrackSeek(Number(event.currentTarget.value) / 1000)}
+              onChange={(event) => previewTrackSeek(Number(event.currentTarget.value) / 1000)}
+              onInput={(event) => previewTrackSeek(Number(event.currentTarget.value) / 1000)}
+              onKeyUp={(event) => commitTrackSeek(Number(event.currentTarget.value) / 1000)}
+              onPointerDown={beginTrackSeek}
+              onPointerUp={(event) => commitTrackSeek(Number(event.currentTarget.value) / 1000)}
+              type="range"
+              value={Math.round(displayProgressRatio * 1000)}
+            />
+          </div>
+          <span>{formatTime(duration)}</span>
+        </div>
+
+        <section className="v4-queue-head">
+          <span>QUEUE</span>
+          <span>{queueCount} TRACKS</span>
+        </section>
+        <section className="v4-live-row">
+          <div><span /> MarkRadio</div>
+          <strong>{servicesOk ? 'LIVE' : 'LOCAL'}</strong>
+        </section>
+
+        {queue?.length ? (
+          <section className="v4-plan-panel" aria-label="DJ 歌曲计划">
+            <div className="v4-plan-title">
+              <span>{planTitle}</span>
+              <button onClick={onRefresh} type="button">ADJUST</button>
+            </div>
+            {planSummary ? <p className="v4-plan-summary">{planSummary}</p> : null}
+            <div className="v4-plan-list">
+              {queue.map((item, index) => {
+                const active = item.id === track?.id;
+                return (
+                  <button
+                    className={active ? 'active' : ''}
+                    key={item.id || index}
+                    onClick={() => onSelectTrack(index, item.id)}
+                    type="button"
+                  >
+                    <strong>{String(index + 1).padStart(2, '0')}</strong>
+                    <span>
+                      <b>{item.title || '未知歌曲'}</b>
+                      <small>{item.artist || '未知歌手'}</small>
+                      {item.reason ? <em>{item.reason}</em> : null}
+                    </span>
+                    <i>{active ? 'ON AIR' : 'PLAY'}</i>
+                  </button>
+                );
+              })}
+            </div>
+          </section>
+        ) : null}
+
+        <section className="v4-chat-log" aria-label="DJ 对话记录">
+          <p className="v4-system-line">Connected to MarkRadio server</p>
+          {lastMessages.map((message) => (
+            <article className={`v4-message ${message.role}`} key={message.id}>
+              <div className="v4-message-avatar">
+                {message.role === 'user' ? 'M' : pixelCafe()}
+              </div>
+              <div>
+                <span>{message.role === 'user' ? 'MMGUO' : 'MARKRADIO'}</span>
+                {message.text ? <p>{message.text}</p> : null}
+                {message.type === 'plan' ? renderPlanCard(message.plan, message.id) : null}
+                {message.meta ? <small>{message.meta}</small> : null}
+              </div>
+            </article>
+          ))}
+          {track?.title ? <p className="v4-now-playing">Now playing: {track.title} · {track.artist}</p> : null}
+        </section>
+
+        <form className="v4-chat-input" onSubmit={handleChatSubmit}>
+          <input
+            aria-label="和 MarkRadio 对话"
+            disabled={chatBusy}
+            onChange={(event) => setChatInput(event.target.value)}
+            placeholder="Talk to DJ..."
+            value={chatInput}
+          />
+          <button
+            aria-label="语音输入"
+            className={speechState === 'listening' ? 'listening' : ''}
+            onClick={onSpeechInput}
+            title={speechMessage || '语音输入'}
+            type="button"
+          >
+            <span className="v4-mic-dot" aria-hidden="true" />
+          </button>
+          <button disabled={chatBusy || busy || !chatInput.trim()} type="submit">
+            {chatBusy ? '…' : '↑'}
+          </button>
+        </form>
+        {speechMessage ? <p className="v4-speech-hint">{speechMessage}</p> : null}
+      </section>
+    </main>
+  );
+}
+
 export default function App() {
+  const [viewMode, setViewMode] = useState('v3');
   const [state, setState] = useState(null);
   const [status, setStatus] = useState(null);
   const [selectedMood, setSelectedMood] = useState('平静');
@@ -712,10 +890,26 @@ export default function App() {
   const [readingCardIndex, setReadingCardIndex] = useState(-1);
   const [volumeTarget, setVolumeTarget] = useState(1);
   const [pendingPlay, setPendingPlay] = useState(false);
+  const [chatInput, setChatInput] = useState('');
+  const [chatBusy, setChatBusy] = useState(false);
+  const [chatMessages, setChatMessages] = useState(() => [{
+    id: 'hello',
+    role: 'dj',
+    text: '我是 MarkRadio，十三哥的音乐之声。你可以告诉我今晚想听什么，我会重新规划歌单。',
+    meta: 'READY'
+  }]);
+  const [speechState, setSpeechState] = useState('idle');
+  const [speechMessage, setSpeechMessage] = useState('');
   const audioRef = useRef(null);
   const djAudioRef = useRef(null);
+  const speechRecognitionRef = useRef(null);
   const spectrumRef = useRef(null);
   const particleRef = useRef(null);
+  const pulseCanvasRef = useRef(null);
+  const pulseParticlesRef = useRef([]);
+  const pulseWavesRef = useRef([]);
+  const pulseFrameRef = useRef(null);
+  const lastPulseAtRef = useRef(0);
   const audioContextRef = useRef(null);
   const analyserRef = useRef(null);
   const analyserDataRef = useRef(null);
@@ -730,11 +924,150 @@ export default function App() {
   const [autoplayToken, setAutoplayToken] = useState(0);
   const planRef = useRef(null);
   const planDjUrlRef = useRef(null);
+  const planIdRef = useRef(null);
   const [seekDraftRatio, setSeekDraftRatio] = useState(null);
 
   function syncReadProgress(ratio) {
     const safeRatio = Math.min(1, Math.max(0, ratio));
     setReadProgress(safeRatio);
+  }
+
+  function paintPixelPulse() {
+    const canvas = pulseCanvasRef.current;
+    const particles = pulseParticlesRef.current;
+    const waves = pulseWavesRef.current;
+    if (!canvas || (!particles.length && !waves.length)) {
+      pulseFrameRef.current = null;
+      return;
+    }
+
+    const rect = canvas.getBoundingClientRect();
+    const dpr = Math.min(window.devicePixelRatio || 1, 1.5);
+    const w = Math.round(rect.width || window.innerWidth);
+    const h = Math.round(rect.height || window.innerHeight);
+    const nextWidth = Math.round(w * dpr);
+    const nextHeight = Math.round(h * dpr);
+    if (canvas.width !== nextWidth || canvas.height !== nextHeight) {
+      canvas.width = nextWidth;
+      canvas.height = nextHeight;
+    }
+
+    const ctx = canvas.getContext('2d');
+    const nowMs = performance.now();
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.clearRect(0, 0, w, h);
+    ctx.imageSmoothingEnabled = false;
+    ctx.globalCompositeOperation = 'lighter';
+
+    for (let index = waves.length - 1; index >= 0; index -= 1) {
+      const wave = waves[index];
+      const age = (nowMs - wave.createdAt) / 1000;
+      const lifeRatio = age / wave.life;
+      if (lifeRatio >= 1) {
+        waves.splice(index, 1);
+        continue;
+      }
+
+      for (let ring = 0; ring < PULSE_RING_COUNT; ring += 1) {
+        const radius = age * 360 - ring * 28;
+        if (radius < 10) continue;
+        const opacity = Math.max(0, 1 * (1 - lifeRatio) * (1 - ring * 0.1));
+        const points = Math.min(132, Math.max(24, Math.floor(radius / 5)));
+        ctx.globalAlpha = opacity;
+        ctx.fillStyle = lerpColor([255, 255, 255], [0, 245, 212], lifeRatio + ring * 0.08);
+        ctx.shadowColor = 'rgba(0,245,212,0.22)';
+        ctx.shadowBlur = 5;
+        for (let i = 0; i < points; i += 1) {
+          const angle = wave.seed + (i / points) * Math.PI * 2;
+          const x = wave.x + Math.cos(angle) * radius;
+          const y = wave.y + Math.sin(angle) * radius;
+          if (x < -8 || x > w + 8 || y < -8 || y > h + 8) continue;
+          ctx.fillRect(Math.round(x), Math.round(y), 10, 10);
+        }
+      }
+    }
+
+    for (let index = particles.length - 1; index >= 0; index -= 1) {
+      const p = particles[index];
+      const age = (nowMs - p.createdAt) / 1000;
+      const lifeRatio = age / p.life;
+      if (lifeRatio >= 1 || p.opacity <= 0.01) {
+        particles.splice(index, 1);
+        continue;
+      }
+
+      p.vx *= PULSE_DAMPING;
+      p.vy *= PULSE_DAMPING;
+      p.curve += p.spin * 0.016;
+      p.x += p.vx;
+      p.y += p.vy + Math.sin(p.curve) * 0.16;
+
+      const fadeStart = Math.max(0.01, p.life - 0.5);
+      const fadeRatio = age > fadeStart ? (age - fadeStart) / 0.5 : 0;
+      const opacity = Math.max(0, 1 - fadeRatio);
+      const size = p.size * (1 - fadeRatio * 0.28);
+      ctx.globalAlpha = opacity * (0.86 + p.energy * 0.14);
+      ctx.fillStyle = lerpColor([255, 255, 255], [0, 245, 212], lifeRatio);
+      ctx.shadowColor = lifeRatio < 0.35 ? 'rgba(255,255,255,0.5)' : 'rgba(0,245,212,0.34)';
+      ctx.shadowBlur = 10;
+      ctx.fillRect(Math.round(p.x), Math.round(p.y), Math.max(2, size), Math.max(2, size));
+      p.opacity = opacity;
+    }
+
+    ctx.globalAlpha = 1;
+    ctx.shadowBlur = 0;
+    ctx.globalCompositeOperation = 'source-over';
+    if (particles.length || waves.length) {
+      pulseFrameRef.current = requestAnimationFrame(paintPixelPulse);
+    } else {
+      ctx.clearRect(0, 0, w, h);
+      pulseFrameRef.current = null;
+    }
+  }
+
+  function triggerPixelPulse(force = false) {
+    const nowMs = performance.now();
+    if (!force && nowMs - lastPulseAtRef.current < 900) return;
+    lastPulseAtRef.current = nowMs;
+
+    const canvas = pulseCanvasRef.current;
+    const host = document.querySelector('.top-status time') || document.querySelector('.phone');
+    if (!canvas || !host) return;
+    const canvasRect = canvas.getBoundingClientRect();
+    const hostRect = host.getBoundingClientRect();
+    const originX = Math.min(canvasRect.width - 64, hostRect.left + hostRect.width / 2 - canvasRect.left);
+    const originY = Math.max(96, hostRect.top + hostRect.height / 2 - canvasRect.top);
+
+    const particles = pulseParticlesRef.current;
+    pulseWavesRef.current.push({
+      x: originX,
+      y: originY,
+      life: 1.7,
+      seed: Math.random() * Math.PI * 2,
+      createdAt: nowMs - 320
+    });
+    for (let i = 0; i < PULSE_PARTICLE_COUNT; i += 1) {
+      const angle = Math.random() * Math.PI * 2;
+      const speed = 9 + Math.random() * 10;
+      const launch = Math.random() * 52;
+      particles.push({
+        x: originX + Math.cos(angle) * launch,
+        y: originY + Math.sin(angle) * launch,
+        vx: Math.cos(angle) * speed,
+        vy: Math.sin(angle) * speed,
+        spin: (Math.random() - 0.5) * 1.2,
+        curve: Math.random() * Math.PI * 2,
+        size: PULSE_PIXEL_SIZE + Math.random() * 2,
+        life: 1.5 + Math.random() * 1.05,
+        opacity: 1,
+        energy: Math.random(),
+        createdAt: nowMs
+      });
+    }
+
+    if (!pulseFrameRef.current) {
+      pulseFrameRef.current = requestAnimationFrame(paintPixelPulse);
+    }
   }
 
   useEffect(() => {
@@ -746,8 +1079,25 @@ export default function App() {
       setNetease(neteaseData);
       setSelectedMood(nowData.now?.mood || '平静');
     }).catch(() => {});
+    // Draw idle spectrum on mount — retry until canvas has valid dimensions
+    let idleTries = 0;
+    const drawIdle = () => {
+      if (!spectrumRef.current || !mounted) return;
+      const rect = spectrumRef.current.getBoundingClientRect();
+      const w = rect.width || spectrumRef.current.clientWidth || window.innerWidth;
+      const h = rect.height || spectrumRef.current.clientHeight;
+      if ((w > 0 && h > 0) || idleTries >= 5) {
+        const n = Math.max(1, Math.floor(w / SPEC_PX.cell));
+        paintSpectrumCanvas(spectrumRef.current, buildIdleSpectrumLevels(n));
+        return;
+      }
+      idleTries++;
+      requestAnimationFrame(drawIdle);
+    };
+    const timer = setTimeout(drawIdle, 400);
     return () => {
       mounted = false;
+      clearTimeout(timer);
     };
   }, []);
 
@@ -837,6 +1187,8 @@ export default function App() {
   const lyricIndex = currentLyricIndex(lyrics, progress);
   const showLyrics = introDoneFor === track.id && !reading;
 
+  // V3: pulse only on song switch / refresh / load, not periodic
+
   useEffect(() => {
     clearInterval(typeTimerRef.current);
     clearInterval(fadeTimerRef.current);
@@ -854,6 +1206,7 @@ export default function App() {
       djAudioRef.current.removeAttribute('src');
     }
     setReadingCardIndex(-1);
+    if (track.id) triggerPixelPulse();
   }, [track.id]);
 
   // Auto-play: starts after song advance / group refresh (first play is user-initiated)
@@ -867,6 +1220,7 @@ export default function App() {
   useEffect(() => {
     planRef.current = plan;
     planDjUrlRef.current = planDjUrl;
+    planIdRef.current = plan?.id || null;
   }, [plan, planDjUrl]);
 
   useEffect(() => () => {
@@ -875,6 +1229,15 @@ export default function App() {
     cancelAnimationFrame(readRafRef.current);
     stopAudioVisuals();
     clearTimeout(seekCommitTimerRef.current);
+    cancelAnimationFrame(pulseFrameRef.current);
+    speechRecognitionRef.current?.abort?.();
+  }, []);
+
+  useEffect(() => {
+    window.triggerPixelPulse = triggerPixelPulse;
+    return () => {
+      if (window.triggerPixelPulse === triggerPixelPulse) delete window.triggerPixelPulse;
+    };
   }, []);
 
   async function chooseMood(mood) {
@@ -884,12 +1247,16 @@ export default function App() {
       await api.setMood(mood);
       await refreshPlan(mood, true);
     } finally {
+      refreshingRef.current = false;
       setBusy(false);
     }
   }
 
   async function refreshPlan(mood = selectedMood, autoplay = false) {
+    if (refreshingRef.current) return;
+    refreshingRef.current = true;
     setBusy(true);
+    triggerPixelPulse();
     try {
       await pausePlayback();
       // 新计划：重置 intro 状态，清缓存
@@ -906,6 +1273,7 @@ export default function App() {
         setAutoplayToken((value) => value + 1);
       }
     } finally {
+      refreshingRef.current = false;
       setBusy(false);
     }
   }
@@ -954,7 +1322,7 @@ export default function App() {
         }
         // Phase 2: Card intro — music at low volume, read song DJ text
         const idx = queueIndex >= 0 ? queueIndex : 0;
-        await runCardIntro(idx);
+        if (queue.length > 0) await runCardIntro(idx);
         // Phase 3: Fade music to full, show lyrics
         if (audio) {
           audio.volume = 1;
@@ -984,26 +1352,68 @@ export default function App() {
   }
 
   async function resolveCardAudioUrl(index) {
-    const latestPlan = planRef.current || plan; const cardTts = latestPlan?.cardTts?.[index];
-    // 优先使用预生成的 TTS
+    // 优先用 ref 中的预生成 TTS
+    const latestPlan = planRef.current || plan;
+    const cardTts = latestPlan?.cardTts?.[index];
     if (cardTts?.ok && cardTts.url) {
       return apiAssetUrl(cardTts.url);
     }
+    if (!cardTts?.deferred && (cardTts?.pending || !cardTts?.ok)) {
+      // 如果 TTS 仍在生成，轮询 API（绕过 WebSocket 延迟）
+      const waited = await new Promise((resolve) => {
+        const start = Date.now();
+        const check = async () => {
+          try {
+            const now = await api.now();
+            const p = now?.plan;
+            const ct = p?.cardTts?.[index];
+            if (ct?.ok && ct.url) { resolve(apiAssetUrl(ct.url)); return; }
+          } catch {}
+          if (Date.now() - start > 15000) { resolve(null); return; }
+          setTimeout(check, 300);
+        };
+        check();
+      });
+      if (waited) return waited;
+    }
     // 回退：调用 API 生成
-    const reason = queue[index]?.reason;
+    const reason = latestPlan?.queue?.[index]?.reason;
     if (!reason) return '';
     const cached = introAudioCacheRef.current.get(reason);
     if (cached) return cached;
-    const result = await api.voicePreview({ text: reason, mood: selectedMood }).catch(() => null);
-    const url = result?.ok && result.url ? apiAssetUrl(result.url) : '';
-    if (url) introAudioCacheRef.current.set(reason, url);
-    return url;
+    try {
+      const result = await api.voicePreview({ text: reason, mood: selectedMood });
+      const url = result?.ok && result.url ? apiAssetUrl(result.url) : '';
+      if (url) introAudioCacheRef.current.set(reason, url);
+      return url;
+    } catch {
+      return '';
+    }
   }
   
     async function resolveIntroAudioUrl(text) {
-    const t = text || introText;
+    const t = text || '';
     if (!t) return '';
-    const latestDjUrl = planDjUrlRef.current; if (latestDjUrl) return latestDjUrl;
+    // 优先 planRef 中的 URL
+    const latestPlan = planRef.current;
+    const djUrl = latestPlan?.tts?.url ? apiAssetUrl(latestPlan.tts.url) : '';
+    if (djUrl) return djUrl;
+    // 轮询 API 等待 TTS 就绪
+    const waited = await new Promise((resolve) => {
+      const start = Date.now();
+      const check = async () => {
+        try {
+          const now = await api.now();
+          const u = now?.plan?.tts?.url;
+          if (u) { resolve(apiAssetUrl(u)); return; }
+        } catch {}
+        if (Date.now() - start > 15000) { resolve(''); return; }
+        setTimeout(check, 300);
+      };
+      check();
+    });
+    if (waited) return waited;
+    // 回退：实时生成
     const cached = introAudioCacheRef.current.get(t);
     if (cached) return cached;
     const result = await api.voicePreview({ text: t, mood: selectedMood }).catch(() => null);
@@ -1105,7 +1515,11 @@ export default function App() {
       });
     }
     if (!introUrl) {
-      introUrl = await resolveIntroAudioUrl(planRef.current?.tts?.text || introText);
+      try {
+        introUrl = await resolveIntroAudioUrl(planRef.current?.tts?.text || introText);
+      } catch {
+        introUrl = '';
+      }
     }
 
     const djAudio = djAudioRef.current;
@@ -1144,8 +1558,10 @@ export default function App() {
     cancelAnimationFrame(readRafRef.current);
     stopAudioVisuals();
     
-    const reason = queue[cardIndex]?.reason;
-    if (!reason) return;
+    // Use ref to stay in sync with latest plan, avoiding stale closure queue
+    const latestPlan = planRef.current;
+    const reason = latestPlan?.queue?.[cardIndex]?.reason
+      || `来自${latestPlan?.mood || '此刻'}的选曲。${latestPlan?.plan?.segue || '下一首，继续把情绪慢慢放平。'}`;
 
     setReading(true);
     setReadProgress(0);
@@ -1184,12 +1600,13 @@ export default function App() {
       });
       djAudio.pause();
       if (playRejected) {
-        await readTextSegment(reason);
+        // Use latest plan ref to avoid stale closure after async gap
+        await readTextSegment(planRef.current?.queue?.[cardIndex]?.reason || reason);
       }
       return;
     }
-    // Fallback
-    await readTextSegment(reason);
+    // Fallback — use latestPlan ref to avoid stale closure
+    await readTextSegment(planRef.current?.queue?.[cardIndex]?.reason || reason);
   }
 
   async function finishIntro() {
@@ -1244,20 +1661,69 @@ export default function App() {
     }, 160);
   }
 
+  const refreshingRef = useRef(false);
+
   async function handleEnded() {
     const audio = audioRef.current;
-    if (!audio) return;
+    if (!audio || refreshingRef.current || busy) return;
+    triggerPixelPulse();
     try {
       const currentIndex = queue.findIndex((item) => item.id === track.id);
       if (currentIndex >= 0 && currentIndex < queue.length - 1) {
         await api.playback('next').catch(() => {});
         autoplayOptionsRef.current = { skipIntro: false };
+        triggerPixelPulse();
         setAutoplayToken((value) => value + 1);
         return;
       }
       await refreshPlan(selectedMood, true);
     } catch (e) {
       try { await refreshPlan(selectedMood, true); } catch (_) {}
+    }
+  }
+
+  async function nextTrack() {
+    if (refreshingRef.current || busy) return;
+    triggerPixelPulse();
+    const currentIndex = queue.findIndex((item) => item.id === track.id);
+    if (currentIndex >= 0 && currentIndex < queue.length - 1) {
+      await api.playback('next').catch(() => {});
+      autoplayOptionsRef.current = { skipIntro: false };
+      setAutoplayToken((value) => value + 1);
+      return;
+    }
+    await refreshPlan(selectedMood, true);
+  }
+
+  async function selectQueueTrack(index, trackId = '') {
+    if (refreshingRef.current || busy || pendingPlay) return;
+    const item = queue.find((track) => track.id === trackId) || queue[index];
+    if (!item) return;
+    const currentIndex = queue.findIndex((track) => track.id === item.id);
+    triggerPixelPulse();
+    setBusy(true);
+    try {
+      await pausePlayback();
+      setIntroDoneFor(null);
+      setReading(false);
+      setReadProgress(0);
+      setReadingCardIndex(-1);
+      setLocalProgress(0);
+      const nextState = await api.playback('select', { index: currentIndex, trackId: item.id });
+      setState(nextState);
+      autoplayOptionsRef.current = { skipIntro: false };
+      setAutoplayToken((value) => value + 1);
+      setChatMessages((items) => [
+        ...items,
+        {
+          id: `select-${Date.now()}`,
+          role: 'system',
+          text: `Switched to: ${item.title}${item.artist ? ` · ${item.artist}` : ''}`,
+          meta: 'QUEUE'
+        }
+      ]);
+    } finally {
+      setBusy(false);
     }
   }
 
@@ -1307,7 +1773,13 @@ function seekTo(ratio) {
     stopAudioVisuals();
     const startedAt = performance.now();
     const numBars = Math.max(1, Math.floor((spectrumRef.current?.clientWidth || window.innerWidth) / SPEC_PX.cell));
+    let frameSkip = 0;
     const tick = () => {
+      frameSkip = (frameSkip + 1) % 2;
+      if (frameSkip !== 0) {
+        visualFrameRef.current = requestAnimationFrame(tick);
+        return;
+      }
       const elapsed = (performance.now() - startedAt) / 1000;
       const levels = buildFallbackLevels(elapsed, numBars);
       paintSpectrumCanvas(spectrumRef.current, levels);
@@ -1325,7 +1797,11 @@ function seekTo(ratio) {
     const startedAt = performance.now();
     let frameSkip = 0;
     const tick = () => {
-      // No frameSkip — render every frame for smooth visuals
+      frameSkip = (frameSkip + 1) % 2;
+      if (frameSkip !== 0) {
+        visualFrameRef.current = requestAnimationFrame(tick);
+        return;
+      }
       let levels = null;
       const canvasW = spectrumRef.current?.clientWidth || window.innerWidth; const numBars = Math.max(1, Math.floor(canvasW / SPEC_PX.cell));
       if (analyser && frequencyData) {
@@ -1371,13 +1847,10 @@ function seekTo(ratio) {
       analyser.fftSize = 128;
       analyser.smoothingTimeConstant = 0.72;
       if (!sourceEntry.connected) {
-        // Always connect to destination so audio plays
         sourceEntry.source.connect(context.destination);
-        // Tap for visualizer
         sourceEntry.source.connect(analyser);
         sourceEntry.connected = true;
       }
-      if (!analyserRef.current) analyser.connect(context.destination);
       analyserRef.current = analyser;
       analyserDataRef.current = new Uint8Array(analyser.frequencyBinCount);
       return analyser;
@@ -1446,6 +1919,122 @@ function seekTo(ratio) {
     }
   }
 
+  async function handleChatSubmit(event) {
+    event?.preventDefault?.();
+    const message = chatInput.trim();
+    if (!message || chatBusy) return;
+    const idBase = Date.now();
+    setChatInput('');
+    setChatBusy(true);
+    setSpeechMessage('');
+    setChatMessages((items) => [
+      ...items,
+      {
+        id: `user-${idBase}`,
+        role: 'user',
+        text: message,
+        meta: `${String(clock.getHours()).padStart(2, '0')}:${String(clock.getMinutes()).padStart(2, '0')}`
+      }
+    ]);
+    try {
+      introAudioCacheRef.current = new Map();
+      const beforeTrackId = track?.id || '';
+      const result = await api.chat(message);
+      const nextNow = await api.now();
+      setState({ ...nextNow, plan: result.plan });
+      const firstTrack = result.plan?.queue?.[0];
+      const shouldSwitch = Boolean(result.plan?.plan?.shouldSwitchNow) ||
+        Boolean(nextNow?.now?.track?.id && nextNow.now.track.id !== beforeTrackId);
+      if (shouldSwitch) {
+        setIntroDoneFor(null);
+        setReading(false);
+        setReadProgress(0);
+        setReadingCardIndex(-1);
+        setLocalProgress(0);
+        autoplayOptionsRef.current = { skipIntro: false };
+        setAutoplayToken((value) => value + 1);
+      }
+      const planMessage = result.planMessage
+        ? {
+            id: `plan-${idBase}`,
+            role: 'dj',
+            type: 'plan',
+            plan: result.planMessage,
+            meta: 'PLAN'
+          }
+        : null;
+      setChatMessages((items) => [
+        ...items,
+        {
+          id: `dj-${idBase}`,
+          role: 'dj',
+          text: result.reply || '收到，我已经重新整理队列。',
+          meta: 'REPLY'
+        },
+        planMessage,
+        firstTrack ? {
+          id: `now-${idBase}`,
+          role: 'system',
+          text: `Now playing: ${firstTrack.title}${firstTrack.artist ? ` · ${firstTrack.artist}` : ''}`,
+          meta: 'QUEUE'
+        } : null
+      ].filter(Boolean));
+    } catch (error) {
+      setChatMessages((items) => [
+        ...items,
+        { id: `err-${idBase}`, role: 'system', text: `DJ 暂时没接上：${error.message}`, meta: 'ERROR' }
+      ]);
+    } finally {
+      setChatBusy(false);
+    }
+  }
+
+  function startSpeechInput() {
+    if (typeof window === 'undefined') return;
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      setSpeechState('unsupported');
+      setSpeechMessage('当前浏览器不支持语音输入，请打字。');
+      return;
+    }
+    if (speechState === 'listening') {
+      speechRecognitionRef.current?.stop?.();
+      return;
+    }
+    const recognition = new SpeechRecognition();
+    speechRecognitionRef.current = recognition;
+    recognition.lang = 'zh-CN';
+    recognition.interimResults = true;
+    recognition.continuous = false;
+    recognition.onstart = () => {
+      setSpeechState('listening');
+      setSpeechMessage('正在听你说话...');
+    };
+    recognition.onresult = (event) => {
+      const transcript = Array.from(event.results)
+        .map((result) => result?.[0]?.transcript || '')
+        .join('')
+        .trim();
+      if (transcript) setChatInput(transcript);
+      if (Array.from(event.results).some((result) => result.isFinal)) {
+        setSpeechMessage('已转成文字，可以发送。');
+      }
+    };
+    recognition.onerror = () => {
+      setSpeechState('idle');
+      setSpeechMessage('语音输入失败，请打字。');
+    };
+    recognition.onend = () => {
+      setSpeechState('idle');
+    };
+    try {
+      recognition.start();
+    } catch {
+      setSpeechState('idle');
+      setSpeechMessage('语音输入没有启动，请打字。');
+    }
+  }
+
   useEffect(() => {
     if (!qr?.key) return undefined;
     let stopped = false;
@@ -1474,32 +2063,135 @@ function seekTo(ratio) {
     };
   }, [qr, selectedMood]);
 
+  const audioNodes = (
+    <>
+      <audio
+        crossOrigin="anonymous"
+        ref={audioRef}
+        src={trackUrl || undefined}
+        preload="auto"
+        onEnded={handleEnded}
+        onPause={() => setIsPlaying(false)}
+        onPlay={() => setIsPlaying(true)}
+        onTimeUpdate={(event) => setLocalProgress(event.currentTarget.currentTime)}
+      />
+      <audio crossOrigin="anonymous" ref={djAudioRef} preload="auto" />
+    </>
+  );
+
+  const modalNodes = (
+    <>
+      {showCastPanel ? (
+        <div className="qr-backdrop" role="dialog" aria-modal="true" aria-label="投屏设备选择">
+          <div className="qr-card cast-card">
+            <h3>投屏到智能音箱</h3>
+            {castDiscovering ? (
+              <p>正在搜索 UPnP/DLNA 设备...</p>
+            ) : castDevices.length === 0 ? (
+              <p>未发现设备，请确保音箱在同一网络。</p>
+            ) : (
+              <div className="cast-list">
+                {castDevices.map((device) => (
+                  <button
+                    key={device.usn}
+                    className={castDevice?.usn === device.usn ? 'active' : ''}
+                    onClick={() => handleCastConnect(device)}
+                  >
+                    <span>⬢</span>
+                    <div>
+                      <strong>{device.name}</strong>
+                      <small>{device.host}:{device.port}</small>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            )}
+            <div className="cast-actions">
+              <button onClick={handleCastDiscover}>再搜</button>
+              {castDevice ? (
+                <button onClick={handleCastDisconnect}>断开</button>
+              ) : null}
+              <button onClick={() => setShowCastPanel(false)}>关闭</button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {qr ? (
+        <div className="qr-backdrop" role="dialog" aria-modal="true" aria-label="网易云扫码登录">
+          <div className="qr-card">
+            <h3>网易云扫码登录</h3>
+            {qr.qrimg ? <img src={qr.qrimg} alt="网易云登录二维码" /> : null}
+            <p>{qrMessage}</p>
+            <button onClick={() => setQr(null)}>关闭</button>
+          </div>
+        </div>
+      ) : null}
+    </>
+  );
+
+  if (viewMode === 'v4') {
+    return (
+      <>
+        <V4RadioView
+          audioNodes={audioNodes}
+          beginTrackSeek={beginTrackSeek}
+          busy={busy}
+          castState={castState}
+          chatBusy={chatBusy}
+          chatInput={chatInput}
+          chatMessages={chatMessages}
+          clock={clock}
+          commitTrackSeek={commitTrackSeek}
+          displayProgressRatio={displayProgressRatio}
+          duration={duration}
+          handleChatSubmit={handleChatSubmit}
+          isPlaying={isPlaying}
+          netease={netease}
+          nextTrack={nextTrack}
+          onBack={() => setViewMode('v3')}
+          onCastOpen={() => setShowCastPanel(true)}
+          onLogin={startNeteaseLogin}
+          onRefresh={() => refreshPlan(selectedMood, false)}
+          onSelectTrack={selectQueueTrack}
+          onSpeechInput={startSpeechInput}
+          playback={playback}
+          pendingPlay={pendingPlay}
+          plan={plan}
+          previewTrackSeek={previewTrackSeek}
+          progress={progress}
+          queue={queue}
+          reading={reading}
+          servicesOk={servicesOk}
+          setChatInput={setChatInput}
+          speechMessage={speechMessage}
+          speechState={speechState}
+          track={track}
+        />
+        {modalNodes}
+      </>
+    );
+  }
+
   return (
     <main className="shell">
       <section className="stage" aria-label="十三哥的音乐之声播放器">
         <div className="aura" />
         <div className="phone">
-          <audio
-            crossOrigin="anonymous"
-            ref={audioRef}
-            src={trackUrl || undefined}
-            preload="auto"
-            onEnded={handleEnded}
-            onPause={() => setIsPlaying(false)}
-            onPlay={() => setIsPlaying(true)}
-            onTimeUpdate={(event) => setLocalProgress(event.currentTarget.currentTime)}
-          />
-          <audio crossOrigin="anonymous" ref={djAudioRef} preload="auto" />
+          <canvas className="pixel-pulse-canvas" ref={pulseCanvasRef} aria-hidden="true" />
+          {audioNodes}
           <header className="hero-panel">
             <div className="topline">
               <div className="brand-lockup">
-                <button className="avatar" onClick={startNeteaseLogin} title="网易云登录">
+                <button className="avatar" onClick={() => setViewMode('v4')} title="进入 MarkRadio V4">
                   {netease.loggedIn && netease.profile?.avatarUrl ? (
                     <img alt="网易云头像" src={netease.profile.avatarUrl} />
                   ) : pixelCafe()}
                 </button>
                 <div>
-                  <h1>MarkRadio</h1>
+                  <button className="brand-title-button" onClick={() => setViewMode('v4')} title="进入 MarkRadio V4">
+                    <h1>MarkRadio</h1>
+                  </button>
                   <div className={`speaking${servicesOk ? '' : ' idle'}`}>
                     <span />
                     {servicesOk
@@ -1565,7 +2257,7 @@ function seekTo(ratio) {
 
             <div className="track-row">
               <button className="tiny-play" onClick={playback} aria-label="播放或暂停">
-                {pendingPlay ? '…' : isPlaying || reading ? 'Ⅱ' : '▶'}
+                {pendingPlay && !reading ? '…' : isPlaying || reading ? 'Ⅱ' : '▶'}
               </button>
               <div className="progress draggable">
                 <span style={{ width: `${displayProgressRatio * 100}%` }} />
@@ -1622,57 +2314,12 @@ function seekTo(ratio) {
                 visualRef={particleRef}
               />
               <button onClick={playback} aria-label="播放或暂停">
-                {busy || pendingPlay ? '…' : isPlaying || reading ? 'Ⅱ' : '▶'}
+                {busy && !reading ? '…' : isPlaying || reading ? 'Ⅱ' : '▶'}
               </button>
             </footer>
           </section>
         </div>
-{showCastPanel ? (
-          <div className="qr-backdrop" role="dialog" aria-modal="true" aria-label="投屏设备选择">
-            <div className="qr-card cast-card">
-              <h3>投屏到智能音箱</h3>
-              {castDiscovering ? (
-                <p>正在搜索 UPnP/DLNA 设备...</p>
-              ) : castDevices.length === 0 ? (
-                <p>未发现设备，请确保音箱在同一网络。</p>
-              ) : (
-                <div className="cast-list">
-                  {castDevices.map((device) => (
-                    <button
-                      key={device.usn}
-                      className={castDevice?.usn === device.usn ? 'active' : ''}
-                      onClick={() => handleCastConnect(device)}
-                    >
-                      <span>⬢</span>
-                      <div>
-                        <strong>{device.name}</strong>
-                        <small>{device.host}:{device.port}</small>
-                      </div>
-                    </button>
-                  ))}
-                </div>
-              )}
-              <div className="cast-actions">
-                <button onClick={handleCastDiscover}>再搜</button>
-                {castDevice ? (
-                  <button onClick={handleCastDisconnect}>断开</button>
-                ) : null}
-                <button onClick={() => setShowCastPanel(false)}>关闭</button>
-              </div>
-            </div>
-          </div>
-        ) : null}
-
-        {qr ? (
-          <div className="qr-backdrop" role="dialog" aria-modal="true" aria-label="网易云扫码登录">
-            <div className="qr-card">
-              <h3>网易云扫码登录</h3>
-              {qr.qrimg ? <img src={qr.qrimg} alt="网易云登录二维码" /> : null}
-              <p>{qrMessage}</p>
-              <button onClick={() => setQr(null)}>关闭</button>
-            </div>
-          </div>
-        ) : null}
+        {modalNodes}
       </section>
     </main>
   );

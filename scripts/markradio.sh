@@ -20,6 +20,22 @@ red()    { echo -e "\033[31m$1\033[0m"; }
 green()  { echo -e "\033[32m$1\033[0m"; }
 yellow() { echo -e "\033[33m$1\033[0m"; }
 
+clear_cache() {
+  echo -n "清理缓存..."
+  rm -rf "$MARKRADIO_DIR/data/cache/tts"/* 2>/dev/null || true
+  # 只清除 TTS/播放记录/当前计划，保留网易云登录、口味、声线等配置
+  if [ -f "$MARKRADIO_DIR/data/markradio.db" ]; then
+    sqlite3 "$MARKRADIO_DIR/data/markradio.db" "
+      DELETE FROM tts_cache;
+      DELETE FROM plays;
+      DELETE FROM kv WHERE key='planToday';
+      DELETE FROM kv WHERE key='now';
+      DELETE FROM kv WHERE key='tracks';
+    " 2>/dev/null || true
+  fi
+  green " ✓"
+}
+
 status() {
   echo "====== Mark Radio 服务状态 ======"
 
@@ -36,10 +52,10 @@ status() {
     red   "  Netease API (3000) ✗ 未启动"
   fi
 
-  if pgrep -f "chromium.*kiosk" > /dev/null 2>&1; then
-    green "  Chromium 全屏        ✓ 运行中"
+  if pgrep -f "firefox.*kiosk" > /dev/null 2>&1; then
+    green "  Firefox 全屏        ✓ 运行中"
   else
-    red   "  Chromium 全屏        ✗ 未启动"
+    red   "  Firefox 全屏        ✗ 未启动"
   fi
   echo "================================"
 }
@@ -86,23 +102,26 @@ start_radio() {
   red " ✗ 启动超时，查看 $MARKRADIO_LOG"
 }
 
+disable_screen_blank() {
+  export DISPLAY="${DISPLAY:-:0}"
+  xset s off 2>/dev/null || true
+  xset -dpms 2>/dev/null || true
+  xset s noblank 2>/dev/null || true
+}
+
 start_chromium() {
-  if pgrep -f "chromium.*kiosk" > /dev/null 2>&1; then
-    yellow "[skip] Chromium 已在运行"
+  if pgrep -f "firefox.*kiosk" > /dev/null 2>&1; then
+    yellow "[skip] Firefox 已在运行"
     return
   fi
 
-  echo -n "启动 Chromium 全屏..."
-  DISPLAY="$DISPLAY" nohup chromium-browser \
+  echo -n "启动 Firefox 全屏..."
+  DISPLAY="$DISPLAY" nohup firefox \
     --kiosk \
-    --noerrdialogs \
-    --disable-infobars \
-    --disable-session-crashed-bubble \
-    --disable-restore-session-state \
     "$KIOSK_URL" > /dev/null 2>&1 &
   sleep 2
 
-  if pgrep -f "chromium.*kiosk" > /dev/null 2>&1; then
+  if pgrep -f "firefox.*kiosk" > /dev/null 2>&1; then
     green " ✓"
   else
     red " ✗ 未能启动"
@@ -111,8 +130,10 @@ start_chromium() {
 
 start() {
   echo "========== 启动 Mark Radio =========="
+  clear_cache
   start_netease
   start_radio
+  disable_screen_blank
   start_chromium
   echo
   status
@@ -151,8 +172,8 @@ stop_radio() {
 }
 
 stop_chromium() {
-  echo -n "停止 Chromium..."
-  pkill -f "chromium.*kiosk" 2>/dev/null || true
+  echo -n "停止 Firefox..."
+  pkill -f "firefox.*kiosk" 2>/dev/null || true
   sleep 1
   green " ✓"
 }
@@ -168,8 +189,16 @@ stop() {
 
 refresh() {
   echo "========== 刷新 Mark Radio =========="
-  # 仅重启 Chromium 获取最新前端；后端不动
   stop_chromium
+  stop_radio
+  clear_cache
+  start_netease
+  start_radio
+  # 等待服务器 warmup 完成，确保计划已就绪
+  echo -n "等待服务就绪..."
+  sleep 5
+  green " ✓"
+  disable_screen_blank
   start_chromium
   echo
   status

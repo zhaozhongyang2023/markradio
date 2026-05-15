@@ -3,10 +3,8 @@ const WS_BASE = import.meta.env.VITE_WS_BASE || '';
 
 function runtimeApiBase() {
   if (typeof window === 'undefined') return '';
-  if (window.location.port === '8080') {
-    return `${window.location.protocol}//${window.location.hostname}:8765`;
-  }
-  return '';
+  if (window.location.port === '8765') return '';
+  return `${window.location.protocol}//${window.location.hostname}:8765`;
 }
 
 async function request(path, options = {}) {
@@ -41,6 +39,11 @@ export const api = {
     request(`/api/playback/${action}`, {
       method: 'POST',
       body: JSON.stringify(body)
+    }),
+  chat: (message) =>
+    request('/api/chat', {
+      method: 'POST',
+      body: JSON.stringify({ message })
     }),
   neteaseStatus: () => request('/api/netease/status'),
   neteaseQrCreate: () =>

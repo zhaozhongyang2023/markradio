@@ -1,12 +1,17 @@
 import { buildDjContext, buildMessages } from './context.js';
 import { buildQueue, getCandidateTracks } from './music.js';
-import { demoPlan, generateDjPlan } from './openai.js';
+import { MAX_AI_PLAN_TRACKS, demoPlan, generateDjPlan } from './openai.js';
 import { synthesizeVoice } from './voice.js';
 import { getWeather } from './weather.js';
 import { getSpecialDates } from './special-dates.js';
 import { recommendMood } from './mood.js';
 
-export async function createRadioPlan({ store, mood: requestedMood = null, nowPlaying = null, deferTts = false, onTtsReady = null }) {
+const DEFAULT_QUEUE_LIMIT = 5;
+const TTS_PRELOAD_LIMIT = 2;
+
+export async function createRadioPlan({ store, mood: requestedMood = null, nowPlaying = null, deferTts = false, onTtsReady = null, userRequest = '', currentPlan = null }) {
+  // 每组刷新时清空跨组去重，确保 AI 选曲不会被跳过
+  sessionPlayedIds.clear();
   const now = new Date();
   const timeContext = buildTimeContext(now);
   const taste = store.get('taste');
@@ -26,17 +31,20 @@ export async function createRadioPlan({ store, mood: requestedMood = null, nowPl
   });
   store.set('mood', { current: mood, updatedAt: new Date().toISOString() });
 
-  const candidates = await getCandidateTracks({ store, mood });
+  const freshCandidates = await getCandidateTracks({ store, mood });
+  const candidates = mergeCandidateTracks(currentPlan?.queue || [], freshCandidates);
   const context = buildDjContext({
     taste,
     mood,
     specialDates,
     weather,
     recentPlays: store.recentPlays(50),
-    tracks: candidates.slice(0, 12),
+    tracks: candidates.slice(0, MAX_AI_PLAN_TRACKS),
     nowPlaying,
     voice,
-    timeContext
+    timeContext,
+    userRequest,
+    currentPlan
   });
   const messages = buildMessages(context);
   const plan = await generateDjPlan({ messages, fallbackTracks: candidates, mood }).catch((error) =>
@@ -65,28 +73,30 @@ export async function createRadioPlan({ store, mood: requestedMood = null, nowPl
       t.reason = buildTrackReason(t, idx, plan, mood);
     }
   }
-  const queueTracks = fillQueueTracks(selected, candidates, 2);
-  const queue = await buildQueue(queueTracks, store, 2);
+  const queueLimit = resolveQueueLimit(plan);
+  const queueTracks = fillQueueTracks(selected, candidates, queueLimit);
+  const queue = await buildQueue(queueTracks, store, queueLimit);
   const ttsText = buildIntroText({ plan, specialDates, track: queue[0] });
-  const tts = deferTts
-    ? { ok: false, pending: true, url: null, text: ttsText }
-    : await buildTts({ store, text: ttsText, mood, voiceStyle: plan.voiceStyle });
+  // 主导读 TTS 始终同步生成，确保播放时有声
+  const planId = `plan-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+  const tts = await buildTts({ store, text: ttsText, mood, voiceStyle: plan.voiceStyle, nonce: planId });
 
   const cardTts = deferTts
-    ? queue.slice(0, 2).map((track) => ({
+    ? queue.map((track, index) => ({
         ok: false, pending: true, url: null,
-        text: track?.reason || ''
+        text: track?.reason || '',
+        deferred: index >= TTS_PRELOAD_LIMIT
       }))
     : await (async () => {
       const results = [];
-      for (const track of queue.slice(0, 2)) {
-        results.push(await buildTts({ store, text: track?.reason || '', mood, voiceStyle: plan.voiceStyle }));
+      for (const track of queue) {
+        results.push(await buildTts({ store, text: track?.reason || '', mood, voiceStyle: plan.voiceStyle, nonce: planId }));
       }
       return results;
     })();
 
   const todayPlan = {
-    id: `plan-${Date.now()}`,
+    id: planId,
     createdAt: new Date().toISOString(),
     mood,
     weather,
@@ -99,20 +109,13 @@ export async function createRadioPlan({ store, mood: requestedMood = null, nowPl
   store.set('planToday', todayPlan);
   if (queue[0]) store.set('now', { track: queue[0], progress: 0, playing: false, speaking: Boolean(tts.ok), mood });
   if (deferTts) {
-    // 主导读 TTS
-    buildTts({ store, text: ttsText, mood, voiceStyle: plan.voiceStyle })
-      .then((nextTts) => updatePlanTts({ store, planId: todayPlan.id, tts: nextTts, onTtsReady }))
-      .catch((error) => updatePlanTts({
-        store,
-        planId: todayPlan.id,
-        tts: { ok: false, pending: false, url: null, message: error.message, text: ttsText },
-        onTtsReady
-      }));
+    // 主导读 TTS 已同步生成，只需更新 now.speaking
+    store.set('now', { ...store.get('now'), speaking: true });
     // 每首歌导读卡片 TTS
-    queue.slice(0, 2).forEach((track, i) => {
+    queue.slice(0, TTS_PRELOAD_LIMIT).forEach((track, i) => {
       const text = track?.reason;
       if (!text) return;
-      buildTts({ store, text, mood, voiceStyle: plan.voiceStyle })
+      buildTts({ store, text, mood, voiceStyle: plan.voiceStyle, nonce: planId })
         .then((card) => updateCardTts({ store, planId: todayPlan.id, index: i, tts: card, onTtsReady }))
         .catch((error) => updateCardTts({
           store, planId: todayPlan.id, index: i,
@@ -124,8 +127,22 @@ export async function createRadioPlan({ store, mood: requestedMood = null, nowPl
   return todayPlan;
 }
 
-async function buildTts({ store, text, mood, voiceStyle }) {
-  return synthesizeVoice({ store, text, mood, voiceStyle }).then((result) => ({
+function resolveQueueLimit(plan) {
+  const requested = Array.isArray(plan?.play) && plan.play.length ? plan.play.length : DEFAULT_QUEUE_LIMIT;
+  return Math.max(1, Math.min(MAX_AI_PLAN_TRACKS, requested));
+}
+
+function mergeCandidateTracks(currentQueue, candidates) {
+  const byId = new Map();
+  for (const track of [...(currentQueue || []), ...(candidates || [])]) {
+    if (!track?.id || byId.has(track.id)) continue;
+    byId.set(track.id, track);
+  }
+  return [...byId.values()];
+}
+
+async function buildTts({ store, text, mood, voiceStyle, nonce = '' }) {
+  return synthesizeVoice({ store, text, mood, voiceStyle, nonce }).then((result) => ({
     ...result,
     pending: false,
     text
@@ -166,12 +183,20 @@ const sessionPlayedIds = new Set();
 function fillQueueTracks(selected, candidates, limit) {
   const seen = new Set(sessionPlayedIds);
   const queue = [];
-  for (const track of [...selected, ...candidates]) {
+  // AI 选曲优先，不被去重跳过
+  for (const track of selected) {
+    if (!track?.id) continue;
+    seen.add(track.id);
+    sessionPlayedIds.add(track.id);
+    queue.push(track);
+  }
+  // 不足时从候选中补齐
+  for (const track of candidates) {
+    if (queue.length >= limit) break;
     if (!track?.id || seen.has(track.id)) continue;
     seen.add(track.id);
     sessionPlayedIds.add(track.id);
     queue.push(track);
-    if (queue.length >= limit) break;
   }
   return queue;
 }

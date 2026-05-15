@@ -169,21 +169,54 @@ app.post('/api/plan/today', async (request) => {
       broadcast('now', publicNow());
     }
   });
-  broadcast('plan', plan);
-  broadcast('now', publicNow());
   return plan;
 });
 
 app.post('/api/chat', async (request) => {
   const text = String(request.body?.message || '');
   const moodMatch = moods.find((item) => text.includes(item));
-  const plan = await createRadioPlan({ store, mood: moodMatch || store.get('mood')?.current });
+  const currentPlan = store.get('planToday');
+  const previousNow = store.get('now');
+  const plan = await createRadioPlan({
+    store,
+    mood: moodMatch || store.get('mood')?.current,
+    userRequest: text,
+    currentPlan,
+    deferTts: true,
+    onTtsReady: (updatedPlan) => {
+      broadcast('plan', updatedPlan);
+      broadcast('now', publicNow());
+    }
+  });
+  if (!plan.plan?.shouldSwitchNow && previousNow?.track?.id) {
+    const preservedTrack = plan.queue?.find((track) => track.id === previousNow.track.id);
+    if (preservedTrack) {
+      store.set('now', {
+        ...previousNow,
+        track: preservedTrack,
+        mood: plan.mood
+      });
+    }
+  }
+  const planMessage = buildPlanMessage(plan);
   broadcast('plan', plan);
+  broadcast('now', publicNow());
   return {
-    reply: `收到。十三哥的音乐之声已经按${plan.mood}重新整理队列。`,
-    plan
+    reply: plan.plan?.reply || `收到。十三哥的音乐之声已经按${plan.mood}重新整理队列。`,
+    plan,
+    planMessage
   };
 });
+
+function buildPlanMessage(plan) {
+  return {
+    type: 'plan',
+    title: plan.plan?.planTitle || 'MarkRadio 播出计划',
+    summary: plan.plan?.planSummary || plan.plan?.reason || '',
+    changes: plan.plan?.changes || [],
+    queue: plan.queue || []
+  };
+}
 
 app.post('/api/playback/:action', async (request) => {
   const action = request.params.action;
@@ -192,6 +225,19 @@ app.post('/api/playback/:action', async (request) => {
   if (action === 'play') now.playing = true;
   if (action === 'pause') now.playing = false;
   if (action === 'seek') now.progress = Number(request.body?.progress || 0);
+  if (action === 'select' && state.plan?.queue?.length) {
+    const index = Number.isInteger(request.body?.index) ? request.body.index : -1;
+    const trackId = String(request.body?.trackId || '');
+    const nextTrack = index >= 0
+      ? state.plan.queue[index]
+      : state.plan.queue.find((track) => track.id === trackId);
+    if (nextTrack) {
+      now.track = nextTrack;
+      now.progress = 0;
+      now.playing = true;
+      store.addPlay(now.track, now.mood);
+    }
+  }
   if (action === 'next' && state.plan?.queue?.length) {
     const currentIndex = state.plan.queue.findIndex((track) => track.id === now.track?.id);
     if (currentIndex >= 0) {

@@ -6,3 +6,19 @@ data/cache/
 .env
 .DS_Store
 npm-debug.log*
+
+# Test artifacts
+.playwright-cli/
+.venv-tts/
+
+# Screenshots
+*.png
+
+# TTS voice cache
+vioce/
+
+# data directory (local only)
+data/
+
+# SSH keys (accidental)
+Zzywo5201314*

@@ -2,6 +2,8 @@ import OpenAI from 'openai';
 import { config } from './config.js';
 import { assertServiceAvailable, markServiceFailure, markServiceSuccess } from './circuit-breaker.js';
 
+export const MAX_AI_PLAN_TRACKS = 60;
+
 export function parseDjJson(text) {
   const trimmed = text.trim();
   const fenced = trimmed.match(/```(?:json)?\s*([\s\S]*?)```/i);
@@ -26,10 +28,22 @@ export function normalizePlan(plan) {
       }
     }
   }
+  // 也合并 AI 直接返回的 trackReasons 字段（与 play 数组分离时）
+  if (plan.trackReasons && typeof plan.trackReasons === 'object') {
+    for (const [id, reason] of Object.entries(plan.trackReasons)) {
+      if (!trackReasons[id]) trackReasons[String(id)] = String(reason);
+    }
+  }
   return {
+    intent: String(plan.intent || 'create'),
+    reply: String(plan.reply || '收到。我会按此刻的心情重新整理队列。'),
     say: String(plan.say || '夜色缓缓铺开，声音是最好的陪伴。我们从一首契合此刻的歌开始。'),
-    play: playIds.slice(0, 8),
+    play: playIds.slice(0, MAX_AI_PLAN_TRACKS),
     trackReasons,
+    planTitle: String(plan.planTitle || plan.title || 'MarkRadio 播出计划'),
+    planSummary: String(plan.planSummary || plan.summary || plan.reason || '根据当前对话生成的播出计划。'),
+    changes: Array.isArray(plan.changes) ? plan.changes.map(String).slice(0, 12) : [],
+    shouldSwitchNow: Boolean(plan.shouldSwitchNow),
     reason: String(plan.reason || '根据当前心情和你的听歌习惯生成。'),
     segue: String(plan.segue || '下一首，同一个夜晚，另一种心情。'),
     mood: String(plan.mood || '平静'),
@@ -64,7 +78,7 @@ export async function generateDjPlan({ messages, fallbackTracks, mood }) {
 
   const text = completion.choices?.[0]?.message?.content || '';
   const plan = parseDjJson(text);
-  if (!plan.play.length) plan.play = fallbackTracks.slice(0, 4).map((track) => track.id);
+  if (!plan.play.length) plan.play = fallbackTracks.slice(0, 5).map((track) => track.id);
   return plan;
 }
 
@@ -73,8 +87,9 @@ export function demoPlan(fallbackTracks, mood, reason = 'Demo 模式') {
   const title = first?.title || '这首歌';
   const artist = first?.artist || '';
   return {
+    reply: `收到。今晚先按${mood}的方向整理一组歌。`,
     say: `窗外夜色正好。此刻的${mood}，让人想起一些声音。${artist ? artist + '的' : ''}《${title}》，是一首适合这个时间的歌。`,
-    play: fallbackTracks.slice(0, 4).map((track) => track.id),
+    play: fallbackTracks.slice(0, 5).map((track) => track.id),
     trackReasons: first ? { [first.id]: `${artist ? artist + '——' : ''}《${title}》。${mood}的质地，藏在旋律的间隙里。` } : {},
     reason,
     segue: '下一首，同样的夜晚，不同的光影。',

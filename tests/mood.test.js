@@ -9,11 +9,11 @@ test('normalizeMood keeps supported mood and falls back to 平静', () => {
 
 test('recommendMood respects manual mood first', () => {
   const mood = recommendMood({
-    currentMood: '欢乐',
+    currentMood: '开心',
     specialDates: [{ importance: 'high' }],
     hour: 23
   });
-  assert.equal(mood, '欢乐');
+  assert.equal(mood, '开心');
 });
 
 test('scoreTrackForMood boosts matching mood and energy', () => {
