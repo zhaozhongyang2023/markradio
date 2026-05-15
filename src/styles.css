@@ -594,7 +594,7 @@ p {
 
 .v4-plan-panel {
   min-height: 0;
-  overflow: hidden;
+  overflow: visible;
   padding: 12px 22px 10px;
   background: rgba(0, 0, 0, 0.18);
   border-top: 1px solid rgba(255, 255, 255, 0.035);
@@ -642,8 +642,9 @@ p {
   gap: 7px;
   max-height: clamp(164px, 20dvh, 280px);
   overflow-y: auto;
-  padding: 1px 4px 5px 1px;
+  padding: 2px 6px 16px 2px;
   scrollbar-width: none;
+  scroll-padding-bottom: 18px;
 }
 
 .v4-plan-panel .v4-plan-list {
@@ -668,6 +669,10 @@ p {
   cursor: pointer;
   padding: 9px 10px;
   text-align: left;
+}
+
+.v4-plan-list button:last-child {
+  margin-bottom: 10px;
 }
 
 .v4-plan-list button.active {
@@ -1861,6 +1866,7 @@ p {
   .v4-plan-list {
     max-height: 128px;
     gap: 6px;
+    padding-bottom: 18px;
   }
 
   .v4-plan-list button {
@@ -2363,7 +2369,7 @@ p {
   .v4-plan-panel .v4-plan-list {
     gap: 8px;
     max-height: clamp(260px, 26dvh, 440px);
-    padding: 2px 6px 8px 2px;
+    padding: 2px 6px 20px 2px;
   }
 
   .v4-plan-list button {
