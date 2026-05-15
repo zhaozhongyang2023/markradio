@@ -8,6 +8,7 @@ import { config } from './config.js';
 import { StateStore } from './state.js';
 import { station } from './defaults.js';
 import { moods, normalizeMood } from './mood.js';
+import { parseLyric } from './music.js';
 import { createRadioPlan } from './scheduler.js';
 import { getSpecialDates } from './special-dates.js';
 import { getVoicePublicConfig, synthesizeVoice, ttsFilePath, updateVoiceConfig } from './voice.js';
@@ -51,6 +52,29 @@ function broadcast(event, payload) {
   const data = JSON.stringify({ event, payload, at: new Date().toISOString() });
   for (const socket of clients) {
     if (socket.readyState === 1) socket.send(data);
+  }
+}
+
+async function hydrateCurrentLyric() {
+  const now = store.get('now');
+  const track = now?.track;
+  if (!track?.id || track.lyric?.length || track.source !== 'netease') return;
+  const sourceId = track.sourceId || String(track.id).replace(/^netease-/, '');
+  if (!sourceId) return;
+
+  const data = await callNetease('lyric', { id: sourceId }, store).catch(() => null);
+  const lyric = parseLyric(data?.lrc?.lyric || data?.klyric?.lyric || data?.tlyric?.lyric || '');
+  if (!lyric.length) return;
+
+  const nextTrack = { ...track, lyric };
+  store.set('now', { ...now, track: nextTrack });
+
+  const plan = store.get('planToday');
+  if (plan?.queue?.length) {
+    store.set('planToday', {
+      ...plan,
+      queue: plan.queue.map((item) => (item.id === nextTrack.id ? { ...item, lyric } : item))
+    });
   }
 }
 
@@ -103,7 +127,10 @@ app.post('/api/netease/like', async (request, reply) => {
   return { ok: true, liked: like, trackId: `netease-${id}`, result };
 });
 
-app.get('/api/now', async () => publicNow());
+app.get('/api/now', async () => {
+  await hydrateCurrentLyric();
+  return publicNow();
+});
 
 app.get('/api/mood', async () => ({
   current: store.get('mood')?.current || '平静',

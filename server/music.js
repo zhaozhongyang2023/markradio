@@ -153,13 +153,17 @@ async function resolveTrackMedia(track, store) {
   if (withUrl.source !== 'netease') return withUrl;
   const sourceId = withUrl.sourceId || withUrl.id?.replace(/^netease-/, '');
   const data = await callNetease('lyric', { id: sourceId }, store).catch(() => null);
-  const lyric = parseLyric(data?.lrc?.lyric || data?.klyric?.lyric || '');
+  const lyric = parseLyric(data?.lrc?.lyric || data?.klyric?.lyric || data?.tlyric?.lyric || '');
   return { ...withUrl, lyric };
 }
 
-function parseLyric(value) {
-  return String(value || '')
+export function parseLyric(value) {
+  const lines = String(value || '')
     .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean);
+
+  const timed = lines
     .map((line) => {
       const match = line.match(/^\[(\d{1,2}):(\d{1,2})(?:\.(\d{1,3}))?](.*)$/);
       if (!match) return null;
@@ -175,6 +179,13 @@ function parseLyric(value) {
     })
     .filter(Boolean)
     .slice(0, 80);
+
+  if (timed.length) return timed;
+
+  return lines
+    .filter((line) => !/^\[(?:offset|by|ti|ar|al):/i.test(line))
+    .slice(0, 80)
+    .map((text, index) => ({ time: index * 6, text }));
 }
 
 export function buildDemoQueue(tracks, limit = 4) {
