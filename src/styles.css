@@ -443,26 +443,18 @@ p {
 
 .v4-now-eq span {
   width: 5px;
-  height: calc(8px + var(--i) * 5px);
+  height: calc(4px + var(--level, 0.18) * 28px);
   background: #42d8b2;
   box-shadow: 0 0 10px rgba(66, 216, 178, 0.42);
-  animation: v4-eq 900ms ease-in-out infinite alternate;
-  animation-delay: calc(var(--i) * 90ms);
-  animation-play-state: paused;
+  transition: height 120ms ease-out, box-shadow 120ms ease-out;
 }
 
-.v4-radio.is-active:not(.low-power) .v4-now-eq span {
-  animation-play-state: running;
-}
-
-.v4-radio.low-power .v4-now-eq span,
 .v4-radio.low-power .v4-onair,
 .v4-radio.low-power .v4-onair span {
   animation: none !important;
 }
 
 .v4-radio.low-power .v4-now-eq span {
-  transform: none;
   box-shadow: none;
 }
 

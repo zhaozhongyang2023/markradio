@@ -728,16 +728,36 @@ function V4RadioView({
   track,
   trackIsFavorite,
   userVolume,
-  lowPowerMode
+  eqLevelsRef,
+  lowPowerMode,
+  pulseCanvasRef
 }) {
   const weekdays = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
   const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
   const currentTrack = track?.title ? `${track.title} - ${track.artist || 'Unknown'}` : '等待选曲';
-  const clockText = `${String(clock.getHours()).padStart(2, '0')}:${String(clock.getMinutes()).padStart(2, '0')}`;
   const queueCount = queue?.length || 0;
   const lastMessages = chatMessages.slice(-10);
   const planTitle = plan?.plan?.planTitle || 'DJ SONG PLAN';
   const planSummary = plan?.plan?.planSummary || plan?.plan?.reason || '';
+
+  const eqRef = useRef(null);
+  const eqSpansRef = useRef(null);
+  useEffect(() => {
+    if (!eqRef.current) return;
+    eqSpansRef.current = Array.from(eqRef.current.querySelectorAll('span'));
+    let raf;
+    function apply() {
+      const spans = eqSpansRef.current;
+      const levels = eqLevelsRef?.current;
+      for (let i = 0; i < spans.length; i++) {
+        spans[i].style.setProperty('--level', (levels?.[i] ?? 0.18).toFixed(3));
+      }
+      raf = requestAnimationFrame(apply);
+    }
+    raf = requestAnimationFrame(apply);
+    return () => cancelAnimationFrame(raf);
+  }, [eqLevelsRef]);
+
 
   const renderPlanCard = (messagePlan, keyPrefix = 'plan') => {
     const planQueue = messagePlan?.queue || [];
@@ -782,6 +802,7 @@ function V4RadioView({
   return (
     <main className={`v4-shell${lowPowerMode ? ' low-power' : ''}`}>
       <section className={`v4-radio${lowPowerMode ? ' low-power' : ''}${isPlaying || reading ? ' is-active' : ''}`} aria-label="MarkRadio V4 播放器聊天室">
+        <canvas className="pixel-pulse-canvas" ref={pulseCanvasRef} aria-hidden="true" />
         {audioNodes}
         <header className="v4-topbar">
           <div className="v4-brand">
@@ -800,11 +821,7 @@ function V4RadioView({
         </header>
 
         <section className="v4-clock-panel">
-          {lowPowerMode ? (
-            <div className="v4-text-clock" aria-label={`当前时间 ${clockText}`}>{clockText}</div>
-          ) : (
-            <PixelClockCanvas hours={clock.getHours()} minutes={clock.getMinutes()} lowPower={lowPowerMode} />
-          )}
+          <PixelClockCanvas hours={clock.getHours()} minutes={clock.getMinutes()} />
           <p>{weekdays[clock.getDay()]}</p>
           <small>{clock.getDate()} · {months[clock.getMonth()].toUpperCase()} · {clock.getFullYear()}</small>
           <div className={servicesOk ? 'v4-onair' : 'v4-onair idle'}>
@@ -814,7 +831,7 @@ function V4RadioView({
         </section>
 
         <section className="v4-player-strip">
-          <div className="v4-now-eq" aria-hidden="true">
+          <div className="v4-now-eq" aria-hidden="true" ref={eqRef}>
             {Array.from({ length: 5 }, (_, i) => <span key={i} style={{ '--i': i }} />)}
           </div>
           <div className="v4-now-text">
@@ -1003,6 +1020,7 @@ export default function App() {
   const spectrumRef = useRef(null);
   const particleRef = useRef(null);
   const pulseCanvasRef = useRef(null);
+  const v4EqLevelsRef = useRef(null);
   const pulseParticlesRef = useRef([]);
   const pulseWavesRef = useRef([]);
   const pulseFrameRef = useRef(null);
@@ -1133,18 +1151,22 @@ export default function App() {
   }
 
   function triggerPixelPulse(force = false) {
-    if (lowPowerMode && viewModeRef.current === 'v4') return;
+    const isV4LowPower = lowPowerMode && viewModeRef.current === 'v4';
     const nowMs = performance.now();
     if (!force && nowMs - lastPulseAtRef.current < 900) return;
     lastPulseAtRef.current = nowMs;
 
     const canvas = pulseCanvasRef.current;
-    const host = document.querySelector('.top-status time') || document.querySelector('.phone');
-    if (!canvas || !host) return;
+    const host = document.querySelector('.v4-clock-panel') || document.querySelector('.top-status time') || document.querySelector('.phone');
+    if (!canvas) return;
     const canvasRect = canvas.getBoundingClientRect();
-    const hostRect = host.getBoundingClientRect();
-    const originX = Math.min(canvasRect.width - 64, hostRect.left + hostRect.width / 2 - canvasRect.left);
-    const originY = Math.max(96, hostRect.top + hostRect.height / 2 - canvasRect.top);
+    let originX = canvasRect.width / 2;
+    let originY = canvasRect.height * 0.3;
+    if (host) {
+      const hostRect = host.getBoundingClientRect();
+      originX = Math.min(canvasRect.width - 64, hostRect.left + hostRect.width / 2 - canvasRect.left);
+      originY = Math.max(96, hostRect.top + hostRect.height / 2 - canvasRect.top);
+    }
 
     const particles = pulseParticlesRef.current;
     pulseWavesRef.current.push({
@@ -1154,10 +1176,11 @@ export default function App() {
       seed: Math.random() * Math.PI * 2,
       createdAt: nowMs - 320
     });
-    for (let i = 0; i < PULSE_PARTICLE_COUNT; i += 1) {
+    const count = isV4LowPower ? Math.floor(PULSE_PARTICLE_COUNT / 3) : PULSE_PARTICLE_COUNT;
+    for (let i = 0; i < count; i += 1) {
       const angle = Math.random() * Math.PI * 2;
-      const speed = 9 + Math.random() * 10;
-      const launch = Math.random() * 52;
+      const speed = isV4LowPower ? 4 + Math.random() * 5 : 9 + Math.random() * 10;
+      const launch = isV4LowPower ? Math.random() * 26 : Math.random() * 52;
       particles.push({
         x: originX + Math.cos(angle) * launch,
         y: originY + Math.sin(angle) * launch,
@@ -1253,7 +1276,7 @@ export default function App() {
   const duration = audioRef.current?.duration && Number.isFinite(audioRef.current.duration)
     ? audioRef.current.duration
     : track.duration || 207;
-  const progress = trackUrl ? localProgress : now.progress || 0;
+  const progress = localProgress;
   const progressRatio = Math.min(1, Math.max(0, progress / duration));
   const displayProgressRatio = seekDraftRatio ?? progressRatio;
   const weather = plan?.weather || {};
@@ -1974,6 +1997,7 @@ function seekTo(ratio) {
       const levels = buildFallbackLevels(elapsed, numBars);
       paintSpectrumCanvas(spectrumRef.current, levels);
       paintLevels(particleRef.current, levels.slice(0, PARTICLE_BARS));
+      v4EqLevelsRef.current = levels.slice(0, 5);
       visualFrameRef.current = requestAnimationFrame(tick);
     };
     tick();
@@ -1982,19 +2006,19 @@ function seekTo(ratio) {
   function startAudioVisuals(mediaElement) {
     stopAudioVisuals();
     if (!mediaElement) return;
-    if (viewModeRef.current === 'v4') return;
-    const analyser = setupAnalyser(mediaElement);
+    const isV4 = viewModeRef.current === 'v4';
+    const analyser = isV4 ? null : setupAnalyser(mediaElement);
     const frequencyData = analyser ? new Uint8Array(analyser.frequencyBinCount) : null;
     const startedAt = performance.now();
     let frameSkip = 0;
     const tick = () => {
-      frameSkip = (frameSkip + 1) % 2;
+      frameSkip = (frameSkip + 1) % (isV4 ? 6 : 2);
       if (frameSkip !== 0) {
         visualFrameRef.current = requestAnimationFrame(tick);
         return;
       }
       let levels = null;
-      const canvasW = spectrumRef.current?.clientWidth || window.innerWidth; const numBars = Math.max(1, Math.floor(canvasW / SPEC_PX.cell));
+      const numBars = isV4 ? 6 : Math.max(1, Math.floor((spectrumRef.current?.clientWidth || window.innerWidth) / SPEC_PX.cell));
       if (analyser && frequencyData) {
         analyser.getByteFrequencyData(frequencyData);
         levels = buildLevelsFromFrequency(frequencyData, numBars);
@@ -2002,8 +2026,11 @@ function seekTo(ratio) {
       if (!levels || levels.every((level) => level < 0.02)) {
         levels = buildFallbackLevels(mediaElement.currentTime || (performance.now() - startedAt) / 1000, numBars);
       }
-      paintSpectrumCanvas(spectrumRef.current, levels);
-      paintLevels(particleRef.current, levels.slice(0, PARTICLE_BARS));
+      if (!isV4) {
+        paintSpectrumCanvas(spectrumRef.current, levels);
+        paintLevels(particleRef.current, levels.slice(0, PARTICLE_BARS));
+      }
+      v4EqLevelsRef.current = levels.slice(0, 5);
       if (!mediaElement.paused && !mediaElement.ended) {
         visualFrameRef.current = requestAnimationFrame(tick);
       }
@@ -2329,6 +2356,8 @@ function seekTo(ratio) {
           beginTrackSeek={beginTrackSeek}
           busy={busy}
           castState={castState}
+          eqLevelsRef={v4EqLevelsRef}
+          pulseCanvasRef={pulseCanvasRef}
           chatBusy={chatBusy}
           chatInput={chatInput}
           chatMessages={chatMessages}
