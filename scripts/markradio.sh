@@ -12,6 +12,7 @@ NETEASE_PID="$NETEASE_DIR/netease-api.pid"
 
 MARKRADIO_LOG="$MARKRADIO_DIR/markradio.log"
 NETEASE_LOG="$NETEASE_DIR/netease-api.log"
+FIREFOX_LOG="$MARKRADIO_DIR/firefox-kiosk.log"
 
 DISPLAY="${DISPLAY:-:0}"
 KIOSK_URL="http://localhost:8080"
@@ -52,7 +53,7 @@ status() {
     red   "  Netease API (3000) ✗ 未启动"
   fi
 
-  if pgrep -f "firefox.*kiosk" > /dev/null 2>&1; then
+  if pgrep -f "firefox.*--kiosk" > /dev/null 2>&1; then
     green "  Firefox 全屏        ✓ 运行中"
   else
     red   "  Firefox 全屏        ✗ 未启动"
@@ -110,22 +111,32 @@ disable_screen_blank() {
 }
 
 start_chromium() {
-  if pgrep -f "firefox.*kiosk" > /dev/null 2>&1; then
+  if pgrep -f "firefox.*--kiosk" > /dev/null 2>&1; then
     yellow "[skip] Firefox 已在运行"
     return
   fi
 
   echo -n "启动 Firefox 全屏..."
-  DISPLAY="$DISPLAY" nohup firefox \
-    --kiosk \
-    "$KIOSK_URL" > /dev/null 2>&1 &
-  sleep 2
-
-  if pgrep -f "firefox.*kiosk" > /dev/null 2>&1; then
-    green " ✓"
-  else
-    red " ✗ 未能启动"
+  local firefox_bin
+  firefox_bin="$(command -v firefox-esr || command -v firefox || true)"
+  if [ -z "$firefox_bin" ]; then
+    red " ✗ 未安装 Firefox"
+    return
   fi
+
+  DISPLAY="$DISPLAY" nohup "$firefox_bin" \
+    --new-instance \
+    --kiosk \
+    "$KIOSK_URL" > "$FIREFOX_LOG" 2>&1 &
+
+  for i in $(seq 1 10); do
+    sleep 1
+    if pgrep -f "firefox.*--kiosk" > /dev/null 2>&1; then
+      green " ✓"
+      return
+    fi
+  done
+  red " ✗ 未能启动，查看 $FIREFOX_LOG"
 }
 
 start() {
@@ -173,7 +184,7 @@ stop_radio() {
 
 stop_chromium() {
   echo -n "停止 Firefox..."
-  pkill -f "firefox.*kiosk" 2>/dev/null || true
+  pkill -f "firefox.*--kiosk" 2>/dev/null || true
   sleep 1
   green " ✓"
 }
