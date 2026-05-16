@@ -13,9 +13,10 @@ NETEASE_PID="$NETEASE_DIR/netease-api.pid"
 MARKRADIO_LOG="$MARKRADIO_DIR/markradio.log"
 NETEASE_LOG="$NETEASE_DIR/netease-api.log"
 FIREFOX_LOG="$MARKRADIO_DIR/firefox-kiosk.log"
+FIREFOX_PROFILE="$MARKRADIO_DIR/firefox-kiosk-profile"
 
 DISPLAY="${DISPLAY:-:0}"
-KIOSK_URL="http://localhost:8080"
+KIOSK_URL="http://localhost:8080/?lowPower=1"
 
 red()    { echo -e "\033[31m$1\033[0m"; }
 green()  { echo -e "\033[32m$1\033[0m"; }
@@ -110,6 +111,24 @@ disable_screen_blank() {
   xset s noblank 2>/dev/null || true
 }
 
+prepare_firefox_profile() {
+  mkdir -p "$FIREFOX_PROFILE"
+  cat > "$FIREFOX_PROFILE/user.js" <<'EOF'
+user_pref("browser.sessionstore.resume_from_crash", false);
+user_pref("browser.sessionstore.max_tabs_undo", 0);
+user_pref("browser.sessionstore.max_windows_undo", 0);
+user_pref("browser.tabs.remote.autostart", false);
+user_pref("dom.ipc.processCount", 1);
+user_pref("dom.ipc.processCount.webIsolated", 1);
+user_pref("fission.autostart", false);
+user_pref("layout.frame_rate", 8);
+user_pref("toolkit.cosmeticAnimations.enabled", false);
+user_pref("ui.prefersReducedMotion", 1);
+user_pref("datareporting.policy.dataSubmissionEnabled", false);
+user_pref("app.update.enabled", false);
+EOF
+}
+
 force_kiosk_fullscreen() {
   command -v xdotool >/dev/null 2>&1 || return
   command -v xdpyinfo >/dev/null 2>&1 || return
@@ -152,8 +171,11 @@ start_chromium() {
     red " ✗ 未安装 Firefox"
     return
   fi
+  prepare_firefox_profile
 
   DISPLAY="$DISPLAY" nohup "$firefox_bin" \
+    --profile "$FIREFOX_PROFILE" \
+    --no-remote \
     --new-instance \
     --kiosk \
     "$KIOSK_URL" > "$FIREFOX_LOG" 2>&1 &
@@ -197,6 +219,9 @@ stop_netease() {
 }
 
 stop_radio() {
+  if command -v systemctl >/dev/null 2>&1 && systemctl list-unit-files markradio.service >/dev/null 2>&1; then
+    sudo -n systemctl stop markradio.service 2>/dev/null || true
+  fi
   if [ -f "$MARKRADIO_PID" ]; then
     local pid=$(cat "$MARKRADIO_PID")
     if kill -0 "$pid" 2>/dev/null; then
@@ -215,6 +240,8 @@ stop_radio() {
 stop_chromium() {
   echo -n "停止 Firefox..."
   pkill -f "firefox.*--kiosk" 2>/dev/null || true
+  pkill -f "chromium.*--kiosk" 2>/dev/null || true
+  pkill -f "chromium.*--app=$KIOSK_URL" 2>/dev/null || true
   sleep 1
   green " ✓"
 }

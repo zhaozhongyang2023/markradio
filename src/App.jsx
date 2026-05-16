@@ -26,6 +26,24 @@ const PULSE_PARTICLE_COUNT = 96;
 const PULSE_DAMPING = 0.98;
 const PULSE_PIXEL_SIZE = 10;
 const PULSE_RING_COUNT = 4;
+const LOW_POWER_READ_PROGRESS_MS = 110;
+
+function detectLowPowerRuntime() {
+  if (typeof navigator === 'undefined') return false;
+  const ua = navigator.userAgent || '';
+  const platform = navigator.platform || '';
+  const cores = navigator.hardwareConcurrency || 0;
+  const memory = navigator.deviceMemory || 0;
+  const screenW = typeof window !== 'undefined' ? window.screen?.width || 0 : 0;
+  const screenH = typeof window !== 'undefined' ? window.screen?.height || 0 : 0;
+  const forced = typeof window !== 'undefined' && new URLSearchParams(window.location.search).has('lowPower');
+  const kioskPortrait = /Linux/i.test(ua) && Math.min(screenW, screenH) <= 1200 && Math.max(screenW, screenH) >= 1600;
+  return forced ||
+    /Raspberry|armv|aarch64|Linux arm/i.test(`${ua} ${platform}`) ||
+    kioskPortrait ||
+    (cores > 0 && cores <= 4) ||
+    (memory > 0 && memory <= 4);
+}
 
 function formatTime(seconds = 0) {
   const safe = Math.max(0, Math.floor(seconds));
@@ -388,14 +406,14 @@ function drawPixelDigit(ctx, ox, oy, ch) {
   ctx.shadowBlur = 0;
 }
 
-function PixelClockCanvas({ hours, minutes }) {
+function PixelClockCanvas({ hours, minutes, lowPower = false }) {
   const canvasRef = useRef(null);
   const [tick, setTick] = useState(0);
 
   useEffect(() => {
-    const id = setInterval(() => setTick(t => t + 1), 500);
+    const id = setInterval(() => setTick(t => t + 1), lowPower ? 30000 : 500);
     return () => clearInterval(id);
-  }, []);
+  }, [lowPower]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -444,7 +462,7 @@ function PixelClockCanvas({ hours, minutes }) {
 
     // draw colon (two squares, blink together)
     const t = Date.now() / 1000;
-    const blinkAlpha = 0.2 + 0.8 * (0.5 + 0.5 * Math.cos(t * Math.PI / 1.5)); // 1Hz breathing
+    const blinkAlpha = lowPower ? 1 : 0.2 + 0.8 * (0.5 + 0.5 * Math.cos(t * Math.PI / 1.5)); // 1Hz breathing
     ctx.globalAlpha = blinkAlpha;
     ctx.fillStyle = '#ffffff';
     ctx.shadowColor = 'rgba(255,255,255,0.18)';
@@ -455,7 +473,7 @@ function PixelClockCanvas({ hours, minutes }) {
     ctx.fillRect(colonX * cell, colCY + 4 * cell, PX.size, PX.size);
     ctx.shadowBlur = 0;
     ctx.globalAlpha = 1;
-  }, [hours, minutes, tick]);
+  }, [hours, minutes, lowPower, tick]);
 
   return <canvas ref={canvasRef} className="pixel-clock-canvas" aria-hidden="true" />;
 }
@@ -709,11 +727,13 @@ function V4RadioView({
   speechState,
   track,
   trackIsFavorite,
-  userVolume
+  userVolume,
+  lowPowerMode
 }) {
   const weekdays = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
   const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
   const currentTrack = track?.title ? `${track.title} - ${track.artist || 'Unknown'}` : '等待选曲';
+  const clockText = `${String(clock.getHours()).padStart(2, '0')}:${String(clock.getMinutes()).padStart(2, '0')}`;
   const queueCount = queue?.length || 0;
   const lastMessages = chatMessages.slice(-10);
   const planTitle = plan?.plan?.planTitle || 'DJ SONG PLAN';
@@ -760,8 +780,8 @@ function V4RadioView({
   };
 
   return (
-    <main className="v4-shell">
-      <section className="v4-radio" aria-label="MarkRadio V4 播放器聊天室">
+    <main className={`v4-shell${lowPowerMode ? ' low-power' : ''}`}>
+      <section className={`v4-radio${lowPowerMode ? ' low-power' : ''}${isPlaying || reading ? ' is-active' : ''}`} aria-label="MarkRadio V4 播放器聊天室">
         {audioNodes}
         <header className="v4-topbar">
           <div className="v4-brand">
@@ -780,7 +800,11 @@ function V4RadioView({
         </header>
 
         <section className="v4-clock-panel">
-          <PixelClockCanvas hours={clock.getHours()} minutes={clock.getMinutes()} />
+          {lowPowerMode ? (
+            <div className="v4-text-clock" aria-label={`当前时间 ${clockText}`}>{clockText}</div>
+          ) : (
+            <PixelClockCanvas hours={clock.getHours()} minutes={clock.getMinutes()} lowPower={lowPowerMode} />
+          )}
           <p>{weekdays[clock.getDay()]}</p>
           <small>{clock.getDate()} · {months[clock.getMonth()].toUpperCase()} · {clock.getFullYear()}</small>
           <div className={servicesOk ? 'v4-onair' : 'v4-onair idle'}>
@@ -988,6 +1012,7 @@ export default function App() {
   const analyserDataRef = useRef(null);
   const mediaSourcesRef = useRef(new Map());
   const visualFrameRef = useRef(null);
+  const lastReadProgressAtRef = useRef(0);
   const typeTimerRef = useRef(null);
   const fadeTimerRef = useRef(null);
   const readRafRef = useRef(null);
@@ -999,9 +1024,18 @@ export default function App() {
   const planDjUrlRef = useRef(null);
   const planIdRef = useRef(null);
   const [seekDraftRatio, setSeekDraftRatio] = useState(null);
+  const lowPowerMode = useMemo(() => detectLowPowerRuntime(), []);
+  const viewModeRef = useRef(viewMode);
+
+  useEffect(() => {
+    viewModeRef.current = viewMode;
+  }, [viewMode]);
 
   function syncReadProgress(ratio) {
     const safeRatio = Math.min(1, Math.max(0, ratio));
+    const nowMs = performance.now();
+    if (lowPowerMode && safeRatio < 1 && nowMs - lastReadProgressAtRef.current < LOW_POWER_READ_PROGRESS_MS) return;
+    lastReadProgressAtRef.current = nowMs;
     setReadProgress(safeRatio);
   }
 
@@ -1099,6 +1133,7 @@ export default function App() {
   }
 
   function triggerPixelPulse(force = false) {
+    if (lowPowerMode && viewModeRef.current === 'v4') return;
     const nowMs = performance.now();
     if (!force && nowMs - lastPulseAtRef.current < 900) return;
     lastPulseAtRef.current = nowMs;
@@ -1175,9 +1210,9 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    const timer = setInterval(() => setClock(new Date()), 1000);
+    const timer = setInterval(() => setClock(new Date()), lowPowerMode ? 60000 : 1000);
     return () => clearInterval(timer);
-  }, []);
+  }, [lowPowerMode]);
 
   useEffect(() => {
     let socket;
@@ -1586,7 +1621,7 @@ export default function App() {
           clearInterval(timer);
           resolve();
         }
-      }, 30);
+      }, lowPowerMode ? LOW_POWER_READ_PROGRESS_MS : 30);
     });
   }
 
@@ -1925,6 +1960,7 @@ function seekTo(ratio) {
   function startFallbackVisuals() {
     // Drive visuals with time-based fallback — no AudioContext needed
     stopAudioVisuals();
+    if (viewModeRef.current === 'v4') return;
     const startedAt = performance.now();
     const numBars = Math.max(1, Math.floor((spectrumRef.current?.clientWidth || window.innerWidth) / SPEC_PX.cell));
     let frameSkip = 0;
@@ -1946,6 +1982,7 @@ function seekTo(ratio) {
   function startAudioVisuals(mediaElement) {
     stopAudioVisuals();
     if (!mediaElement) return;
+    if (viewModeRef.current === 'v4') return;
     const analyser = setupAnalyser(mediaElement);
     const frequencyData = analyser ? new Uint8Array(analyser.frequencyBinCount) : null;
     const startedAt = performance.now();
@@ -2302,6 +2339,7 @@ function seekTo(ratio) {
           handleChatSubmit={handleChatSubmit}
           isPlaying={isPlaying}
           liveLyricLine={liveLyricLine}
+          lowPowerMode={lowPowerMode}
           netease={netease}
           nextTrack={nextTrack}
           onBack={() => setViewMode('v3')}

@@ -253,6 +253,23 @@ p {
   pointer-events: none;
 }
 
+.v4-shell.low-power {
+  background: #0b0a14;
+}
+
+.v4-shell.low-power .v4-radio {
+  background: #080910;
+  box-shadow: none;
+}
+
+.v4-shell.low-power .v4-radio::before {
+  display: none;
+}
+
+.v4-shell.low-power .v4-clock-panel {
+  background: #030407;
+}
+
 .v4-topbar,
 .v4-clock-panel,
 .v4-player-strip,
@@ -363,6 +380,15 @@ p {
   max-width: calc(100vw - 72px);
 }
 
+.v4-text-clock {
+  color: #f7f5ef;
+  font-family: "Courier New", ui-monospace, monospace;
+  font-size: clamp(84px, 15vw, 156px);
+  font-weight: 900;
+  line-height: 0.9;
+  letter-spacing: 0;
+}
+
 .v4-clock-panel p {
   color: rgba(255, 255, 255, 0.84);
   font-size: 17px;
@@ -425,8 +451,23 @@ p {
   animation-play-state: paused;
 }
 
-.v4-radio:has(.v4-now-text small) .v4-now-eq span {
+.v4-radio.is-active:not(.low-power) .v4-now-eq span {
   animation-play-state: running;
+}
+
+.v4-radio.low-power .v4-now-eq span,
+.v4-radio.low-power .v4-onair,
+.v4-radio.low-power .v4-onair span {
+  animation: none !important;
+}
+
+.v4-radio.low-power .v4-now-eq span {
+  transform: none;
+  box-shadow: none;
+}
+
+.v4-radio.low-power .v4-onair span {
+  box-shadow: 0 0 6px rgba(66, 216, 178, 0.32);
 }
 
 @keyframes v4-eq {
