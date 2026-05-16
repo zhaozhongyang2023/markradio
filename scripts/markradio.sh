@@ -110,9 +110,38 @@ disable_screen_blank() {
   xset s noblank 2>/dev/null || true
 }
 
+force_kiosk_fullscreen() {
+  command -v xdotool >/dev/null 2>&1 || return
+  command -v xdpyinfo >/dev/null 2>&1 || return
+
+  local size width height windows
+  size="$(DISPLAY="$DISPLAY" xdpyinfo 2>/dev/null | awk '/dimensions:/ {print $2; exit}')"
+  width="${size%x*}"
+  height="${size#*x}"
+  if [ -z "$width" ] || [ -z "$height" ] || [ "$width" = "$size" ]; then
+    return
+  fi
+
+  for i in $(seq 1 12); do
+    windows="$(DISPLAY="$DISPLAY" xdotool search --onlyvisible --class firefox 2>/dev/null || true)"
+    [ -n "$windows" ] && break
+    sleep 1
+  done
+  [ -n "$windows" ] || return
+
+  for i in $(seq 1 5); do
+    for window in $windows; do
+      DISPLAY="$DISPLAY" xdotool windowmove "$window" 0 0 2>/dev/null || true
+      DISPLAY="$DISPLAY" xdotool windowsize "$window" "$width" "$height" 2>/dev/null || true
+    done
+    sleep 1
+  done
+}
+
 start_chromium() {
   if pgrep -f "firefox.*--kiosk" > /dev/null 2>&1; then
     yellow "[skip] Firefox 已在运行"
+    force_kiosk_fullscreen
     return
   fi
 
@@ -132,6 +161,7 @@ start_chromium() {
   for i in $(seq 1 10); do
     sleep 1
     if pgrep -f "firefox.*--kiosk" > /dev/null 2>&1; then
+      force_kiosk_fullscreen
       green " ✓"
       return
     fi
