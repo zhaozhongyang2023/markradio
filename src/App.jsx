@@ -142,6 +142,8 @@ function activeTokenIndex(segments, charCount) {
 
 function currentLyricIndex(lyrics, seconds) {
   if (!lyrics?.length) return 0;
+  // 若第一个歌词的时间戳还没到，返回 -1 避免提前显示
+  if (lyrics[0].time > seconds) return -1;
   let index = 0;
   for (let i = 0; i < lyrics.length; i += 1) {
     if (lyrics[i].time <= seconds) index = i;
