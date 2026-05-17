@@ -2186,7 +2186,7 @@ function seekTo(ratio) {
   }
 
   function castTrackUrl(item = track) {
-    return item?.originalUrl || item?.url || '';
+    return item?.url || item?.originalUrl || '';
   }
 
   async function playCastTrack(item = track) {
