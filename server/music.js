@@ -273,11 +273,11 @@ async function resolveTrackMedia(track, store) {
   if (withUrl.source !== 'netease') return withUrl;
   const sourceId = withUrl.sourceId || withUrl.id?.replace(/^netease-/, '');
   const data = await callNetease('lyric', { id: sourceId }, store).catch(() => null);
-  const lyric = parseLyric(data?.lrc?.lyric || data?.klyric?.lyric || data?.tlyric?.lyric || '');
+  const lyric = parseLyric(data?.lrc?.lyric || data?.klyric?.lyric || data?.tlyric?.lyric || '', withUrl.duration);
   return { ...withUrl, lyric };
 }
 
-export function parseLyric(value) {
+export function parseLyric(value, duration) {
   const lines = String(value || '')
     .split(/\r?\n/)
     .map((line) => line.trim())
@@ -311,10 +311,13 @@ export function parseLyric(value) {
 
   if (timed.length) return timed;
 
-  return lines
+  // 无时间戳的纯文本歌词：按曲长均匀分布
+  const untimedLines = lines
     .filter((line) => !/^\[(?:offset|by|ti|ar|al):/i.test(line))
-    .slice(0, 80)
-    .map((text, index) => ({ time: index * 6, text }));
+    .slice(0, 80);
+  const dur = (duration && duration > 0) ? duration : untimedLines.length * 6;
+  const interval = dur / Math.max(1, untimedLines.length);
+  return untimedLines.map((text, index) => ({ time: index * interval, text }));
 }
 
 export function buildDemoQueue(tracks, limit = 4) {
