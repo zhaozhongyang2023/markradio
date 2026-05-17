@@ -13,6 +13,7 @@ import { createRadioPlan } from './scheduler.js';
 import { getSpecialDates } from './special-dates.js';
 import { getVoicePublicConfig, synthesizeVoice, ttsFilePath, updateVoiceConfig } from './voice.js';
 import { castManager, getCastStatus } from './cast.js';
+import { buildCastUrl } from './cast-url.js';
 import { callNetease, checkNeteaseQr, createNeteaseQr, getNeteaseLoginStatus } from './netease-auth.js';
 
 const store = new StateStore();
@@ -331,17 +332,18 @@ app.get('/api/cast/devices', async () => {
   return { devices };
 });
 
-app.post('/api/cast/connect', async (request) => {
+app.post('/api/cast/connect', async (request, reply) => {
   const { host, port } = request.body || {};
-  if (!host || !port) return { ok: false, message: '缺少 host 或 port' };
+  if (!host || !port) return reply.code(400).send({ ok: false, message: '缺少 host 或 port' });
   await castManager.connect(host, port);
   return castManager.getStatus();
 });
 
-app.post('/api/cast/play', async (request) => {
+app.post('/api/cast/play', async (request, reply) => {
   const { url, title, artist, album } = request.body || {};
-  if (!url) return { ok: false, message: '缺少音频 url' };
-  castManager.play(url, { title, artist, album });
+  if (!url) return reply.code(400).send({ ok: false, message: '缺少音频 url' });
+  const castUrl = buildCastUrl(url, { requestHost: request.headers.host, apiPort: config.apiPort });
+  await castManager.play(castUrl, { title, artist, album });
   return castManager.getStatus();
 });
 

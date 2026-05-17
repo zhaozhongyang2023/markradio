@@ -2159,24 +2159,39 @@ function seekTo(ratio) {
     }
   }
 
+  function castTrackUrl(item = track) {
+    return item?.originalUrl || item?.url || '';
+  }
+
   async function handleCastConnect(device) {
     try {
       await api.castConnect(device.host, device.port);
       setCastDevice(device);
       setCastState('idle');
-      if (track?.originalUrl) {
-        await api.castPlay(track.originalUrl, {
+      const url = castTrackUrl(track);
+      if (url) {
+        const status = await api.castPlay(url, {
           title: track.title || '',
           artist: track.artist || '',
           album: track.album || ''
         });
-        setCastState('playing');
+        setCastState(status.state || 'playing');
         if (audioRef.current) audioRef.current.pause();
         setIsPlaying(false);
+        setShowCastPanel(false);
+      } else {
+        setChatMessages((items) => [
+          ...items,
+          { id: `cast-no-url-${Date.now()}`, role: 'system', text: '当前歌曲暂无可投放音源。', meta: 'CAST' }
+        ]);
       }
     } catch (err) {
       setCastDevice(null);
       setCastState('idle');
+      setChatMessages((items) => [
+        ...items,
+        { id: `cast-error-${Date.now()}`, role: 'system', text: `投屏失败：${err.message}`, meta: 'CAST' }
+      ]);
     }
   }
 

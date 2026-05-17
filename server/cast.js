@@ -95,12 +95,15 @@ class CastManager extends EventEmitter {
           .trim();
         if (!name) name = '智能音箱'; // 智能音箱
 
+        let locationUrl = null;
+        try { locationUrl = new URL(headers.LOCATION || ''); } catch (_) {}
+
         this.devices.push({
           usn: headers.USN || headers.LOCATION || '',
           name,
           location: headers.LOCATION || '',
-          host: rinfo.address,
-          port: rinfo.port
+          host: locationUrl?.hostname || rinfo.address,
+          port: Number(locationUrl?.port || 80)
         });
       });
 
@@ -112,9 +115,14 @@ class CastManager extends EventEmitter {
   async connect(host, port) {
     this.disconnect();
     try {
-      const client = new MediaRendererClient(`http://${host}:${port}/description.xml`);
+      const device = this.devices.find((item) =>
+        item.host === host && Number(item.port) === Number(port)
+      );
+      const descriptionUrl = device?.location || `http://${host}:${port}/description.xml`;
+      const client = new MediaRendererClient(descriptionUrl);
       await this._waitReady(client);
       this.client = client;
+      this.currentDevice = device || { host, port: Number(port), name: '智能音箱' };
       this.state = 'idle';
       return true;
     } catch (err) {
@@ -145,14 +153,18 @@ class CastManager extends EventEmitter {
         ...metadata
       }
     };
-    this.client.load(url, options, (err) => {
-      if (err) {
-        this.state = 'idle';
-        this.emit('error', err);
-        return;
-      }
-      this.state = 'playing';
-      this.emit('state', 'playing');
+    return new Promise((resolve, reject) => {
+      this.client.load(url, options, (err) => {
+        if (err) {
+          this.state = 'idle';
+          if (this.listenerCount('error')) this.emit('error', err);
+          reject(err);
+          return;
+        }
+        this.state = 'playing';
+        this.emit('state', 'playing');
+        resolve(this.getStatus());
+      });
     });
   }
 

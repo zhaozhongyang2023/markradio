@@ -311,8 +311,13 @@ export function parseLyric(value) {
 
   if (timed.length) return timed;
 
-  // 无时间戳的纯文本歌词 → 返回空，由前端 DJ 播报文案作为回退
-  return [];
+  return lines
+    .filter((line) => !/^\[[a-z]+:/i.test(line))
+    .slice(0, 80)
+    .map((text, index) => ({
+      time: index * 6,
+      text
+    }));
 }
 
 export function buildDemoQueue(tracks, limit = 4) {
