@@ -2215,6 +2215,17 @@ function seekTo(ratio) {
       await api.castConnect(device.host, device.port);
       setCastDevice(device);
       setCastState('idle');
+    } catch (err) {
+      setCastDevice(null);
+      setCastState('idle');
+      setChatMessages((items) => [
+        ...items,
+        { id: `cast-error-${Date.now()}`, role: 'system', text: `连接音箱失败：${err.message}`, meta: 'CAST' }
+      ]);
+      return;
+    }
+
+    try {
       if (castTrackUrl(track)) {
         await playCastTrack(track);
         setShowCastPanel(false);
@@ -2225,7 +2236,6 @@ function seekTo(ratio) {
         ]);
       }
     } catch (err) {
-      setCastDevice(null);
       setCastState('idle');
       setChatMessages((items) => [
         ...items,

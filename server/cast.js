@@ -16,6 +16,33 @@ function decodeXmlEntity(value = '') {
     .trim();
 }
 
+function escapeXml(value = '') {
+  return String(value)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&apos;');
+}
+
+function buildAudioMetadata(url, metadata = {}, contentType = 'audio/mpeg') {
+  const protocolInfo = `http-get:*:${contentType}:*`;
+  const title = metadata.title || 'MarkRadio';
+  const creator = metadata.artist || metadata.creator || 'MarkRadio';
+  const album = metadata.album || '';
+  return [
+    '<DIDL-Lite xmlns="urn:schemas-upnp-org:metadata-1-0/DIDL-Lite/" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:upnp="urn:schemas-upnp-org:metadata-1-0/upnp/">',
+    '<item id="0" parentID="0" restricted="1">',
+    `<dc:title>${escapeXml(title)}</dc:title>`,
+    `<dc:creator>${escapeXml(creator)}</dc:creator>`,
+    album ? `<upnp:album>${escapeXml(album)}</upnp:album>` : '',
+    '<upnp:class>object.item.audioItem.musicTrack</upnp:class>',
+    `<res protocolInfo="${escapeXml(protocolInfo)}">${escapeXml(url)}</res>`,
+    '</item>',
+    '</DIDL-Lite>'
+  ].join('');
+}
+
 export function parseUpnpFriendlyName(xml = '') {
   const match = String(xml).match(/<friendlyName[^>]*>([^<]+)<\/friendlyName>/i);
   return match ? decodeXmlEntity(match[1]) : '';
@@ -183,6 +210,78 @@ class CastManager extends EventEmitter {
         ...metadata
       }
     };
+    try {
+      return await this._loadWithClient(url, options);
+    } catch (err) {
+      if (!this._isPrepareFallbackError(err)) throw err;
+      return this._loadDirect(url, options);
+    }
+  }
+
+  _isPrepareFallbackError(err) {
+    return (err?.code === 'EUPNP' && String(err.errorCode || '').trim() === '501') ||
+      err?.code === 'ECONNRESET';
+  }
+
+  _callAction(service, action, params, timeoutMs = 15000) {
+    return new Promise((resolve, reject) => {
+      let done = false;
+      const timer = setTimeout(() => {
+        if (done) return;
+        done = true;
+        reject(new Error(`UPnP ${action} timeout`));
+      }, timeoutMs);
+      this.client.callAction(service, action, params, (err, result) => {
+        if (done) return;
+        done = true;
+        clearTimeout(timer);
+        if (err) reject(err);
+        else resolve(result);
+      });
+    });
+  }
+
+  _getDeviceDescription() {
+    return new Promise((resolve, reject) => {
+      this.client.getDeviceDescription((err, desc) => {
+        if (err) reject(err);
+        else resolve(desc);
+      });
+    });
+  }
+
+  async _postSoap(serviceId, action, params, timeoutMs = 15000) {
+    const resolvedId = serviceId.includes(':') ? serviceId : `urn:upnp-org:serviceId:${serviceId}`;
+    const desc = await this._getDeviceDescription();
+    const service = desc.services?.[resolvedId];
+    if (!service) throw new Error(`UPnP service missing: ${serviceId}`);
+    const body = Object.entries(params)
+      .map(([key, value]) => `<${key}>${escapeXml(value ?? '')}</${key}>`)
+      .join('');
+    const xml = `<?xml version="1.0"?><s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/" s:encodingStyle="http://schemas.xmlsoap.org/soap/encoding/"><s:Body><u:${action} xmlns:u="${service.serviceType}">${body}</u:${action}></s:Body></s:Envelope>`;
+    const response = await fetch(service.controlURL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'text/xml; charset="utf-8"',
+        SOAPACTION: `"${service.serviceType}#${action}"`
+      },
+      body: xml,
+      signal: AbortSignal.timeout(timeoutMs)
+    });
+    const text = await response.text().catch(() => '');
+    if (!response.ok) {
+      const errorCode = text.match(/<errorCode>([^<]+)<\/errorCode>/i)?.[1] || response.status;
+      const errorDescription = text.match(/<errorDescription>([^<]+)<\/errorDescription>/i)?.[1] || response.statusText;
+      const err = new Error(`${errorDescription} (${errorCode})`);
+      err.code = 'EUPNP';
+      err.statusCode = response.status;
+      err.errorCode = errorCode;
+      throw err;
+    }
+    return text;
+  }
+
+  _loadWithClient(url, options) {
     return new Promise((resolve, reject) => {
       this.client.load(url, options, (err) => {
         if (err) {
@@ -196,6 +295,28 @@ class CastManager extends EventEmitter {
         resolve(this.getStatus());
       });
     });
+  }
+
+  async _loadDirect(url, options = {}) {
+    const instanceId = Number(this.client?.instanceId || 0);
+    const metadata = buildAudioMetadata(url, options.metadata || {}, options.contentType || 'audio/mpeg');
+    const params = {
+      InstanceID: instanceId,
+      CurrentURI: url,
+      CurrentURIMetaData: ''
+    };
+    try {
+      await this._postSoap('AVTransport', 'SetAVTransportURI', params);
+    } catch (err) {
+      await this._postSoap('AVTransport', 'SetAVTransportURI', {
+        ...params,
+        CurrentURIMetaData: metadata
+      });
+    }
+    await this._postSoap('AVTransport', 'Play', { InstanceID: instanceId, Speed: 1 });
+    this.state = 'playing';
+    this.emit('state', 'playing');
+    return this.getStatus();
   }
 
   pause() {
