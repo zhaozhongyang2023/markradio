@@ -1321,7 +1321,7 @@ export default function App() {
   const lyricIndex = currentLyricIndex(lyrics, progress);
   const realLyricIndex = currentLyricIndex(realLyrics, progress);
   const showLyrics = introDoneFor === track.id && !reading;
-  const liveLyricLine = showLyrics && isPlaying ? realLyrics[realLyricIndex]?.text || '' : '';
+  const liveLyricLine = showLyrics && isPlaying ? lyrics[lyricIndex]?.text || '' : '';
   const trackIsFavorite = Boolean(track.id && favoriteTrackIds.includes(track.id));
 
   // V3: pulse only on song switch / refresh / load, not periodic
