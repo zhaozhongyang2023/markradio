@@ -1499,12 +1499,43 @@ export default function App() {
     await api.playback('pause').catch(() => {});
   }
 
+
+  function unlockMobileAudio() {
+    const audio = audioRef.current;
+    const djAudio = djAudioRef.current;
+    // 通过静音 + 短暂播放解锁 AudioContext 和媒体元素
+    try {
+      const AudioContext = window.AudioContext || window.webkitAudioContext;
+      if (AudioContext) {
+        const ctx = audioContextRef.current || new AudioContext();
+        audioContextRef.current = ctx;
+        if (ctx.state === 'suspended') ctx.resume().catch(() => {});
+      }
+    } catch {}
+    if (audio) {
+      const prevVol = audio.volume;
+      audio.volume = 0;
+      audio.play().then(() => audio.pause()).catch(() => {});
+      audio.volume = prevVol;
+      if (audio.currentTime > 0) audio.currentTime = 0;
+    }
+    if (djAudio) {
+      djAudio.volume = 0;
+      djAudio.play().then(() => djAudio.pause()).catch(() => {});
+      djAudio.volume = 1;
+      djAudio.currentTime = 0;
+      djAudio.removeAttribute('src');
+    }
+  }
+
   async function startPlayback(options = {}) {
     if (pendingPlay) return;
     setPendingPlay(true);
     const audio = audioRef.current;
     try {
       if (!audio) return;
+      // 解锁移动端音频自动播放（iOS Safari 要求在用户手势内触发首次播放）
+      unlockMobileAudio();
       audio.onended = handleEnded;
       const needsIntro = !options.skipIntro && introDoneFor !== track.id;
       const shouldReadStationIntro = !options.skipStationIntro && !introDoneFor;
