@@ -66,19 +66,34 @@ class CastManager extends EventEmitter {
 
       client.on('response', (headers, _code, rinfo) => {
         const st = headers.ST || headers.NT || '';
-        const usn = headers.USN || headers.LOCATION || '';
-        if (found.has(usn)) return;
-        found.set(usn, true);
-        
-        const name = headers.SERVER 
-          || headers['X-AV-Physical-Unit-Info'] 
+        // 只保留 MediaRenderer 设备，过滤路由器 IGD / WANDevice 等
+        if (!st.includes('MediaRenderer')) return;
+        // 同一 IP 只保留一条
+        const ipKey = rinfo.address;
+        if (found.has(ipKey)) return;
+        found.set(ipKey, true);
+
+        const raw = headers.SERVER
+          || headers['X-AV-Physical-Unit-Info']
           || headers['Friendly-Name']
-          || (usn.includes('::') ? usn.split('::')[1] : usn) 
-          || 'Unknown Device';
-        
+          || (headers.USN || '').split('::')[1]
+          || 'Audio Renderer';
+
+        // 清理设备名称
+        let name = String(raw)
+          .replace(/^DLNADOC\/[\d.]+ /, '')
+          .replace(/ UPnP\/[\d.]+/, '')
+          .replace(/^Linux\/[\d.]+,\s*/, '')
+          .replace(/Portable SDK for UPnP devices\/[\d.]+/, '')
+          .replace(/,\s*,/g, ',')
+          .replace(/^,\s*/, '')
+          .replace(/,\s*$/, '')
+          .trim();
+        if (!name) name = '智能音箱'; // 智能音箱
+
         this.devices.push({
-          usn,
-          name: String(name).replace(/^DLNADOC\/[\d.]+ /, '').replace(/ UPnP\/[\d.]+/, ''),
+          usn: headers.USN || headers.LOCATION || '',
+          name,
           location: headers.LOCATION || '',
           host: rinfo.address,
           port: rinfo.port
