@@ -1501,9 +1501,7 @@ export default function App() {
 
 
   function unlockMobileAudio() {
-    const audio = audioRef.current;
-    const djAudio = djAudioRef.current;
-    // 通过静音 + 短暂播放解锁 AudioContext 和媒体元素
+    // 在用户手势内恢复 AudioContext，解锁移动端音频自动播放
     try {
       const AudioContext = window.AudioContext || window.webkitAudioContext;
       if (AudioContext) {
@@ -1512,20 +1510,7 @@ export default function App() {
         if (ctx.state === 'suspended') ctx.resume().catch(() => {});
       }
     } catch {}
-    if (audio) {
-      const prevVol = audio.volume;
-      audio.volume = 0;
-      audio.play().then(() => audio.pause()).catch(() => {});
-      audio.volume = prevVol;
-      if (audio.currentTime > 0) audio.currentTime = 0;
-    }
-    if (djAudio) {
-      djAudio.volume = 0;
-      djAudio.play().then(() => djAudio.pause()).catch(() => {});
-      djAudio.volume = 1;
-      djAudio.currentTime = 0;
-      djAudio.removeAttribute('src');
-    }
+    // 不在 unlock 中触碰 audio/djAudio，避免干扰后续播放流程
   }
 
   async function startPlayback(options = {}) {
