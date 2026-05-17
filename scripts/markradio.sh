@@ -1,6 +1,6 @@
 #!/bin/bash
 # markradio.sh - Mark Radio 服务管理脚本
-# 用法: ./markradio.sh {start|stop|refresh}
+# 用法: ./markradio.sh {start|stop|refresh|status|server}
 
 set -e
 
@@ -272,6 +272,17 @@ refresh() {
   status
 }
 
+server() {
+  echo "========== 启动 Mark Radio (服务端模式) =========="
+  clear_cache
+  start_netease
+  start_radio
+  echo
+  echo "后端服务已启动，手机/浏览器访问 http://$(hostname -I 2>/dev/null | awk '{print $1}'):8080"
+  echo
+  status
+}
+
 case "$1" in
   start)
     start
@@ -285,8 +296,11 @@ case "$1" in
   status)
     status
     ;;
+  server)
+    server
+    ;;
   *)
-    echo "用法: $0 {start|stop|refresh|status}"
+    echo "用法: $0 {start|stop|refresh|status|server}"
     exit 1
     ;;
 esac
