@@ -68,10 +68,10 @@ class CastManager extends EventEmitter {
         const st = headers.ST || headers.NT || '';
         // 只保留 MediaRenderer 设备，过滤路由器 IGD / WANDevice 等
         if (!st.includes('MediaRenderer')) return;
-        // 同一 IP 只保留一条
-        const ipKey = rinfo.address;
-        if (found.has(ipKey)) return;
-        found.set(ipKey, true);
+        // 同一设备去重（按 USN 前缀）
+        const baseUsn = (headers.USN || '').split('::')[0];
+        if (found.has(baseUsn)) return;
+        found.set(baseUsn, true);
 
         const raw = headers.SERVER
           || headers['X-AV-Physical-Unit-Info']
@@ -82,12 +82,14 @@ class CastManager extends EventEmitter {
         // 清理设备名称
         let name = String(raw)
           .replace(/^DLNADOC\/[\d.]+ /, '')
-          .replace(/ UPnP\/[\d.]+/, '')
-          .replace(/^Linux\/[\d.]+,\s*/, '')
-          .replace(/Portable SDK for UPnP devices\/[\d.]+/, '')
+          .replace(/\s*UPnP\/[\d.]+/g, '')
+          .replace(/^Linux\/[\d._a-zA-Z]+/g, '')
+          .replace(/Portable SDK for UPnP devices\/[\d.]+/g, '')
+          .replace(/\s*Cling\/[\d.]+/g, '')
           .replace(/,\s*,/g, ',')
-          .replace(/^,\s*/, '')
-          .replace(/,\s*$/, '')
+          .replace(/^[,\s]+/, '')
+          .replace(/[,\s]+$/, '')
+          .replace(/^[^\w\u4e00-\u9fff]+/, '')
           .trim();
         if (!name) name = '智能音箱'; // 智能音箱
 

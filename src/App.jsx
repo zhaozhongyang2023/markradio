@@ -1470,19 +1470,20 @@ export default function App() {
     }
     // First play: init autoplayToken so subsequent songs auto-advance
     if (autoplayToken === 0) setAutoplayToken(1);
-    // Ensure AudioContext is active (must happen in user-gesture context)
-    if (audioContextRef.current && audioContextRef.current.state === 'suspended') {
-      await audioContextRef.current.resume();
+    // Create & resume AudioContext in user-gesture context (required by iOS)
+    const AudioCtx = window.AudioContext || window.webkitAudioContext;
+    if (AudioCtx) {
+      if (!audioContextRef.current) {
+        audioContextRef.current = new AudioCtx();
+      }
+      if (audioContextRef.current.state === 'suspended') {
+        await audioContextRef.current.resume();
+      }
     }
-    // Prime audio element for iOS Bluetooth - unlock audio session in user gesture
-    const audioEl = audioRef.current;
-    if (audioEl && trackUrl) {
-      if (audioEl.src !== trackUrl) audioEl.src = trackUrl;
-      audioEl.volume = 0;
-      await audioEl.play().catch(() => {});
-      audioEl.pause();
-      audioEl.currentTime = 0;
-    }
+    // Route both audio elements through shared AudioContext so they can play
+    // simultaneously (music bed + DJ voice) and iOS keeps one Bluetooth session.
+    connectToAudioContext(audioRef.current);
+    connectToAudioContext(djAudioRef.current);
     await startPlayback();
   }
 
@@ -1687,7 +1688,8 @@ export default function App() {
     setReadingCardIndex(-1);
 
     if (audioRef.current) {
-      // Mute instead of pause: keep iOS audio session alive for Bluetooth
+      audioRef.current.pause();
+      audioRef.current.onended = null;
       audioRef.current.volume = 0;
     }
 
@@ -1788,16 +1790,6 @@ export default function App() {
         startDjProgressLoop(djAudio, reason.length);
       });
       djAudio.pause();
-      // Force iOS Bluetooth reclamation: reset audio element src to trigger new session
-      if (audio && trackUrl) {
-        const savedSrc = audio.src;
-        audio.src = '';
-        try { audio.load(); } catch {}
-        audio.src = trackUrl;
-        audio.load();
-        audio.volume = audioRef.current ? audioRef.current.volume : BED_VOLUME;
-        try { await audio.play(); } catch {}
-      }
       if (playRejected) {
         // Use latest plan ref to avoid stale closure after async gap
         await readTextSegment(planRef.current?.queue?.[cardIndex]?.reason || reason);
