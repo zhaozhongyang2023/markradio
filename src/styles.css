@@ -1727,9 +1727,10 @@ p {
   border-color: rgba(99,102,241,0.4);
 }
 .cast-list button.active {
-  background: rgba(99,102,241,0.22);
-  border-color: rgba(99,102,241,0.6);
-  color: #fff;
+  background: rgba(34, 211, 238, 0.18);
+  border-color: rgba(45, 255, 214, 0.75);
+  color: #f8fffb;
+  box-shadow: 0 0 0 1px rgba(45, 255, 214, 0.12), inset 0 0 18px rgba(45, 255, 214, 0.08);
 }
 .cast-list button span {
   font-size: 1.6rem;
@@ -1737,7 +1738,7 @@ p {
   color: rgba(139,142,255,0.8);
 }
 .cast-list button.active span {
-  color: rgba(165,168,255,0.95);
+  color: #2dffd6;
 }
 .cast-list button div {
   display: flex;
@@ -1755,8 +1756,14 @@ p {
   font-size: 0.75rem;
   margin-top: 2px;
 }
+.cast-list button.active strong {
+  color: #ffffff;
+}
+.cast-list button.active small {
+  color: rgba(208, 255, 245, 0.82);
+}
 .cast-list button .cast-check {
-  color: rgba(99,102,241,0.85);
+  color: #2dffd6;
   font-weight: 700;
   font-size: 1rem;
   flex-shrink: 0;
@@ -1782,9 +1789,18 @@ p {
   color: #fff;
 }
 .cast-actions button:active {
-  background: rgba(99,102,241,0.25);
-  border-color: rgba(99,102,241,0.5);
+  background: rgba(45, 255, 214, 0.22);
+  border-color: rgba(45, 255, 214, 0.5);
   color: #fff;
+}
+.cast-card .cast-actions button {
+  background: rgba(45, 255, 214, 0.12);
+  border-color: rgba(45, 255, 214, 0.28);
+  color: #eafffa;
+}
+.cast-card .cast-actions button:hover {
+  background: rgba(45, 255, 214, 0.22);
+  border-color: rgba(45, 255, 214, 0.5);
 }
 
 .qr-backdrop {
