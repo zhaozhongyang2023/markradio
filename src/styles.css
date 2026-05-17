@@ -1852,6 +1852,55 @@ p {
   padding: 0 10px;
 }
 
+.qr-card.cast-card .cast-list button {
+  background: rgba(8, 14, 30, 0.96);
+  border-color: rgba(234, 255, 250, 0.24);
+  color: #f8fffb;
+}
+
+.qr-card.cast-card .cast-list button:hover,
+.qr-card.cast-card .cast-list button:focus-visible {
+  background: rgba(16, 40, 52, 0.98);
+  border-color: rgba(45, 255, 214, 0.58);
+  color: #ffffff;
+  outline: 2px solid rgba(45, 255, 214, 0.2);
+}
+
+.qr-card.cast-card .cast-list button.active {
+  background: rgba(10, 72, 70, 0.96);
+  border-color: #2dffd6;
+  color: #ffffff;
+}
+
+.qr-card.cast-card .cast-list button span,
+.qr-card.cast-card .cast-list button .cast-check {
+  color: #2dffd6;
+}
+
+.qr-card.cast-card .cast-list button strong {
+  color: #ffffff;
+}
+
+.qr-card.cast-card .cast-list button small {
+  color: #c8fff4;
+}
+
+.qr-card.cast-card .cast-actions button {
+  background: #101827;
+  border-color: rgba(248, 255, 251, 0.32);
+  color: #f8fffb;
+  font-weight: 700;
+}
+
+.qr-card.cast-card .cast-actions button:hover,
+.qr-card.cast-card .cast-actions button:focus-visible,
+.qr-card.cast-card .cast-actions button:active {
+  background: #173a3b;
+  border-color: #2dffd6;
+  color: #ffffff;
+  outline: 2px solid rgba(45, 255, 214, 0.22);
+}
+
 @media (max-height: 800px) {
   .v4-radio {
     grid-template-rows: auto minmax(160px, 26dvh) auto auto auto auto auto minmax(0, 1fr) auto auto;

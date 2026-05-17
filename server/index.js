@@ -352,14 +352,14 @@ app.post('/api/cast/:action', async (request) => {
   if (action === 'pause') castManager.pause();
   else if (action === 'resume') castManager.resume();
   else if (action === 'stop') castManager.stop();
-  else if (action === 'volume') castManager.setVolume(Number(request.body?.volume || 0));
+  else if (action === 'volume') await castManager.setVolume(Number(request.body?.volume || 0));
   else if (action === 'disconnect') castManager.disconnect();
   else return { ok: false, message: `未知 action: ${action}` };
   return castManager.getStatus();
 });
 
-app.get('/media/audio', async (request, reply) => {
-  const id = String(request.query?.id || '');
+async function streamMediaAudio(request, reply, routeId = '') {
+  const id = String(routeId || request.query?.id || '');
   let target = String(request.query?.url || '');
   if (id) {
     const data = await callNetease('song/url/v1', { id, level: 'standard' }, store).catch(() =>
@@ -376,11 +376,20 @@ app.get('/media/audio', async (request, reply) => {
   const contentLength = upstream.headers.get('content-length');
   const contentRange = upstream.headers.get('content-range');
   const acceptRanges = upstream.headers.get('accept-ranges');
-  if (contentType) reply.header('Content-Type', contentType);
+  reply.header('Content-Type', contentType || 'audio/mpeg');
   if (contentLength) reply.header('Content-Length', contentLength);
   if (contentRange) reply.header('Content-Range', contentRange);
-  if (acceptRanges) reply.header('Accept-Ranges', acceptRanges);
+  reply.header('Accept-Ranges', acceptRanges || 'bytes');
   return reply.send(Readable.fromWeb(upstream.body));
+}
+
+app.get('/media/audio', async (request, reply) => {
+  return streamMediaAudio(request, reply);
+});
+
+app.get('/media/audio/:fileName', async (request, reply) => {
+  const id = String(request.params.fileName || '').replace(/\.mp3$/i, '');
+  return streamMediaAudio(request, reply, id);
 });
 
 const distDir = path.resolve(process.cwd(), 'dist');

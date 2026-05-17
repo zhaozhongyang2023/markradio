@@ -2186,7 +2186,12 @@ function seekTo(ratio) {
   }
 
   function castTrackUrl(item = track) {
-    return item?.url || item?.originalUrl || '';
+    const rawUrl = item?.url || item?.originalUrl || '';
+    const sourceId = item?.sourceId || (String(item?.id || '').startsWith('netease-') ? String(item.id).replace('netease-', '') : '');
+    if (sourceId) return `/media/audio/${encodeURIComponent(sourceId)}.mp3`;
+    const match = String(rawUrl).match(/^\/media\/audio\?id=([^&]+)/);
+    if (match) return `/media/audio/${encodeURIComponent(decodeURIComponent(match[1]))}.mp3`;
+    return rawUrl;
   }
 
   async function playCastTrack(item = track) {
@@ -2200,6 +2205,8 @@ function seekTo(ratio) {
     setCastState(status.state || 'playing');
     if (audioRef.current) audioRef.current.pause();
     setIsPlaying(false);
+    const castVolume = Math.round((userVolume > 0.05 ? userVolume : 0.6) * 100);
+    await api.castAction('volume', { volume: castVolume }).catch(() => {});
     await api.playback('play').catch(() => {});
     return status;
   }

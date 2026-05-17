@@ -343,10 +343,20 @@ class CastManager extends EventEmitter {
     this.emit('state', 'idle');
   }
 
-  setVolume(vol) {
-    if (!this.client) return;
+  async setVolume(vol) {
+    if (!this.client) return this.getStatus();
     const v = Math.max(0, Math.min(100, Math.round(vol)));
-    this.client.setVolume(v);
+    const params = {
+      InstanceID: Number(this.client?.instanceId || 0),
+      Channel: 'Master',
+      DesiredVolume: v
+    };
+    try {
+      await this._callAction('RenderingControl', 'SetVolume', params, 5000);
+    } catch (err) {
+      await this._postSoap('RenderingControl', 'SetVolume', params, 5000);
+    }
+    return this.getStatus();
   }
 
   disconnect() {
