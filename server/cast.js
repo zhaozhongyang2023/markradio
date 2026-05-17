@@ -1,6 +1,7 @@
 import { EventEmitter } from 'node:events';
 import ssdp from 'node-ssdp';
 import MediaRendererClient from 'upnp-mediarenderer-client';
+import { networkInterfaces } from 'node:os';
 
 const SSDP_SEARCH = 'urn:schemas-upnp-org:device:MediaRenderer:1';
 const DISCOVER_TIMEOUT_MS = 6000;
@@ -16,17 +17,33 @@ class CastManager extends EventEmitter {
     this._discoverTimer = null;
   }
 
+  _getInterfaces() {
+    const ifaces = networkInterfaces();
+    const candidates = [];
+    for (const [name, addrs] of Object.entries(ifaces)) {
+      if (!addrs) continue;
+      for (const addr of addrs) {
+        if (addr.family === 'IPv4' && !addr.internal) {
+          candidates.push({ name, address: addr.address });
+          break;
+        }
+      }
+    }
+    return candidates;
+  }
+
   async discover() {
     return new Promise((resolve) => {
       this.devices = [];
       const found = new Map();
       let searches = 0;
       const maxSearches = 3;
+      const ifaces = this._getInterfaces();
+      const ifaceNames = ifaces.map((i) => i.name);
       
       const doSearch = () => {
         if (searches >= maxSearches) return;
         searches += 1;
-        // Try multiple UPnP service types
         const types = [
           'urn:schemas-upnp-org:device:MediaRenderer:1',
           'urn:schemas-upnp-org:service:AVTransport:1',
@@ -35,7 +52,7 @@ class CastManager extends EventEmitter {
         types.forEach((st) => client.search(st));
       };
 
-      const client = new ssdp.Client({ log: false });
+      const client = new ssdp.Client({ log: false, interfaces: ifaceNames, explicitSocketBind: true });
       
       const timer = setTimeout(() => {
         client.stop();
