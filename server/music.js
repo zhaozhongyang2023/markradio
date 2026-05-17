@@ -273,11 +273,11 @@ async function resolveTrackMedia(track, store) {
   if (withUrl.source !== 'netease') return withUrl;
   const sourceId = withUrl.sourceId || withUrl.id?.replace(/^netease-/, '');
   const data = await callNetease('lyric', { id: sourceId }, store).catch(() => null);
-  const lyric = parseLyric(data?.lrc?.lyric || data?.klyric?.lyric || data?.tlyric?.lyric || '', withUrl.duration);
+  const lyric = parseLyric(data?.lrc?.lyric || data?.klyric?.lyric || data?.tlyric?.lyric || '');
   return { ...withUrl, lyric };
 }
 
-export function parseLyric(value, duration) {
+export function parseLyric(value) {
   const lines = String(value || '')
     .split(/\r?\n/)
     .map((line) => line.trim())
@@ -311,13 +311,8 @@ export function parseLyric(value, duration) {
 
   if (timed.length) return timed;
 
-  // 无时间戳的纯文本歌词：按曲长均匀分布
-  const untimedLines = lines
-    .filter((line) => !/^\[(?:offset|by|ti|ar|al):/i.test(line))
-    .slice(0, 80);
-  const dur = (duration && duration > 0) ? duration : untimedLines.length * 6;
-  const interval = dur / Math.max(1, untimedLines.length);
-  return untimedLines.map((text, index) => ({ time: index * interval, text }));
+  // 无时间戳的纯文本歌词 → 返回空，由前端 DJ 播报文案作为回退
+  return [];
 }
 
 export function buildDemoQueue(tracks, limit = 4) {
