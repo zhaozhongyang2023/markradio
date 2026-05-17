@@ -6,6 +6,21 @@ import { networkInterfaces } from 'node:os';
 const SSDP_SEARCH = 'urn:schemas-upnp-org:device:MediaRenderer:1';
 const DISCOVER_TIMEOUT_MS = 6000;
 
+function decodeXmlEntity(value = '') {
+  return String(value)
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&apos;/g, "'")
+    .trim();
+}
+
+export function parseUpnpFriendlyName(xml = '') {
+  const match = String(xml).match(/<friendlyName[^>]*>([^<]+)<\/friendlyName>/i);
+  return match ? decodeXmlEntity(match[1]) : '';
+}
+
 class CastManager extends EventEmitter {
   constructor() {
     super();
@@ -36,6 +51,7 @@ class CastManager extends EventEmitter {
     return new Promise((resolve) => {
       this.devices = [];
       const found = new Map();
+      const nameLookups = [];
       let searches = 0;
       const maxSearches = 3;
       const ifaces = this._getInterfaces();
@@ -54,9 +70,10 @@ class CastManager extends EventEmitter {
 
       const client = new ssdp.Client({ log: false, interfaces: ifaceNames, explicitSocketBind: true });
       
-      const timer = setTimeout(() => {
+      const timer = setTimeout(async () => {
         client.stop();
         clearInterval(interval);
+        await Promise.allSettled(nameLookups);
         resolve(this.devices);
       }, DISCOVER_TIMEOUT_MS);
 
@@ -98,13 +115,26 @@ class CastManager extends EventEmitter {
         let locationUrl = null;
         try { locationUrl = new URL(headers.LOCATION || ''); } catch (_) {}
 
-        this.devices.push({
+        const device = {
           usn: headers.USN || headers.LOCATION || '',
           name,
           location: headers.LOCATION || '',
           host: locationUrl?.hostname || rinfo.address,
           port: Number(locationUrl?.port || 80)
-        });
+        };
+        this.devices.push(device);
+
+        if (device.location) {
+          nameLookups.push(
+            fetch(device.location, { signal: AbortSignal.timeout(2200) })
+              .then((response) => response.ok ? response.text() : '')
+              .then((xml) => {
+                const friendlyName = parseUpnpFriendlyName(xml);
+                if (friendlyName) device.name = friendlyName;
+              })
+              .catch(() => {})
+          );
+        }
       });
 
       this.ssdp = client;

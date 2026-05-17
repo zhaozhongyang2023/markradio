@@ -160,14 +160,6 @@ function normalizeTitleText(value = '') {
   return String(value).toLowerCase().replace(/[\s《》"“”'’‘()（）\-_/]+/g, '');
 }
 
-function fallbackLyrics({ introText, plan }) {
-  return [
-    { time: 0, text: introText || '这里是十三哥的音乐之声。' },
-    { time: 8, text: plan?.plan?.reason || '这首歌来自此刻的天气、心情和你的音乐记忆。' },
-    { time: 16, text: plan?.plan?.segue || '下一句旋律，继续慢慢往前。' }
-  ];
-}
-
 function buildTrackIntroText({ isPlanIntroTrack, plan, queueIndex, track, ttsText }) {
   if (isPlanIntroTrack && ttsText) return ttsText;
   const song = track?.title ? `接下来是《${track.title}》。` : '';
@@ -529,8 +521,7 @@ function ParticleWave({ progressRatio, active, onSeek, onPreview, onCommit, onSe
   );
 }
 
-function DjFeed({ introSegments, lyrics, lyricIndex, plan, queue, reading, readWordIndex, showLyrics, readingCardIndex, introText, introDoneFor, cardSegments, cardWordIndex }) {
-  const currentLyric = lyrics[lyricIndex]?.text || '旋律正在流动。';
+function DjFeed({ introSegments, lyrics, lyricIndex, lyricsSynced, plan, queue, reading, readWordIndex, showLyrics, readingCardIndex, introText, introDoneFor, cardSegments, cardWordIndex }) {
   const displayTracks = queue?.slice(0, 2) || [];
   const djText = introText || plan?.plan?.say || '';
   const showIntroPara = !showLyrics && djText && (
@@ -552,13 +543,15 @@ function DjFeed({ introSegments, lyrics, lyricIndex, plan, queue, reading, readW
     <div className={reading ? 'dj-feed is-reading' : 'dj-feed'}>
       {showLyrics ? (
         <div className="lyrics-view">
-          <span className="feed-meta">MarkRadio · {formatTime(lyrics[lyricIndex]?.time || 0)}</span>
-          {[-1, 0, 1].map((offset) => {
+          <span className="feed-meta">MarkRadio · {lyricsSynced ? formatTime(lyrics[lyricIndex]?.time || 0) : 'LYRICS'}</span>
+          {(lyricsSynced ? [-1, 0, 1] : [0, 1, 2]).map((offset) => {
             const idx = lyricIndex + offset;
             const line = lyrics[idx];
             if (!line?.text) return null;
             const dist = Math.abs(offset);
-            const cls = dist === 0 ? 'active' : `distance-${dist}`;
+            const cls = lyricsSynced
+              ? (dist === 0 ? 'active' : `distance-${dist}`)
+              : 'plain';
             return (
               <p key={idx} className={`lyric-line ${cls}`}>
                 {line.text}
@@ -737,6 +730,7 @@ function V4RadioView({
   const weekdays = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
   const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
   const currentTrack = track?.title ? `${track.title} - ${track.artist || 'Unknown'}` : '等待选曲';
+  const casting = castState === 'playing';
   const queueCount = queue?.length || 0;
   const lastMessages = chatMessages.slice(-10);
   const planTitle = plan?.plan?.planTitle || 'DJ SONG PLAN';
@@ -803,7 +797,7 @@ function V4RadioView({
 
   return (
     <main className={`v4-shell${lowPowerMode ? ' low-power' : ''}`}>
-      <section className={`v4-radio${lowPowerMode ? ' low-power' : ''}${isPlaying || reading ? ' is-active' : ''}`} aria-label="MarkRadio V4 播放器聊天室">
+      <section className={`v4-radio${lowPowerMode ? ' low-power' : ''}${isPlaying || reading || casting ? ' is-active' : ''}`} aria-label="MarkRadio V4 播放器聊天室">
         <canvas className="pixel-pulse-canvas" ref={pulseCanvasRef} aria-hidden="true" />
         {audioNodes}
         <header className="v4-topbar">
@@ -838,11 +832,11 @@ function V4RadioView({
           </div>
           <div className="v4-now-text">
             <strong>{currentTrack}</strong>
-            <small>{reading ? 'SPEAKING' : isPlaying ? 'PLAYING' : 'READY'}</small>
+            <small>{reading ? 'SPEAKING' : casting ? 'CASTING' : isPlaying ? 'PLAYING' : 'READY'}</small>
           </div>
           <div className="v4-controls">
             <button onClick={previousTrack} aria-label="上一首">‹</button>
-            <button onClick={playback} aria-label="播放或暂停">{pendingPlay && !reading ? '…' : isPlaying || reading ? 'Ⅱ' : '▶'}</button>
+            <button onClick={playback} aria-label="播放或暂停">{pendingPlay && !reading ? '…' : isPlaying || reading || casting ? 'Ⅱ' : '▶'}</button>
             <button onClick={nextTrack} aria-label="下一首">›</button>
             <button onClick={onRefresh} aria-label="刷新下一组">↻</button>
             <button
@@ -1333,14 +1327,17 @@ export default function App() {
   const realLyrics = useMemo(() => (
     (track.lyric || []).filter((line) => line.text?.trim() && !isCreditLine(line.text))
   ), [track.lyric]);
-  const lyrics = useMemo(() => {
-    const source = realLyrics.length ? realLyrics : fallbackLyrics({ introText, plan });
-    return source.filter((line) => line.text?.trim() && !isCreditLine(line.text));
-  }, [introText, plan, realLyrics]);
-  const lyricIndex = currentLyricIndex(lyrics, progress);
-  const realLyricIndex = currentLyricIndex(realLyrics, progress);
-  const showLyrics = introDoneFor === track.id && !reading;
-  const liveLyricLine = showLyrics && isPlaying ? lyrics[lyricIndex]?.text || '' : '';
+  const lyricsSynced = realLyrics.some((line) => line.synced !== false && Number.isFinite(line.time));
+  const lyrics = useMemo(() => (
+    lyricsSynced
+      ? realLyrics.filter((line) => line.synced !== false && Number.isFinite(line.time))
+      : realLyrics
+  ), [lyricsSynced, realLyrics]);
+  const lyricIndex = lyricsSynced ? currentLyricIndex(lyrics, progress) : 0;
+  const showLyrics = introDoneFor === track.id && !reading && lyrics.length > 0;
+  const liveLyricLine = showLyrics && (isPlaying || castState === 'playing')
+    ? lyrics[Math.max(0, lyricIndex)]?.text || ''
+    : '';
   const trackIsFavorite = Boolean(track.id && favoriteTrackIds.includes(track.id));
 
   // V3: pulse only on song switch / refresh / load, not periodic
@@ -1361,6 +1358,9 @@ export default function App() {
       const bedRatio = reading ? BED_VOLUME : 1;
       audio.volume = Math.max(0, Math.min(1, safeVolume * bedRatio));
       setVolumeTarget(audio.volume);
+    }
+    if (castDevice) {
+      api.castAction('volume', { volume: safeVolume * 100 }).catch(() => {});
     }
   }
 
@@ -1464,8 +1464,14 @@ export default function App() {
 
   async function playback() {
     if (pendingPlay) return;
-    if (isPlaying || reading) {
+    if (isPlaying || reading || castState === 'playing') {
       await pausePlayback();
+      return;
+    }
+    if (castDevice && castState === 'paused') {
+      const status = await api.castAction('resume').catch(() => null);
+      setCastState(status?.state || 'playing');
+      await api.playback('play').catch(() => {});
       return;
     }
     // First play: init autoplayToken so subsequent songs auto-advance
@@ -1494,6 +1500,10 @@ export default function App() {
     stopAudioVisuals();
     audioRef.current?.pause();
     djAudioRef.current?.pause();
+    if (castDevice && castState === 'playing') {
+      const status = await api.castAction('pause').catch(() => null);
+      setCastState(status?.state || 'paused');
+    }
     setIsPlaying(false);
     setReading(false);
     await api.playback('pause').catch(() => {});
@@ -1534,7 +1544,9 @@ export default function App() {
         const idx = queueIndex >= 0 ? queueIndex : 0;
         if (queue.length > 0) await runCardIntro(idx);
         // Phase 3: Fade music to full, show lyrics
-        if (audio) {
+        if (castDevice) {
+          await playCastTrack(track);
+        } else if (audio) {
           applyMusicVolume(1);
           setIsPlaying(true);
           startAudioVisuals(audio);
@@ -1545,7 +1557,9 @@ export default function App() {
         setReadProgress(1);
       } else {
         // Resume: play music directly
-        if (trackUrl) {
+        if (castDevice) {
+          await playCastTrack(track);
+        } else if (trackUrl) {
           if (audio.src !== trackUrl) audio.src = trackUrl;
           applyMusicVolume(1);
           await audio.play().catch(() => {});
@@ -1777,7 +1791,7 @@ export default function App() {
 
     // Set background music to low volume
     const audio = audioRef.current;
-    if (audio && trackUrl) {
+    if (audio && trackUrl && !castDevice) {
       if (audio.src !== trackUrl) audio.src = trackUrl;
       applyMusicVolume(BED_VOLUME);
       audio.play().catch(() => {});
@@ -1829,6 +1843,16 @@ export default function App() {
 
   function resumeMusicAfterIntro() {
     const audio = audioRef.current;
+    if (castDevice) {
+      playCastTrack(track).catch((error) => {
+        setCastState('idle');
+        setChatMessages((items) => [
+          ...items,
+          { id: `cast-error-${Date.now()}`, role: 'system', text: `投屏失败：${error.message}`, meta: 'CAST' }
+        ]);
+      });
+      return;
+    }
     if (!audio || !trackUrl) {
       fadeToFullVolume();
       return;
@@ -1893,6 +1917,7 @@ export default function App() {
     triggerPixelPulse();
     const currentIndex = queue.findIndex((item) => item.id === track.id);
     if (currentIndex >= 0 && currentIndex < queue.length - 1) {
+      await pauseCastOnly();
       await api.playback('next').catch(() => {});
       autoplayOptionsRef.current = { skipIntro: false, skipStationIntro: true };
       setAutoplayToken((value) => value + 1);
@@ -1911,6 +1936,7 @@ export default function App() {
     setReadProgress(0);
     setReadingCardIndex(-1);
     setLocalProgress(0);
+    await pauseCastOnly();
     const nextState = await api.playback('prev').catch(() => null);
     if (nextState?.now) setState(nextState);
     autoplayOptionsRef.current = { skipIntro: false, skipStationIntro: true };
@@ -2163,21 +2189,34 @@ function seekTo(ratio) {
     return item?.originalUrl || item?.url || '';
   }
 
+  async function playCastTrack(item = track) {
+    const url = castTrackUrl(item);
+    if (!url) throw new Error('当前歌曲暂无可投放音源');
+    const status = await api.castPlay(url, {
+      title: item.title || '',
+      artist: item.artist || '',
+      album: item.album || ''
+    });
+    setCastState(status.state || 'playing');
+    if (audioRef.current) audioRef.current.pause();
+    setIsPlaying(false);
+    await api.playback('play').catch(() => {});
+    return status;
+  }
+
+  async function pauseCastOnly() {
+    if (!castDevice || castState !== 'playing') return;
+    const status = await api.castAction('pause').catch(() => null);
+    setCastState(status?.state || 'paused');
+  }
+
   async function handleCastConnect(device) {
     try {
       await api.castConnect(device.host, device.port);
       setCastDevice(device);
       setCastState('idle');
-      const url = castTrackUrl(track);
-      if (url) {
-        const status = await api.castPlay(url, {
-          title: track.title || '',
-          artist: track.artist || '',
-          album: track.album || ''
-        });
-        setCastState(status.state || 'playing');
-        if (audioRef.current) audioRef.current.pause();
-        setIsPlaying(false);
+      if (castTrackUrl(track)) {
+        await playCastTrack(track);
         setShowCastPanel(false);
       } else {
         setChatMessages((items) => [
@@ -2249,6 +2288,7 @@ function seekTo(ratio) {
       const shouldSwitch = Boolean(result.plan?.plan?.shouldSwitchNow) ||
         Boolean(nextNow?.now?.track?.id && nextNow.now.track.id !== beforeTrackId);
       if (shouldSwitch) {
+        await pauseCastOnly();
         setIntroDoneFor(null);
         setReading(false);
         setReadProgress(0);
@@ -2555,7 +2595,7 @@ function seekTo(ratio) {
                 </div>
               );
             })()}
-            <Spectrum active={isPlaying || reading} progressRatio={displayProgressRatio} visualRef={spectrumRef} />
+            <Spectrum active={isPlaying || reading || castState === 'playing'} progressRatio={displayProgressRatio} visualRef={spectrumRef} />
           </header>
 
           <section className="card">
@@ -2570,7 +2610,7 @@ function seekTo(ratio) {
 
             <div className="track-row">
               <button className="tiny-play" onClick={playback} aria-label="播放或暂停">
-                {pendingPlay && !reading ? '…' : isPlaying || reading ? 'Ⅱ' : '▶'}
+                {pendingPlay && !reading ? '…' : isPlaying || reading || castState === 'playing' ? 'Ⅱ' : '▶'}
               </button>
               <div className="progress draggable">
                 <span style={{ width: `${displayProgressRatio * 100}%` }} />
@@ -2595,6 +2635,7 @@ function seekTo(ratio) {
               introSegments={introSegments}
               lyricIndex={lyricIndex}
               lyrics={lyrics}
+              lyricsSynced={lyricsSynced}
               plan={plan}
               queue={queue}
               reading={reading}

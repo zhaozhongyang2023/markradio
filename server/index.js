@@ -352,6 +352,7 @@ app.post('/api/cast/:action', async (request) => {
   if (action === 'pause') castManager.pause();
   else if (action === 'resume') castManager.resume();
   else if (action === 'stop') castManager.stop();
+  else if (action === 'volume') castManager.setVolume(Number(request.body?.volume || 0));
   else if (action === 'disconnect') castManager.disconnect();
   else return { ok: false, message: `未知 action: ${action}` };
   return castManager.getStatus();

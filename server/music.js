@@ -303,7 +303,8 @@ export function parseLyric(value) {
       const adjustedTime = Math.max(0, rawTime + offsetMs / 1000);
       return {
         time: adjustedTime,
-        text
+        text,
+        synced: true
       };
     })
     .filter(Boolean)
@@ -316,7 +317,8 @@ export function parseLyric(value) {
     .slice(0, 80)
     .map((text, index) => ({
       time: index * 6,
-      text
+      text,
+      synced: false
     }));
 }
 

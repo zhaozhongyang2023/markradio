@@ -72,8 +72,11 @@ export const api = {
       method: 'POST',
       body: JSON.stringify({ url, ...meta })
     }),
-  castAction: (action) =>
-    request(`/api/cast/${action}`, { method: 'POST' }),
+  castAction: (action, body = {}) =>
+    request(`/api/cast/${action}`, {
+      method: 'POST',
+      body: JSON.stringify(body)
+    }),
   voicePreview: (body) =>
     request('/api/voice/preview', {
       method: 'POST',
