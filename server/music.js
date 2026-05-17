@@ -283,6 +283,13 @@ export function parseLyric(value) {
     .map((line) => line.trim())
     .filter(Boolean);
 
+  // 解析 LRC offset 标签，修正所有时间戳
+  let offsetMs = 0;
+  const offsetMatch = String(value || '').match(/^\[offset:([+-]?\d+)\]/im);
+  if (offsetMatch) {
+    offsetMs = Number(offsetMatch[1]) || 0;
+  }
+
   const timed = lines
     .map((line) => {
       const match = line.match(/^\[(\d{1,2}):(\d{1,2})(?:\.(\d{1,3}))?](.*)$/);
@@ -292,8 +299,10 @@ export function parseLyric(value) {
       const ms = Number((match[3] || '0').padEnd(3, '0'));
       const text = match[4].trim();
       if (!text) return null;
+      const rawTime = minutes * 60 + seconds + ms / 1000;
+      const adjustedTime = Math.max(0, rawTime + offsetMs / 1000);
       return {
-        time: minutes * 60 + seconds + ms / 1000,
+        time: adjustedTime,
         text
       };
     })
