@@ -1779,6 +1779,11 @@ p {
   background: rgba(0,0,0,0.12);
   color: #111;
 }
+.cast-actions button:active {
+  background: rgba(99,102,241,0.15);
+  border-color: rgba(99,102,241,0.4);
+  color: #1a1a2e;
+}
 
 .qr-backdrop {
   position: absolute;
