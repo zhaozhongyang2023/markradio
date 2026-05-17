@@ -1241,18 +1241,35 @@ export default function App() {
 
   useEffect(() => {
     let socket;
-    try {
-      socket = new WebSocket(streamUrl());
-      socket.onmessage = (event) => {
-        const message = JSON.parse(event.data);
-        if (message.event === 'now') setState(message.payload);
-        if (message.event === 'plan') setState((current) => ({ ...(current || {}), plan: message.payload }));
-        if (message.event === 'mood') setSelectedMood(message.payload.current);
-      };
-    } catch {
-      return undefined;
+    let reconnectTimer;
+    let reconnectDelay = 1000;
+    const maxDelay = 30000;
+
+    function connect() {
+      try {
+        socket = new WebSocket(streamUrl());
+        socket.onmessage = (event) => {
+          const message = JSON.parse(event.data);
+          if (message.event === 'now') setState(message.payload);
+          if (message.event === 'plan') setState((current) => ({ ...(current || {}), plan: message.payload }));
+          if (message.event === 'mood') setSelectedMood(message.payload.current);
+        };
+        socket.onopen = () => { reconnectDelay = 1000; };
+        socket.onclose = () => {
+          reconnectTimer = setTimeout(connect, reconnectDelay);
+          reconnectDelay = Math.min(maxDelay, reconnectDelay * 1.5);
+        };
+        socket.onerror = () => { socket?.close(); };
+      } catch {
+        reconnectTimer = setTimeout(connect, reconnectDelay);
+      }
     }
-    return () => socket?.close();
+
+    connect();
+    return () => {
+      clearTimeout(reconnectTimer);
+      socket?.close();
+    };
   }, []);
 
   const now = state?.now || {};
@@ -1456,6 +1473,15 @@ export default function App() {
     // Ensure AudioContext is active (must happen in user-gesture context)
     if (audioContextRef.current && audioContextRef.current.state === 'suspended') {
       await audioContextRef.current.resume();
+    }
+    // Prime audio element for iOS Bluetooth - unlock audio session in user gesture
+    const audioEl = audioRef.current;
+    if (audioEl && trackUrl) {
+      if (audioEl.src !== trackUrl) audioEl.src = trackUrl;
+      audioEl.volume = 0;
+      await audioEl.play().catch(() => {});
+      audioEl.pause();
+      audioEl.currentTime = 0;
     }
     await startPlayback();
   }
@@ -1661,8 +1687,7 @@ export default function App() {
     setReadingCardIndex(-1);
 
     if (audioRef.current) {
-      audioRef.current.pause();
-      audioRef.current.onended = null;
+      // Mute instead of pause: keep iOS audio session alive for Bluetooth
       audioRef.current.volume = 0;
     }
 
@@ -1763,6 +1788,16 @@ export default function App() {
         startDjProgressLoop(djAudio, reason.length);
       });
       djAudio.pause();
+      // Force iOS Bluetooth reclamation: reset audio element src to trigger new session
+      if (audio && trackUrl) {
+        const savedSrc = audio.src;
+        audio.src = '';
+        try { audio.load(); } catch {}
+        audio.src = trackUrl;
+        audio.load();
+        audio.volume = audioRef.current ? audioRef.current.volume : BED_VOLUME;
+        try { await audio.play(); } catch {}
+      }
       if (playRejected) {
         // Use latest plan ref to avoid stale closure after async gap
         await readTextSegment(planRef.current?.queue?.[cardIndex]?.reason || reason);
@@ -2046,6 +2081,31 @@ function seekTo(ratio) {
     paintLevels(particleRef.current, null);
   }
 
+  function connectToAudioContext(mediaElement) {
+    // Route audio element through shared AudioContext so iOS keeps one audio session
+    try {
+      const AudioContext = window.AudioContext || window.webkitAudioContext;
+      if (!AudioContext) return null;
+      const context = audioContextRef.current || new AudioContext();
+      audioContextRef.current = context;
+      if (context.state === 'suspended') {
+        context.resume().catch(() => {});
+      }
+      let sourceEntry = mediaSourcesRef.current.get(mediaElement);
+      if (!sourceEntry) {
+        sourceEntry = { source: context.createMediaElementSource(mediaElement), connected: false };
+        mediaSourcesRef.current.set(mediaElement, sourceEntry);
+      }
+      if (!sourceEntry.connected) {
+        sourceEntry.source.connect(context.destination);
+        sourceEntry.connected = true;
+      }
+      return sourceEntry;
+    } catch {
+      return null;
+    }
+  }
+
   function setupAnalyser(mediaElement) {
     try {
       const AudioContext = window.AudioContext || window.webkitAudioContext;
@@ -2317,11 +2377,12 @@ function seekTo(ratio) {
                     className={castDevice?.usn === device.usn ? 'active' : ''}
                     onClick={() => handleCastConnect(device)}
                   >
-                    <span>⬢</span>
+                    <span>{castDevice?.usn === device.usn ? '⬢' : '⬡'}</span>
                     <div>
                       <strong>{device.name}</strong>
-                      <small>{device.host}:{device.port}</small>
+                      <small>{device.host}</small>
                     </div>
+                    {castDevice?.usn === device.usn ? <b className="cast-check">✓</b> : null}
                   </button>
                 ))}
               </div>
