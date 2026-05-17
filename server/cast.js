@@ -68,10 +68,12 @@ class CastManager extends EventEmitter {
         const st = headers.ST || headers.NT || '';
         // 只保留 MediaRenderer 设备，过滤路由器 IGD / WANDevice 等
         if (!st.includes('MediaRenderer')) return;
-        // 同一设备去重（按 USN 前缀）
-        const baseUsn = (headers.USN || '').split('::')[0];
-        if (found.has(baseUsn)) return;
-        found.set(baseUsn, true);
+        // 同一设备去重（按 LOCATION 中的 host，同物理设备多 IP 会指向同一 host）
+        let locHost = '';
+        try { locHost = new URL(headers.LOCATION || '').hostname; } catch (_) {}
+        const devKey = locHost || rinfo.address;
+        if (found.has(devKey)) return;
+        found.set(devKey, true);
 
         const raw = headers.SERVER
           || headers['X-AV-Physical-Unit-Info']
