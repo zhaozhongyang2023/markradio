@@ -1698,9 +1698,9 @@ p {
 .cast-card {
   min-width: 300px;
   max-width: 380px;
-  /* 确保浅色卡片 + 深色文字，覆盖可能的暗色继承 */
-  background: #f5f3ec;
-  color: #111;
+  background: #fefdf9 !important;
+  color: #1a1a2e !important;
+  color-scheme: light;
 }
 .cast-list {
   display: flex;
@@ -1709,6 +1709,7 @@ p {
   margin: 12px 0;
   overflow-y: auto;
 }
+.cast-card * { color-scheme: light; }
 .cast-list button {
   display: flex;
   align-items: center;
@@ -1748,11 +1749,11 @@ p {
 }
 .cast-list button strong {
   font-weight: 600;
-  color: #1a1a2e;
+  color: #1a1a2e !important;
   font-size: 0.95rem;
 }
 .cast-list button small {
-  color: rgba(0,0,0,0.48);
+  color: rgba(0,0,0,0.55) !important;
   font-size: 0.75rem;
   margin-top: 2px;
 }
