@@ -30,6 +30,7 @@ const LOW_POWER_READ_PROGRESS_MS = 110;
 const CAST_LEASE_TTL_MS = 15 * 60 * 1000;
 const CAST_HEARTBEAT_INTERVAL_MS = 30 * 1000;
 const CAST_PLAYBACK_LEASE_BUFFER_MS = 2 * 60 * 1000;
+const SILENT_AUDIO_URL = 'data:audio/wav;base64,UklGRigAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQQAAAAAAA==';
 
 function detectLowPowerRuntime() {
   if (typeof navigator === 'undefined') return false;
@@ -1016,6 +1017,7 @@ export default function App() {
   const [speechMessage, setSpeechMessage] = useState('');
   const audioRef = useRef(null);
   const djAudioRef = useRef(null);
+  const djAudioUnlockedRef = useRef(false);
   const speechRecognitionRef = useRef(null);
   const spectrumRef = useRef(null);
   const particleRef = useRef(null);
@@ -1632,7 +1634,8 @@ export default function App() {
   function unlockMobileAudio() {
     // 在用户手势内恢复 AudioContext，解锁移动端音频自动播放
     ensureSharedAudioOutput();
-    // 不在 unlock 中触碰 audio/djAudio，避免干扰后续播放流程
+    primeDjAudioForMobile();
+    // 只预热 DJ 音频元素，后续真正的主导读仍由 runPreIntro 接管。
   }
 
   async function startPlayback(options = {}) {
@@ -1921,7 +1924,9 @@ export default function App() {
       djAudio.pause();
       djAudio.src = introUrl;
       djAudio.currentTime = 0;
+      djAudio.muted = false;
       djAudio.volume = 1.0;
+      djAudio.load();
       // Play DJ audio natively — drive visuals with fallback levels
       startFallbackVisuals();
       let playRejected = false;
@@ -2007,7 +2012,9 @@ export default function App() {
       djAudio.pause();
       djAudio.src = cardUrl;
       djAudio.currentTime = 0;
+      djAudio.muted = false;
       djAudio.volume = 1.0;
+      djAudio.load();
       let playRejected = false;
       await new Promise((resolve) => {
         const finish = () => {
@@ -2339,6 +2346,38 @@ function seekTo(ratio) {
     await resumeSharedAudioContext();
     connectToAudioContext(audioRef.current);
     connectToAudioContext(djAudioRef.current);
+  }
+
+  function primeDjAudioForMobile() {
+    const djAudio = djAudioRef.current;
+    if (!djAudio || djAudioUnlockedRef.current) return;
+    try {
+      djAudioUnlockedRef.current = true;
+      djAudio.muted = true;
+      djAudio.volume = 0;
+      djAudio.src = SILENT_AUDIO_URL;
+      djAudio.load();
+      const playPromise = djAudio.play();
+      const cleanup = () => {
+        if (djAudio.getAttribute('src') === SILENT_AUDIO_URL) {
+          djAudio.pause();
+          djAudio.removeAttribute('src');
+          djAudio.load();
+        }
+        djAudio.muted = false;
+        djAudio.volume = 1;
+      };
+      if (playPromise) {
+        playPromise.then(cleanup).catch(() => {
+          djAudioUnlockedRef.current = false;
+          cleanup();
+        });
+      } else {
+        cleanup();
+      }
+    } catch {
+      djAudioUnlockedRef.current = false;
+    }
   }
 
   async function playLocalMusic({ ratio = 1, fade = false, runId } = {}) {
