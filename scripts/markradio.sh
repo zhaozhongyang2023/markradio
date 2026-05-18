@@ -111,6 +111,16 @@ disable_screen_blank() {
   xset s noblank 2>/dev/null || true
 }
 
+enable_screen_blank() {
+  export DISPLAY="${DISPLAY:-:0}"
+  # 服务端模式不占用本机屏幕，恢复 X11 屏保/DPMS，让树莓派屏幕可以熄屏节电。
+  xset s on 2>/dev/null || true
+  xset s blank 2>/dev/null || true
+  xset s 600 600 2>/dev/null || true
+  xset +dpms 2>/dev/null || true
+  xset dpms 0 0 600 2>/dev/null || true
+}
+
 prepare_firefox_profile() {
   mkdir -p "$FIREFOX_PROFILE"
   cat > "$FIREFOX_PROFILE/user.js" <<'EOF'
@@ -275,6 +285,8 @@ refresh() {
 server() {
   echo "========== 启动 Mark Radio (服务端模式) =========="
   clear_cache
+  stop_chromium
+  enable_screen_blank
   start_netease
   start_radio
   echo
