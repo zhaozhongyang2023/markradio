@@ -379,6 +379,20 @@ function mediaIdFromUrl(url = '') {
   return '';
 }
 
+function ttsHashFromUrl(url = '') {
+  const raw = String(url || '').trim();
+  if (!raw) return '';
+  const directMatch = raw.match(/\/tts\/([a-f0-9]{24})\.mp3(?:[?#]|$)/i);
+  if (directMatch) return directMatch[1];
+  try {
+    const parsed = raw.startsWith('http') ? new URL(raw) : new URL(raw, 'http://markradio.local');
+    const match = parsed.pathname.match(/^\/tts\/([a-f0-9]{24})\.mp3$/i);
+    return match ? match[1] : '';
+  } catch (_) {
+    return '';
+  }
+}
+
 async function neteaseAudioUrl(id) {
   const data = await callNetease('song/url/v1', { id, level: 'standard' }, store).catch(() =>
     callNetease('song/url', { id }, store).catch(() => null)
@@ -387,6 +401,16 @@ async function neteaseAudioUrl(id) {
 }
 
 async function prepareCastMediaUrl(url = '', { requestHost = '' } = {}) {
+  const ttsHash = ttsHashFromUrl(url);
+  if (ttsHash) {
+    await fs.promises.mkdir(castCacheDir, { recursive: true });
+    const key = `tts-${ttsHash}`;
+    const filePath = path.join(castCacheDir, `${key}.mp3`);
+    const existing = await fs.promises.stat(filePath).catch(() => null);
+    if (!existing?.size) await fs.promises.copyFile(ttsFilePath(ttsHash), filePath);
+    return castMediaUrl(key, requestHost);
+  }
+
   const id = mediaIdFromUrl(url);
   if (!/^\d+$/.test(id)) return url;
   await fs.promises.mkdir(castCacheDir, { recursive: true });
@@ -425,7 +449,7 @@ function dlnaHeaders(size, { start = 0, end = size - 1, partial = false } = {}) 
 
 async function sendCachedCastMedia(request, reply) {
   const id = String(request.params.fileName || '').replace(/\.mp3$/i, '');
-  if (!/^\d+$/.test(id)) return reply.code(404).send();
+  if (!/^(?:\d+|tts-[a-f0-9]{24})$/i.test(id)) return reply.code(404).send();
   const filePath = path.join(castCacheDir, `${id}.mp3`);
   const stat = await fs.promises.stat(filePath).catch(() => null);
   if (!stat?.size) return reply.code(404).send();
@@ -516,7 +540,7 @@ app.get('/media/cast/:fileName', async (request, reply) => {
 function sendRawCastMedia(req, res) {
   const startedAt = Date.now();
   const parsed = new URL(req.url || '/', `http://${req.headers.host || 'localhost'}`);
-  const match = parsed.pathname.match(/^\/cast\/(\d+)\.mp3$/);
+  const match = parsed.pathname.match(/^\/cast\/(\d+|tts-[a-f0-9]{24})\.mp3$/i);
   if (!match || !['GET', 'HEAD'].includes(req.method || '')) {
     res.writeHead(404).end();
     return;

@@ -1037,6 +1037,7 @@ export default function App() {
   const planRef = useRef(null);
   const planDjUrlRef = useRef(null);
   const planIdRef = useRef(null);
+  const castDeviceRef = useRef(null);
   const [seekDraftRatio, setSeekDraftRatio] = useState(null);
   const lowPowerMode = useMemo(() => detectLowPowerRuntime(), []);
   const viewModeRef = useRef(viewMode);
@@ -1044,6 +1045,10 @@ export default function App() {
   useEffect(() => {
     viewModeRef.current = viewMode;
   }, [viewMode]);
+
+  useEffect(() => {
+    castDeviceRef.current = castDevice;
+  }, [castDevice]);
 
   function syncReadProgress(ratio) {
     const safeRatio = Math.min(1, Math.max(0, ratio));
@@ -1359,9 +1364,13 @@ export default function App() {
       audio.volume = Math.max(0, Math.min(1, safeVolume * bedRatio));
       setVolumeTarget(audio.volume);
     }
-    if (castDevice) {
+    if (castDeviceRef.current || castDevice) {
       api.castAction('volume', { volume: safeVolume * 100 }).catch(() => {});
     }
+  }
+
+  function hasCastDevice() {
+    return Boolean(castDeviceRef.current || castDevice);
   }
 
   useEffect(() => {
@@ -1468,7 +1477,7 @@ export default function App() {
       await pausePlayback();
       return;
     }
-    if (castDevice && castState === 'paused') {
+    if (hasCastDevice() && castState === 'paused') {
       const status = await api.castAction('resume').catch(() => null);
       setCastState(status?.state || 'playing');
       await api.playback('play').catch(() => {});
@@ -1500,7 +1509,7 @@ export default function App() {
     stopAudioVisuals();
     audioRef.current?.pause();
     djAudioRef.current?.pause();
-    if (castDevice && castState === 'playing') {
+    if (hasCastDevice() && castState === 'playing') {
       const status = await api.castAction('pause').catch(() => null);
       setCastState(status?.state || 'paused');
     }
@@ -1544,7 +1553,7 @@ export default function App() {
         const idx = queueIndex >= 0 ? queueIndex : 0;
         if (queue.length > 0) await runCardIntro(idx);
         // Phase 3: Fade music to full, show lyrics
-        if (castDevice) {
+        if (hasCastDevice()) {
           await playCastTrack(track);
         } else if (audio) {
           applyMusicVolume(1);
@@ -1557,7 +1566,7 @@ export default function App() {
         setReadProgress(1);
       } else {
         // Resume: play music directly
-        if (castDevice) {
+        if (hasCastDevice()) {
           await playCastTrack(track);
         } else if (trackUrl) {
           if (audio.src !== trackUrl) audio.src = trackUrl;
@@ -1745,6 +1754,18 @@ export default function App() {
     }
 
     const djAudio = djAudioRef.current;
+    if (introUrl && hasCastDevice()) {
+      startFallbackVisuals();
+      try {
+        await playCastClip(introUrl, { title: 'MarkRadio DJ', artist: 'MarkRadio' });
+        await readTextSegment(introText);
+        stopAudioVisuals();
+        return;
+      } catch {
+        stopAudioVisuals();
+      }
+    }
+
     if (introUrl && djAudio) {
       djAudio.pause();
       djAudio.src = introUrl;
@@ -1788,6 +1809,24 @@ export default function App() {
     setReading(true);
     setReadProgress(0);
     setReadingCardIndex(cardIndex);
+
+    if (hasCastDevice()) {
+      startFallbackVisuals();
+      const cardUrl = await resolveCardAudioUrl(cardIndex);
+      if (cardUrl) {
+        try {
+          await playCastClip(cardUrl, { title: `${track.title || 'MarkRadio'} 导读`, artist: 'MarkRadio' });
+          await readTextSegment(reason);
+          stopAudioVisuals();
+          return;
+        } catch {
+          stopAudioVisuals();
+        }
+      }
+      await readTextSegment(planRef.current?.queue?.[cardIndex]?.reason || reason);
+      stopAudioVisuals();
+      return;
+    }
 
     // Set background music to low volume
     const audio = audioRef.current;
@@ -1843,7 +1882,7 @@ export default function App() {
 
   function resumeMusicAfterIntro() {
     const audio = audioRef.current;
-    if (castDevice) {
+    if (hasCastDevice()) {
       playCastTrack(track).catch((error) => {
         setCastState('idle');
         setChatMessages((items) => [
@@ -2194,11 +2233,23 @@ function seekTo(ratio) {
     return rawUrl;
   }
 
+  async function playCastClip(url, meta = {}) {
+    if (!url) throw new Error('暂无可投放音频');
+    const status = await api.castPlay(url, {
+      title: meta.title || 'MarkRadio',
+      artist: meta.artist || 'MarkRadio',
+      album: meta.album || ''
+    });
+    setCastState(status.state || 'playing');
+    audioRef.current?.pause();
+    djAudioRef.current?.pause();
+    setIsPlaying(false);
+    return status;
+  }
+
   async function playCastTrack(item = track) {
     const url = castTrackUrl(item);
     if (!url) throw new Error('当前歌曲暂无可投放音源');
-    const castVolume = Math.round((userVolume > 0.05 ? userVolume : 0.6) * 100);
-    await api.castAction('volume', { volume: castVolume }).catch(() => {});
     const status = await api.castPlay(url, {
       title: item.title || '',
       artist: item.artist || '',
@@ -2220,9 +2271,11 @@ function seekTo(ratio) {
   async function handleCastConnect(device) {
     try {
       await api.castConnect(device.host, device.port);
+      castDeviceRef.current = device;
       setCastDevice(device);
       setCastState('idle');
     } catch (err) {
+      castDeviceRef.current = null;
       setCastDevice(null);
       setCastState('idle');
       setChatMessages((items) => [
@@ -2234,6 +2287,15 @@ function seekTo(ratio) {
 
     try {
       if (castTrackUrl(track)) {
+        if (introDoneFor !== track.id) {
+          if (!introDoneFor) await runPreIntro();
+          const idx = queueIndex >= 0 ? queueIndex : 0;
+          if (queue.length > 0) await runCardIntro(idx);
+          setIntroDoneFor(track.id);
+          setReading(false);
+          setReadingCardIndex(null);
+          setReadProgress(1);
+        }
         await playCastTrack(track);
         setShowCastPanel(false);
       } else {
@@ -2256,6 +2318,7 @@ function seekTo(ratio) {
       await api.castAction('stop');
       await api.castAction('disconnect');
     } catch (_) { /* ignore */ }
+    castDeviceRef.current = null;
     setCastDevice(null);
     setCastState('idle');
   }
