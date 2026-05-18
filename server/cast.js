@@ -26,7 +26,8 @@ function escapeXml(value = '') {
 }
 
 function buildAudioMetadata(url, metadata = {}, contentType = 'audio/mpeg') {
-  const protocolInfo = `http-get:*:${contentType}:*`;
+  const dlnaFeatures = 'DLNA.ORG_PN=MP3;DLNA.ORG_OP=01;DLNA.ORG_CI=0;DLNA.ORG_FLAGS=01700000000000000000000000000000';
+  const protocolInfo = `http-get:*:${contentType}:${dlnaFeatures}`;
   const title = metadata.title || 'MarkRadio';
   const creator = metadata.artist || metadata.creator || 'MarkRadio';
   const album = metadata.album || '';
@@ -303,14 +304,14 @@ class CastManager extends EventEmitter {
     const params = {
       InstanceID: instanceId,
       CurrentURI: url,
-      CurrentURIMetaData: ''
+      CurrentURIMetaData: metadata
     };
     try {
       await this._postSoap('AVTransport', 'SetAVTransportURI', params);
     } catch (err) {
       await this._postSoap('AVTransport', 'SetAVTransportURI', {
         ...params,
-        CurrentURIMetaData: metadata
+        CurrentURIMetaData: ''
       });
     }
     await this._postSoap('AVTransport', 'Play', { InstanceID: instanceId, Speed: 1 });
@@ -345,12 +346,24 @@ class CastManager extends EventEmitter {
 
   async setVolume(vol) {
     if (!this.client) return this.getStatus();
+    const instanceId = Number(this.client?.instanceId || 0);
+    const channel = 'Master';
     const v = Math.max(0, Math.min(100, Math.round(vol)));
+    const muteParams = {
+      InstanceID: instanceId,
+      Channel: channel,
+      DesiredMute: 0
+    };
     const params = {
-      InstanceID: Number(this.client?.instanceId || 0),
-      Channel: 'Master',
+      InstanceID: instanceId,
+      Channel: channel,
       DesiredVolume: v
     };
+    try {
+      await this._callAction('RenderingControl', 'SetMute', muteParams, 5000);
+    } catch (err) {
+      await this._postSoap('RenderingControl', 'SetMute', muteParams, 5000).catch(() => {});
+    }
     try {
       await this._callAction('RenderingControl', 'SetVolume', params, 5000);
     } catch (err) {

@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { Readable } from 'node:stream';
+import { pipeline } from 'node:stream/promises';
 import Fastify from 'fastify';
 import fastifyStatic from '@fastify/static';
 import websocket from '@fastify/websocket';
@@ -20,6 +21,7 @@ const store = new StateStore();
 const app = Fastify({ logger: true });
 const webApp = Fastify({ logger: true });
 const clients = new Set();
+const castCacheDir = path.resolve(process.cwd(), 'data', 'cast-cache');
 
 await app.register(websocket);
 
@@ -342,7 +344,11 @@ app.post('/api/cast/connect', async (request, reply) => {
 app.post('/api/cast/play', async (request, reply) => {
   const { url, title, artist, album } = request.body || {};
   if (!url) return reply.code(400).send({ ok: false, message: '缺少音频 url' });
-  const castUrl = buildCastUrl(url, { requestHost: request.headers.host, apiPort: config.apiPort });
+  const stableUrl = await prepareCastMediaUrl(url).catch((err) => {
+    app.log.warn('Cast media cache skipped: ' + err.message);
+    return url;
+  });
+  const castUrl = buildCastUrl(stableUrl, { requestHost: request.headers.host, apiPort: config.apiPort });
   await castManager.play(castUrl, { title, artist, album });
   return castManager.getStatus();
 });
@@ -358,14 +364,97 @@ app.post('/api/cast/:action', async (request) => {
   return castManager.getStatus();
 });
 
+function mediaIdFromUrl(url = '') {
+  const raw = String(url || '').trim();
+  if (!raw) return '';
+  const pathMatch = raw.match(/\/media\/audio\/([^/?#]+?)(?:\.mp3)?(?:[?#]|$)/);
+  if (pathMatch) return decodeURIComponent(pathMatch[1]).replace(/\.mp3$/i, '');
+  try {
+    const parsed = raw.startsWith('http') ? new URL(raw) : new URL(raw, 'http://markradio.local');
+    const id = parsed.searchParams.get('id') || '';
+    if (parsed.pathname === '/media/audio' && id) return id;
+  } catch (_) {}
+  return '';
+}
+
+async function neteaseAudioUrl(id) {
+  const data = await callNetease('song/url/v1', { id, level: 'standard' }, store).catch(() =>
+    callNetease('song/url', { id }, store).catch(() => null)
+  );
+  return data?.data?.[0]?.url || '';
+}
+
+async function prepareCastMediaUrl(url = '') {
+  const id = mediaIdFromUrl(url);
+  if (!/^\d+$/.test(id)) return url;
+  await fs.promises.mkdir(castCacheDir, { recursive: true });
+  const filePath = path.join(castCacheDir, `${id}.mp3`);
+  const existing = await fs.promises.stat(filePath).catch(() => null);
+  if (existing?.size > 1024) return `/media/cast/${encodeURIComponent(id)}.mp3`;
+
+  const target = await neteaseAudioUrl(id);
+  if (!/^https?:\/\//i.test(target)) throw new Error('invalid cast media url');
+  const upstream = await fetch(target);
+  if (!upstream.ok || !upstream.body) throw new Error(`media fetch failed: ${upstream.status}`);
+  const tmpPath = `${filePath}.${Date.now()}.tmp`;
+  await pipeline(Readable.fromWeb(upstream.body), fs.createWriteStream(tmpPath));
+  await fs.promises.rename(tmpPath, filePath);
+  return `/media/cast/${encodeURIComponent(id)}.mp3`;
+}
+
+function dlnaHeaders(size, { start = 0, end = size - 1, partial = false } = {}) {
+  const dlnaFeatures = 'DLNA.ORG_PN=MP3;DLNA.ORG_OP=01;DLNA.ORG_CI=0;DLNA.ORG_FLAGS=01700000000000000000000000000000';
+  const headers = {
+    'Content-Type': 'audio/mpeg',
+    'transferMode.dlna.org': 'Streaming',
+    'contentFeatures.dlna.org': dlnaFeatures,
+    'Cache-Control': 'no-transform',
+    'Accept-Ranges': 'bytes',
+    'Content-Length': String(end - start + 1)
+  };
+  if (partial) headers['Content-Range'] = `bytes ${start}-${end}/${size}`;
+  return headers;
+}
+
+async function sendCachedCastMedia(request, reply) {
+  const id = String(request.params.fileName || '').replace(/\.mp3$/i, '');
+  if (!/^\d+$/.test(id)) return reply.code(404).send();
+  const filePath = path.join(castCacheDir, `${id}.mp3`);
+  const stat = await fs.promises.stat(filePath).catch(() => null);
+  if (!stat?.size) return reply.code(404).send();
+
+  let start = 0;
+  let end = stat.size - 1;
+  let partial = false;
+  const range = String(request.headers.range || '');
+  const match = range.match(/^bytes=(\d*)-(\d*)$/);
+  if (match) {
+    partial = true;
+    start = match[1] ? Number(match[1]) : 0;
+    end = match[2] ? Number(match[2]) : end;
+    if (!Number.isFinite(start) || !Number.isFinite(end) || start > end || start >= stat.size) {
+      return reply.code(416).header('Content-Range', `bytes */${stat.size}`).send();
+    }
+    end = Math.min(end, stat.size - 1);
+  }
+
+  reply.code(partial ? 206 : 200);
+  const headers = dlnaHeaders(stat.size, { start, end, partial });
+  if (request.method === 'HEAD') {
+    reply.hijack();
+    reply.raw.writeHead(partial ? 206 : 200, headers);
+    reply.raw.end();
+    return reply;
+  }
+  for (const [key, value] of Object.entries(headers)) reply.header(key, value);
+  return reply.send(fs.createReadStream(filePath, { start, end }));
+}
+
 async function streamMediaAudio(request, reply, routeId = '') {
   const id = String(routeId || request.query?.id || '');
   let target = String(request.query?.url || '');
   if (id) {
-    const data = await callNetease('song/url/v1', { id, level: 'standard' }, store).catch(() =>
-      callNetease('song/url', { id }, store).catch(() => null)
-    );
-    target = data?.data?.[0]?.url || '';
+    target = await neteaseAudioUrl(id);
   }
   if (!/^https?:\/\//i.test(target)) return reply.code(400).send({ error: 'invalid media url' });
   const upstream = await fetch(target, {
@@ -376,7 +465,11 @@ async function streamMediaAudio(request, reply, routeId = '') {
   const contentLength = upstream.headers.get('content-length');
   const contentRange = upstream.headers.get('content-range');
   const acceptRanges = upstream.headers.get('accept-ranges');
-  reply.header('Content-Type', contentType || 'audio/mpeg');
+  const dlnaFeatures = 'DLNA.ORG_PN=MP3;DLNA.ORG_OP=01;DLNA.ORG_CI=0;DLNA.ORG_FLAGS=01700000000000000000000000000000';
+  reply.header('Content-Type', id ? 'audio/mpeg' : contentType || 'audio/mpeg');
+  reply.header('transferMode.dlna.org', 'Streaming');
+  reply.header('contentFeatures.dlna.org', dlnaFeatures);
+  reply.header('Cache-Control', 'no-transform');
   if (contentLength) reply.header('Content-Length', contentLength);
   if (contentRange) reply.header('Content-Range', contentRange);
   reply.header('Accept-Ranges', acceptRanges || 'bytes');
@@ -390,6 +483,10 @@ app.get('/media/audio', async (request, reply) => {
 app.get('/media/audio/:fileName', async (request, reply) => {
   const id = String(request.params.fileName || '').replace(/\.mp3$/i, '');
   return streamMediaAudio(request, reply, id);
+});
+
+app.get('/media/cast/:fileName', async (request, reply) => {
+  return sendCachedCastMedia(request, reply);
 });
 
 const distDir = path.resolve(process.cwd(), 'dist');
