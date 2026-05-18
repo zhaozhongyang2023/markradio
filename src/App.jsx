@@ -981,7 +981,7 @@ function V4RadioView({
 }
 
 export default function App() {
-  const [viewMode, setViewMode] = useState('v4');
+  const [viewMode, setViewMode] = useState('v3');
   const [state, setState] = useState(null);
   const [status, setStatus] = useState(null);
   const [selectedMood, setSelectedMood] = useState('平静');
