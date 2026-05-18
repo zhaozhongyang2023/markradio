@@ -24,6 +24,9 @@ const webApp = Fastify({ logger: true });
 const clients = new Set();
 const castCacheDir = path.resolve(process.cwd(), 'data', 'cast-cache');
 const castMediaPort = Number(config.apiPort) + 1;
+const CAST_HEARTBEAT_TTL_MS = 8000;
+let castLeaseExpiresAt = 0;
+let castLeaseTimer = null;
 
 await app.register(websocket);
 
@@ -343,6 +346,32 @@ app.post('/api/cast/connect', async (request, reply) => {
   return castManager.getStatus();
 });
 
+function clearCastLease() {
+  castLeaseExpiresAt = 0;
+  if (castLeaseTimer) clearTimeout(castLeaseTimer);
+  castLeaseTimer = null;
+}
+
+function armCastLease(ttlMs = CAST_HEARTBEAT_TTL_MS) {
+  castLeaseExpiresAt = Date.now() + ttlMs;
+  if (castLeaseTimer) return;
+  const check = async () => {
+    castLeaseTimer = null;
+    if (!castLeaseExpiresAt) return;
+    const delay = castLeaseExpiresAt - Date.now();
+    if (delay > 0) {
+      castLeaseTimer = setTimeout(check, delay);
+      return;
+    }
+    clearCastLease();
+    if (castManager.getStatus().state !== 'idle') {
+      app.log.info('Cast heartbeat expired; stopping playback');
+      try { castManager.stop(); } catch (_) {}
+    }
+  };
+  castLeaseTimer = setTimeout(check, ttlMs);
+}
+
 app.post('/api/cast/play', async (request, reply) => {
   const { url, title, artist, album } = request.body || {};
   if (!url) return reply.code(400).send({ ok: false, message: '缺少音频 url' });
@@ -355,13 +384,18 @@ app.post('/api/cast/play', async (request, reply) => {
   return castManager.getStatus();
 });
 
+app.post('/api/cast/heartbeat', async (request) => {
+  armCastLease(Number(request.body?.ttlMs || CAST_HEARTBEAT_TTL_MS));
+  return { ...castManager.getStatus(), leaseExpiresAt: castLeaseExpiresAt };
+});
+
 app.post('/api/cast/:action', async (request) => {
   const action = request.params.action;
   if (action === 'pause') castManager.pause();
   else if (action === 'resume') castManager.resume();
-  else if (action === 'stop') castManager.stop();
+  else if (action === 'stop') { clearCastLease(); castManager.stop(); }
   else if (action === 'volume') await castManager.setVolume(Number(request.body?.volume || 0));
-  else if (action === 'disconnect') castManager.disconnect();
+  else if (action === 'disconnect') { clearCastLease(); castManager.disconnect(); }
   else return { ok: false, message: `未知 action: ${action}` };
   return castManager.getStatus();
 });
@@ -605,6 +639,12 @@ function sendRawCastMedia(req, res) {
 
 const distDir = path.resolve(process.cwd(), 'dist');
 if (fs.existsSync(distDir)) {
+  webApp.post('/api/cast/stop', async () => {
+    clearCastLease();
+    castManager.stop();
+    return castManager.getStatus();
+  });
+
   await webApp.register(fastifyStatic, {
     root: distDir,
     prefix: '/'

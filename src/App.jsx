@@ -1038,6 +1038,7 @@ export default function App() {
   const planIdRef = useRef(null);
   const castDeviceRef = useRef(null);
   const castStateRef = useRef('idle');
+  const castHeartbeatTimerRef = useRef(null);
   const castVolumeTimerRef = useRef(null);
   const pendingCastVolumeRef = useRef(null);
   const [seekDraftRatio, setSeekDraftRatio] = useState(null);
@@ -1391,6 +1392,25 @@ export default function App() {
     }, 120);
   }
 
+  function startCastHeartbeat() {
+    if (castHeartbeatTimerRef.current) return;
+    const beat = () => {
+      if (!castDeviceRef.current) {
+        clearInterval(castHeartbeatTimerRef.current);
+        castHeartbeatTimerRef.current = null;
+        return;
+      }
+      api.castHeartbeat({ ttlMs: 8000 }).catch(() => {});
+    };
+    beat();
+    castHeartbeatTimerRef.current = setInterval(beat, 3000);
+  }
+
+  function stopCastHeartbeat() {
+    clearInterval(castHeartbeatTimerRef.current);
+    castHeartbeatTimerRef.current = null;
+  }
+
   useEffect(() => {
     clearInterval(typeTimerRef.current);
     clearInterval(fadeTimerRef.current);
@@ -1437,6 +1457,7 @@ export default function App() {
   useEffect(() => () => {
     clearInterval(typeTimerRef.current);
     clearInterval(fadeTimerRef.current);
+    clearInterval(castHeartbeatTimerRef.current);
     clearTimeout(castVolumeTimerRef.current);
     cancelAnimationFrame(readRafRef.current);
     stopAudioVisuals();
@@ -2306,6 +2327,7 @@ function seekTo(ratio) {
       castDeviceRef.current = device;
       setCastDevice(device);
       setCastState('idle');
+      startCastHeartbeat();
     } catch (err) {
       castDeviceRef.current = null;
       setCastDevice(null);
@@ -2350,6 +2372,7 @@ function seekTo(ratio) {
       await api.castAction('stop');
       await api.castAction('disconnect');
     } catch (_) { /* ignore */ }
+    stopCastHeartbeat();
     castDeviceRef.current = null;
     setCastDevice(null);
     setCastState('idle');

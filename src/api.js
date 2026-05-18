@@ -77,6 +77,11 @@ export const api = {
       method: 'POST',
       body: JSON.stringify(body)
     }),
+  castHeartbeat: (body = {}) =>
+    request('/api/cast/heartbeat', {
+      method: 'POST',
+      body: JSON.stringify(body)
+    }),
   voicePreview: (body) =>
     request('/api/voice/preview', {
       method: 'POST',
@@ -87,7 +92,7 @@ export const api = {
 export function castActionBeacon(action, body = {}) {
   if (typeof window === 'undefined') return;
   const payload = JSON.stringify(body);
-  const url = `${API_BASE}/api/cast/${action}`;
+  const url = action === 'stop' ? '/api/cast/stop' : `${API_BASE}/api/cast/${action}`;
   const blob = new Blob([payload], { type: 'application/json' });
   if (navigator.sendBeacon?.(url, blob)) return;
   fetch(url, {
