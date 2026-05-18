@@ -1533,6 +1533,11 @@ export default function App() {
     setReading(false);
     setReadProgress(0);
     applyMusicVolume(1);
+    // 防止已结束音频在重新赋值 onended 时二次触发
+    if (audioRef.current) {
+      audioRef.current.onended = null;
+      audioRef.current.pause();
+    }
     if (djAudioRef.current) {
       djAudioRef.current.pause();
       djAudioRef.current.removeAttribute('src');
@@ -2558,6 +2563,7 @@ export default function App() {
   }
 
   const refreshingRef = useRef(false);
+  const advancingRef = useRef(false);
 
   async function advanceEndedTrack() {
     if (refreshingRef.current || busy) return;
@@ -2580,8 +2586,13 @@ export default function App() {
 
   async function handleEnded() {
     const audio = audioRef.current;
-    if (!audio || reading) return;
-    await advanceEndedTrack();
+    if (!audio || reading || advancingRef.current) return;
+    advancingRef.current = true;
+    try {
+      await advanceEndedTrack();
+    } finally {
+      advancingRef.current = false;
+    }
   }
 
   async function nextTrack() {
