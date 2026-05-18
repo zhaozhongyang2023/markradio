@@ -1053,6 +1053,7 @@ export default function App() {
   const readRafRef = useRef(null);
   const seekCommitTimerRef = useRef(null);
   const introAudioCacheRef = useRef(new Map());
+  const introWarmupRef = useRef(new Map());
   const autoplayOptionsRef = useRef({ skipIntro: false });
   const [autoplayToken, setAutoplayToken] = useState(0);
   const planRef = useRef(null);
@@ -1551,6 +1552,29 @@ export default function App() {
   }, [plan, planDjUrl]);
 
   useEffect(() => {
+    const text = plan?.tts?.text || '';
+    if (!text || plan?.tts?.url || introAudioCacheRef.current.get(text)) return undefined;
+    const key = `${plan?.id || 'plan'}:${text}`;
+    if (introWarmupRef.current.get(key)) return undefined;
+    let cancelled = false;
+    const warmup = api.voicePreview({ text, mood: plan?.mood || selectedMood })
+      .then((result) => {
+        const url = result?.ok && result.url ? apiAssetUrl(result.url) : '';
+        if (!url || cancelled) return;
+        introAudioCacheRef.current.set(text, url);
+        if (planIdRef.current === plan?.id) planDjUrlRef.current = url;
+      })
+      .catch(() => {})
+      .finally(() => {
+        introWarmupRef.current.delete(key);
+      });
+    introWarmupRef.current.set(key, warmup);
+    return () => {
+      cancelled = true;
+    };
+  }, [plan?.id, plan?.tts?.text, plan?.tts?.url, plan?.mood, selectedMood]);
+
+  useEffect(() => {
     const likedIds = (plan?.queue || [])
       .filter((item) => item?.source === 'netease' && /我喜欢的音乐/.test(`${item.album || ''} ${item.reason || ''}`))
       .map((item) => item.id)
@@ -1643,6 +1667,7 @@ export default function App() {
 
   async function playback() {
     if (pendingPlay) return;
+    unlockMobileAudio();
     if (isPlaying || reading || castState === 'playing') {
       await pausePlayback();
       return;
@@ -1658,7 +1683,6 @@ export default function App() {
     }
     // First play: init autoplayToken so subsequent songs auto-advance
     if (autoplayToken === 0) setAutoplayToken(1);
-    await ensureSharedAudioOutput();
     await startPlayback();
   }
 
@@ -1784,6 +1808,8 @@ export default function App() {
     const latestPlan = planRef.current;
     const djUrl = latestPlan?.tts?.url ? apiAssetUrl(latestPlan.tts.url) : '';
     if (djUrl) return djUrl;
+    const cached = introAudioCacheRef.current.get(t);
+    if (cached) return cached;
     // 轮询 API 等待 TTS 就绪
     const waited = await new Promise((resolve) => {
       const start = Date.now();
@@ -1801,8 +1827,6 @@ export default function App() {
     if (waited) return waited;
     if (!synthesize) return '';
     // 回退：实时生成
-    const cached = introAudioCacheRef.current.get(t);
-    if (cached) return cached;
     const result = await api.voicePreview({ text: t, mood: selectedMood }).catch(() => null);
     const url = result?.ok && result.url ? apiAssetUrl(result.url) : '';
     if (url) introAudioCacheRef.current.set(t, url);
@@ -2493,6 +2517,17 @@ function seekTo(ratio) {
     if (djAudioUnlockedRef.current) return;
     try {
       djAudioUnlockedRef.current = true;
+      const AudioContext = window.AudioContext || window.webkitAudioContext;
+      const context = AudioContext ? (audioContextRef.current || new AudioContext()) : null;
+      if (context) {
+        audioContextRef.current = context;
+        context.resume?.().catch?.(() => {});
+        const silent = context.createBuffer(1, 1, 22050);
+        const source = context.createBufferSource();
+        source.buffer = silent;
+        source.connect(context.destination);
+        source.start(0);
+      }
       const unlockAudio = new Audio(SILENT_AUDIO_URL);
       unlockAudio.muted = true;
       unlockAudio.volume = 0;
