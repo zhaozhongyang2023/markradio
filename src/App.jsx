@@ -1039,8 +1039,11 @@ export default function App() {
   const castDeviceRef = useRef(null);
   const castStateRef = useRef('idle');
   const castHeartbeatTimerRef = useRef(null);
+  const castProgressTimerRef = useRef(null);
   const castVolumeTimerRef = useRef(null);
   const pendingCastVolumeRef = useRef(null);
+  const playbackRunRef = useRef(0);
+  const localProgressRef = useRef(0);
   const [seekDraftRatio, setSeekDraftRatio] = useState(null);
   const lowPowerMode = useMemo(() => detectLowPowerRuntime(), []);
   const viewModeRef = useRef(viewMode);
@@ -1056,6 +1059,10 @@ export default function App() {
   useEffect(() => {
     castStateRef.current = castState;
   }, [castState]);
+
+  useEffect(() => {
+    localProgressRef.current = localProgress;
+  }, [localProgress]);
 
   function syncReadProgress(ratio) {
     const safeRatio = Math.min(1, Math.max(0, ratio));
@@ -1411,6 +1418,47 @@ export default function App() {
     castHeartbeatTimerRef.current = null;
   }
 
+  function isPlaybackRunCurrent(runId) {
+    return !runId || playbackRunRef.current === runId;
+  }
+
+  function cancelPlaybackFlow() {
+    playbackRunRef.current += 1;
+    clearInterval(typeTimerRef.current);
+    clearInterval(fadeTimerRef.current);
+    clearInterval(castProgressTimerRef.current);
+    castProgressTimerRef.current = null;
+    cancelAnimationFrame(readRafRef.current);
+    stopAudioVisuals();
+    audioRef.current?.pause();
+    djAudioRef.current?.pause();
+    setIsPlaying(false);
+    setReading(false);
+  }
+
+  function stopCastProgress() {
+    clearInterval(castProgressTimerRef.current);
+    castProgressTimerRef.current = null;
+  }
+
+  function startCastProgress(totalSeconds = duration, offsetSeconds = 0) {
+    stopCastProgress();
+    const safeTotal = Math.max(5, Number(totalSeconds) || duration || 207);
+    const startedAt = Date.now() - Math.max(0, offsetSeconds) * 1000;
+    localProgressRef.current = Math.max(0, offsetSeconds);
+    setLocalProgress(Math.max(0, offsetSeconds));
+    castProgressTimerRef.current = setInterval(() => {
+      if (!hasCastDevice() || castStateRef.current !== 'playing') return;
+      const elapsed = Math.min(safeTotal, (Date.now() - startedAt) / 1000);
+      localProgressRef.current = elapsed;
+      setLocalProgress(elapsed);
+      if (elapsed >= safeTotal - 0.25) {
+        stopCastProgress();
+        handleEnded();
+      }
+    }, 1000);
+  }
+
   useEffect(() => {
     clearInterval(typeTimerRef.current);
     clearInterval(fadeTimerRef.current);
@@ -1458,6 +1506,7 @@ export default function App() {
     clearInterval(typeTimerRef.current);
     clearInterval(fadeTimerRef.current);
     clearInterval(castHeartbeatTimerRef.current);
+    clearInterval(castProgressTimerRef.current);
     clearTimeout(castVolumeTimerRef.current);
     cancelAnimationFrame(readRafRef.current);
     stopAudioVisuals();
@@ -1532,7 +1581,10 @@ export default function App() {
     }
     if (hasCastDevice() && castState === 'paused') {
       const status = await api.castAction('resume').catch(() => null);
-      setCastState(status?.state || 'playing');
+      const nextState = status?.state || 'playing';
+      castStateRef.current = nextState;
+      setCastState(nextState);
+      startCastProgress(duration, localProgressRef.current);
       await api.playback('play').catch(() => {});
       return;
     }
@@ -1556,18 +1608,13 @@ export default function App() {
   }
 
   async function pausePlayback() {
-    clearInterval(typeTimerRef.current);
-    clearInterval(fadeTimerRef.current);
-    cancelAnimationFrame(readRafRef.current);
-    stopAudioVisuals();
-    audioRef.current?.pause();
-    djAudioRef.current?.pause();
-    if (hasCastDevice() && castState === 'playing') {
+    cancelPlaybackFlow();
+    if (hasCastDevice() && castStateRef.current === 'playing') {
       const status = await api.castAction('pause').catch(() => null);
-      setCastState(status?.state || 'paused');
+      const nextState = status?.state || 'paused';
+      castStateRef.current = nextState;
+      setCastState(nextState);
     }
-    setIsPlaying(false);
-    setReading(false);
     await api.playback('pause').catch(() => {});
   }
 
@@ -1588,6 +1635,8 @@ export default function App() {
   async function startPlayback(options = {}) {
     if (pendingPlay) return;
     setPendingPlay(true);
+    const runId = playbackRunRef.current + 1;
+    playbackRunRef.current = runId;
     const audio = audioRef.current;
     try {
       if (!audio) return;
@@ -1600,18 +1649,26 @@ export default function App() {
       if (needsIntro) {
         // Phase 1: Pre-intro (first play only) — pause music, read pre-intro DJ text
         if (shouldReadStationIntro) {
-          await runPreIntro();
+          await runPreIntro(runId);
+          if (!isPlaybackRunCurrent(runId)) return;
         }
         // Phase 2: Card intro — music at low volume, read song DJ text
         const idx = queueIndex >= 0 ? queueIndex : 0;
-        if (queue.length > 0) await runCardIntro(idx);
+        if (queue.length > 0) {
+          await runCardIntro(idx, runId);
+          if (!isPlaybackRunCurrent(runId)) return;
+        }
         // Phase 3: Fade music to full, show lyrics
         if (hasCastDevice()) {
           await playCastTrack(track);
+          if (!isPlaybackRunCurrent(runId)) return;
         } else if (audio) {
-          applyMusicVolume(1);
+          if (trackUrl && audio.src !== trackUrl) audio.src = trackUrl;
+          audio.onended = handleEnded;
+          if (audio.paused && trackUrl) await audio.play().catch(() => {});
           setIsPlaying(true);
           startAudioVisuals(audio);
+          fadeMusicIn();
         }
         setIntroDoneFor(track.id);
         setReading(false);
@@ -1621,6 +1678,7 @@ export default function App() {
         // Resume: play music directly
         if (hasCastDevice()) {
           await playCastTrack(track);
+          if (!isPlaybackRunCurrent(runId)) return;
         } else if (trackUrl) {
           if (audio.src !== trackUrl) audio.src = trackUrl;
           applyMusicVolume(1);
@@ -1751,13 +1809,46 @@ export default function App() {
     tick();
   }
 
-  async function readTextSegment(text) {
+  function fallbackReadDurationMs(text = '') {
+    return Math.max(3500, String(text || '').length * 220);
+  }
+
+  function probeAudioDurationMs(url) {
+    if (!url) return Promise.resolve(0);
     return new Promise((resolve) => {
-      const totalMs = Math.max(3000, text.length * 180);
+      const probe = new Audio();
+      const done = (value = 0) => {
+        probe.onloadedmetadata = null;
+        probe.onerror = null;
+        clearTimeout(timer);
+        probe.removeAttribute('src');
+        resolve(value);
+      };
+      const timer = setTimeout(() => done(0), 2200);
+      probe.preload = 'metadata';
+      probe.onloadedmetadata = () => {
+        const duration = probe.duration && Number.isFinite(probe.duration)
+          ? Math.ceil(probe.duration * 1000)
+          : 0;
+        done(duration);
+      };
+      probe.onerror = () => done(0);
+      probe.src = url;
+    });
+  }
+
+  async function readTextSegment(text, options = {}) {
+    return new Promise((resolve) => {
+      const totalMs = Math.max(options.durationMs || 0, fallbackReadDurationMs(text));
       const startedAt = performance.now();
       setReadProgress(0);
       setReading(true);
       const timer = setInterval(() => {
+        if (!isPlaybackRunCurrent(options.runId)) {
+          clearInterval(timer);
+          resolve();
+          return;
+        }
         const elapsed = performance.now() - startedAt;
         const ratio = Math.min(1, elapsed / totalMs);
         setReadProgress(ratio);
@@ -1769,7 +1860,18 @@ export default function App() {
     });
   }
 
-  async function runPreIntro() {
+  async function playCastVoiceClip(url, text, meta, runId) {
+    const durationMs = await probeAudioDurationMs(url);
+    if (!isPlaybackRunCurrent(runId)) return;
+    await playCastClip(url, meta);
+    if (!isPlaybackRunCurrent(runId)) return;
+    await readTextSegment(text, {
+      runId,
+      durationMs: durationMs ? durationMs + 700 : 0
+    });
+  }
+
+  async function runPreIntro(runId) {
     // Read pre-intro DJ text — background music paused
     clearInterval(typeTimerRef.current);
     clearInterval(fadeTimerRef.current);
@@ -1810,8 +1912,7 @@ export default function App() {
     if (introUrl && hasCastDevice()) {
       startFallbackVisuals();
       try {
-        await playCastClip(introUrl, { title: 'MarkRadio DJ', artist: 'MarkRadio' });
-        await readTextSegment(introText);
+        await playCastVoiceClip(introUrl, introText, { title: 'MarkRadio DJ', artist: 'MarkRadio' }, runId);
         stopAudioVisuals();
         return;
       } catch {
@@ -1828,11 +1929,24 @@ export default function App() {
       startFallbackVisuals();
       let playRejected = false;
       await new Promise((resolve) => {
-        djAudio.onended = resolve;
-        djAudio.onerror = resolve;
+        const finish = () => {
+          clearInterval(cancelTimer);
+          djAudio.onended = null;
+          djAudio.onerror = null;
+          djAudio.onpause = null;
+          resolve();
+        };
+        const cancelTimer = setInterval(() => {
+          if (!isPlaybackRunCurrent(runId)) finish();
+        }, 120);
+        djAudio.onended = finish;
+        djAudio.onerror = finish;
+        djAudio.onpause = () => {
+          if (!isPlaybackRunCurrent(runId)) finish();
+        };
         const playPromise = djAudio.play();
         if (playPromise) {
-          playPromise.catch(() => { playRejected = true; resolve(); });
+          playPromise.catch(() => { playRejected = true; finish(); });
         }
         startDjProgressLoop(djAudio);
       });
@@ -1840,15 +1954,15 @@ export default function App() {
       stopAudioVisuals();
       if (playRejected) {
         // Browser blocked autoplay — use text-only fallback with proper timing
-        await readTextSegment(introText);
+        await readTextSegment(introText, { runId });
       }
       return;
     }
     // Fallback: text-only reading
-    await readTextSegment(introText);
+    await readTextSegment(introText, { runId });
   }
 
-  async function runCardIntro(cardIndex) {
+  async function runCardIntro(cardIndex, runId) {
     // Read song card DJ intro — music at low volume, DJ voice prominent
     clearInterval(typeTimerRef.current);
     cancelAnimationFrame(readRafRef.current);
@@ -1868,15 +1982,14 @@ export default function App() {
       const cardUrl = await resolveCardAudioUrl(cardIndex);
       if (cardUrl) {
         try {
-          await playCastClip(cardUrl, { title: `${track.title || 'MarkRadio'} 导读`, artist: 'MarkRadio' });
-          await readTextSegment(reason);
+          await playCastVoiceClip(cardUrl, reason, { title: `${track.title || 'MarkRadio'} 导读`, artist: 'MarkRadio' }, runId);
           stopAudioVisuals();
           return;
         } catch {
           stopAudioVisuals();
         }
       }
-      await readTextSegment(planRef.current?.queue?.[cardIndex]?.reason || reason);
+      await readTextSegment(planRef.current?.queue?.[cardIndex]?.reason || reason, { runId });
       stopAudioVisuals();
       return;
     }
@@ -1903,23 +2016,36 @@ export default function App() {
       djAudio.volume = 1.0;
       let playRejected = false;
       await new Promise((resolve) => {
-        djAudio.onended = resolve;
-        djAudio.onerror = resolve;
+        const finish = () => {
+          clearInterval(cancelTimer);
+          djAudio.onended = null;
+          djAudio.onerror = null;
+          djAudio.onpause = null;
+          resolve();
+        };
+        const cancelTimer = setInterval(() => {
+          if (!isPlaybackRunCurrent(runId)) finish();
+        }, 120);
+        djAudio.onended = finish;
+        djAudio.onerror = finish;
+        djAudio.onpause = () => {
+          if (!isPlaybackRunCurrent(runId)) finish();
+        };
         const playPromise = djAudio.play();
         if (playPromise) {
-          playPromise.catch(() => { playRejected = true; resolve(); });
+          playPromise.catch(() => { playRejected = true; finish(); });
         }
         startDjProgressLoop(djAudio, reason.length);
       });
       djAudio.pause();
       if (playRejected) {
         // Use latest plan ref to avoid stale closure after async gap
-        await readTextSegment(planRef.current?.queue?.[cardIndex]?.reason || reason);
+        await readTextSegment(planRef.current?.queue?.[cardIndex]?.reason || reason, { runId });
       }
       return;
     }
     // Fallback — use latestPlan ref to avoid stale closure
-    await readTextSegment(planRef.current?.queue?.[cardIndex]?.reason || reason);
+    await readTextSegment(planRef.current?.queue?.[cardIndex]?.reason || reason, { runId });
   }
 
   async function finishIntro() {
@@ -1937,6 +2063,7 @@ export default function App() {
     const audio = audioRef.current;
     if (hasCastDevice()) {
       playCastTrack(track).catch((error) => {
+        castStateRef.current = 'idle';
         setCastState('idle');
         setChatMessages((items) => [
           ...items,
@@ -2007,6 +2134,7 @@ export default function App() {
   async function nextTrack() {
     if (refreshingRef.current || busy) return;
     triggerPixelPulse();
+    cancelPlaybackFlow();
     const currentIndex = queue.findIndex((item) => item.id === track.id);
     if (currentIndex >= 0 && currentIndex < queue.length - 1) {
       await pauseCastOnly();
@@ -2023,6 +2151,7 @@ export default function App() {
     const currentIndex = queue.findIndex((item) => item.id === track.id);
     if (currentIndex < 0) return;
     triggerPixelPulse();
+    cancelPlaybackFlow();
     setIntroDoneFor(null);
     setReading(false);
     setReadProgress(0);
@@ -2288,12 +2417,15 @@ function seekTo(ratio) {
 
   async function playCastClip(url, meta = {}) {
     if (!url) throw new Error('暂无可投放音频');
+    stopCastProgress();
     const status = await api.castPlay(url, {
       title: meta.title || 'MarkRadio',
       artist: meta.artist || 'MarkRadio',
       album: meta.album || ''
     });
-    setCastState(status.state || 'playing');
+    const nextState = status.state || 'playing';
+    castStateRef.current = nextState;
+    setCastState(nextState);
     audioRef.current?.pause();
     djAudioRef.current?.pause();
     setIsPlaying(false);
@@ -2308,17 +2440,23 @@ function seekTo(ratio) {
       artist: item.artist || '',
       album: item.album || ''
     });
-    setCastState(status.state || 'playing');
+    const nextState = status.state || 'playing';
+    castStateRef.current = nextState;
+    setCastState(nextState);
     if (audioRef.current) audioRef.current.pause();
     setIsPlaying(false);
+    startCastProgress(item.duration || duration, 0);
     await api.playback('play').catch(() => {});
     return status;
   }
 
   async function pauseCastOnly() {
-    if (!castDevice || castState !== 'playing') return;
+    if (!hasCastDevice() || castStateRef.current !== 'playing') return;
     const status = await api.castAction('pause').catch(() => null);
-    setCastState(status?.state || 'paused');
+    stopCastProgress();
+    const nextState = status?.state || 'paused';
+    castStateRef.current = nextState;
+    setCastState(nextState);
   }
 
   async function handleCastConnect(device) {
@@ -2326,11 +2464,13 @@ function seekTo(ratio) {
       await api.castConnect(device.host, device.port);
       castDeviceRef.current = device;
       setCastDevice(device);
+      castStateRef.current = 'idle';
       setCastState('idle');
       startCastHeartbeat();
     } catch (err) {
       castDeviceRef.current = null;
       setCastDevice(null);
+      castStateRef.current = 'idle';
       setCastState('idle');
       setChatMessages((items) => [
         ...items,
@@ -2342,9 +2482,17 @@ function seekTo(ratio) {
     try {
       if (castTrackUrl(track)) {
         if (introDoneFor !== track.id) {
-          if (!introDoneFor) await runPreIntro();
+          const runId = playbackRunRef.current + 1;
+          playbackRunRef.current = runId;
+          if (!introDoneFor) {
+            await runPreIntro(runId);
+            if (!isPlaybackRunCurrent(runId)) return;
+          }
           const idx = queueIndex >= 0 ? queueIndex : 0;
-          if (queue.length > 0) await runCardIntro(idx);
+          if (queue.length > 0) {
+            await runCardIntro(idx, runId);
+            if (!isPlaybackRunCurrent(runId)) return;
+          }
           setIntroDoneFor(track.id);
           setReading(false);
           setReadingCardIndex(null);
@@ -2359,6 +2507,7 @@ function seekTo(ratio) {
         ]);
       }
     } catch (err) {
+      castStateRef.current = 'idle';
       setCastState('idle');
       setChatMessages((items) => [
         ...items,
@@ -2373,8 +2522,10 @@ function seekTo(ratio) {
       await api.castAction('disconnect');
     } catch (_) { /* ignore */ }
     stopCastHeartbeat();
+    stopCastProgress();
     castDeviceRef.current = null;
     setCastDevice(null);
+    castStateRef.current = 'idle';
     setCastState('idle');
   }
 
