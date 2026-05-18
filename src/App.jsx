@@ -1664,12 +1664,8 @@ export default function App() {
           await playCastTrack(track);
           if (!isPlaybackRunCurrent(runId)) return;
         } else if (audio) {
-          if (trackUrl && audio.src !== trackUrl) audio.src = trackUrl;
-          audio.onended = handleEnded;
-          if (audio.paused && trackUrl) await audio.play().catch(() => {});
-          setIsPlaying(true);
-          startAudioVisuals(audio);
-          fadeMusicIn();
+          const started = await playLocalMusic({ ratio: 1, fade: true, runId });
+          if (!started || !isPlaybackRunCurrent(runId)) return;
         }
         setIntroDoneFor(track.id);
         setReading(false);
@@ -1681,11 +1677,8 @@ export default function App() {
           await playCastTrack(track);
           if (!isPlaybackRunCurrent(runId)) return;
         } else if (trackUrl) {
-          if (audio.src !== trackUrl) audio.src = trackUrl;
-          applyMusicVolume(1);
-          await audio.play().catch(() => {});
-          setIsPlaying(true);
-          startAudioVisuals(audio);
+          const started = await playLocalMusic({ ratio: 1, runId });
+          if (!started || !isPlaybackRunCurrent(runId)) return;
         }
       }
       await api.playback('play').catch(() => {});
@@ -1999,12 +1992,7 @@ export default function App() {
     // Set background music to low volume
     const audio = audioRef.current;
     if (audio && trackUrl && !castDevice) {
-      await ensureSharedAudioOutput();
-      if (audio.src !== trackUrl) audio.src = trackUrl;
-      applyMusicVolume(BED_VOLUME);
-      audio.play().catch(() => {});
-      setIsPlaying(true);
-      startAudioVisuals(audio);
+      await playLocalMusic({ ratio: BED_VOLUME, runId });
     }
 
     // Start fallback visuals before DJ TTS plays
@@ -2080,25 +2068,15 @@ export default function App() {
       fadeToFullVolume();
       return;
     }
-    if (audio.src !== trackUrl) audio.src = trackUrl;
-    audio.onended = handleEnded;
     if (audio.ended || (audio.duration && audio.currentTime >= audio.duration - 0.3)) {
       applyMusicVolume(1);
       handleEnded();
       return;
     }
-    applyMusicVolume(1);
     clearInterval(fadeTimerRef.current);
-    audio.play()
-      .then(() => {
-        setIsPlaying(true);
-        startAudioVisuals(audio);
-        fadeMusicIn();
-        api.playback('play').catch(() => {});
-      })
-      .catch(() => {
-        setIsPlaying(false);
-        applyMusicVolume(1);
+    playLocalMusic({ ratio: 1, fade: true })
+      .then((started) => {
+        if (started) api.playback('play').catch(() => {});
       });
   }
 
@@ -2359,6 +2337,51 @@ function seekTo(ratio) {
     await resumeSharedAudioContext();
     connectToAudioContext(audioRef.current);
     connectToAudioContext(djAudioRef.current);
+  }
+
+  async function playLocalMusic({ ratio = 1, fade = false, runId } = {}) {
+    const audio = audioRef.current;
+    if (!audio || !trackUrl) return false;
+    await ensureSharedAudioOutput();
+    if (!isPlaybackRunCurrent(runId)) return false;
+
+    const sourceChanged = audio.src !== trackUrl;
+    if (sourceChanged) {
+      audio.pause();
+      audio.src = trackUrl;
+      audio.load();
+      localProgressRef.current = 0;
+      setLocalProgress(0);
+    }
+    audio.onended = handleEnded;
+    audio.muted = false;
+    applyMusicVolume(ratio);
+
+    const tryPlay = async () => {
+      try {
+        await audio.play();
+        return true;
+      } catch {
+        return false;
+      }
+    };
+
+    let started = await tryPlay();
+    if (!started && isPlaybackRunCurrent(runId)) {
+      await new Promise((resolve) => setTimeout(resolve, 180));
+      await resumeSharedAudioContext();
+      started = await tryPlay();
+    }
+    if (!started || !isPlaybackRunCurrent(runId)) {
+      setIsPlaying(false);
+      applyMusicVolume(1);
+      return false;
+    }
+
+    setIsPlaying(true);
+    startAudioVisuals(audio);
+    if (fade) fadeMusicIn();
+    return true;
   }
 
   function connectToAudioContext(mediaElement) {
@@ -2740,12 +2763,13 @@ function seekTo(ratio) {
         ref={audioRef}
         src={trackUrl || undefined}
         preload="auto"
+        playsInline
         onEnded={handleEnded}
         onPause={() => setIsPlaying(false)}
         onPlay={() => setIsPlaying(true)}
         onTimeUpdate={(event) => setLocalProgress(event.currentTarget.currentTime)}
       />
-      <audio crossOrigin="anonymous" ref={djAudioRef} preload="auto" />
+      <audio crossOrigin="anonymous" ref={djAudioRef} preload="auto" playsInline />
     </>
   );
 
