@@ -1541,12 +1541,11 @@ export default function App() {
       if (!castDeviceRef.current && castStateRef.current === 'idle') return;
       castActionBeacon('stop', { reason: 'browser-exit' });
     };
-    // beforeunload is weak on mobile Safari; pagehide covers tab close / refresh more reliably.
+    // Keep cast alive when iPhone Safari locks the screen. pagehide can fire on lock,
+    // so only use beforeunload for explicit refresh / close best-effort cleanup.
     window.addEventListener('beforeunload', stopCastOnExit);
-    window.addEventListener('pagehide', stopCastOnExit);
     return () => {
       window.removeEventListener('beforeunload', stopCastOnExit);
-      window.removeEventListener('pagehide', stopCastOnExit);
     };
   }, []);
 
