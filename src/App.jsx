@@ -1043,6 +1043,7 @@ export default function App() {
   const pulseFrameRef = useRef(null);
   const lastPulseAtRef = useRef(0);
   const audioContextRef = useRef(null);
+  const audioKeepAliveRef = useRef(null);
   const analyserRef = useRef(null);
   const analyserDataRef = useRef(null);
   const mediaSourcesRef = useRef(new Map());
@@ -1053,6 +1054,8 @@ export default function App() {
   const readRafRef = useRef(null);
   const seekCommitTimerRef = useRef(null);
   const introAudioCacheRef = useRef(new Map());
+  const introBufferCacheRef = useRef(new Map());
+  const introBufferWarmupRef = useRef(new Map());
   const introWarmupRef = useRef(new Map());
   const autoplayOptionsRef = useRef({ skipIntro: false });
   const [autoplayToken, setAutoplayToken] = useState(0);
@@ -1486,6 +1489,7 @@ export default function App() {
     activeDjClipRef.current = null;
     try { activeDjSourceRef.current?.stop?.(); } catch {}
     activeDjSourceRef.current = null;
+    stopAudioKeepAlive();
     window.speechSynthesis?.cancel?.();
     setIsPlaying(false);
     setReading(false);
@@ -1533,6 +1537,7 @@ export default function App() {
     activeDjClipRef.current = null;
     try { activeDjSourceRef.current?.stop?.(); } catch {}
     activeDjSourceRef.current = null;
+    stopAudioKeepAlive();
     setReadingCardIndex(-1);
     if (track.id) triggerPixelPulse();
   }, [track.id]);
@@ -1553,17 +1558,21 @@ export default function App() {
 
   useEffect(() => {
     const text = plan?.tts?.text || '';
-    if (!text || plan?.tts?.url || introAudioCacheRef.current.get(text)) return undefined;
+    if (!text) return undefined;
     const key = `${plan?.id || 'plan'}:${text}`;
     if (introWarmupRef.current.get(key)) return undefined;
     let cancelled = false;
-    const warmup = api.voicePreview({ text, mood: plan?.mood || selectedMood })
-      .then((result) => {
-        const url = result?.ok && result.url ? apiAssetUrl(result.url) : '';
+    const warmup = (async () => {
+      let url = plan?.tts?.url ? apiAssetUrl(plan.tts.url) : introAudioCacheRef.current.get(text);
+      if (!url) {
+        const result = await api.voicePreview({ text, mood: plan?.mood || selectedMood });
+        url = result?.ok && result.url ? apiAssetUrl(result.url) : '';
+      }
         if (!url || cancelled) return;
         introAudioCacheRef.current.set(text, url);
         if (planIdRef.current === plan?.id) planDjUrlRef.current = url;
-      })
+      await warmDjAudioBuffer(url);
+    })()
       .catch(() => {})
       .finally(() => {
         introWarmupRef.current.delete(key);
@@ -2001,15 +2010,48 @@ export default function App() {
     });
   }
 
+  function getSharedAudioContext() {
+    try {
+      const AudioContext = window.AudioContext || window.webkitAudioContext;
+      if (!AudioContext) return null;
+      const context = audioContextRef.current || new AudioContext();
+      audioContextRef.current = context;
+      return context;
+    } catch {
+      return null;
+    }
+  }
+
+  async function warmDjAudioBuffer(url) {
+    if (!url) return null;
+    const cached = introBufferCacheRef.current.get(url);
+    if (cached) return cached;
+    const pending = introBufferWarmupRef.current.get(url);
+    if (pending) return pending;
+    const task = (async () => {
+      const context = getSharedAudioContext();
+      if (!context) return null;
+      const response = await fetch(url, { cache: 'force-cache' });
+      const bytes = await response.arrayBuffer();
+      const buffer = await context.decodeAudioData(bytes.slice(0));
+      introBufferCacheRef.current.set(url, buffer);
+      return buffer;
+    })().catch(() => null).finally(() => {
+      introBufferWarmupRef.current.delete(url);
+    });
+    introBufferWarmupRef.current.set(url, task);
+    return task;
+  }
+
   async function playLocalDjClip(url, text, runId) {
     if (!url) return false;
     const context = await resumeSharedAudioContext();
     if (context) {
       try {
-        const response = await fetch(url, { cache: 'force-cache' });
-        const bytes = await response.arrayBuffer();
-        const audioBuffer = await context.decodeAudioData(bytes.slice(0));
+        const audioBuffer = await warmDjAudioBuffer(url);
+        if (!audioBuffer) throw new Error('DJ audio buffer not ready');
         if (!isPlaybackRunCurrent(runId)) return false;
+        startAudioKeepAlive(context);
         const source = context.createBufferSource();
         source.buffer = audioBuffer;
         source.connect(context.destination);
@@ -2494,10 +2536,8 @@ function seekTo(ratio) {
 
   async function resumeSharedAudioContext() {
     try {
-      const AudioContext = window.AudioContext || window.webkitAudioContext;
-      if (!AudioContext) return null;
-      const context = audioContextRef.current || new AudioContext();
-      audioContextRef.current = context;
+      const context = getSharedAudioContext();
+      if (!context) return null;
       if (context.state === 'suspended') {
         await context.resume();
       }
@@ -2505,6 +2545,27 @@ function seekTo(ratio) {
     } catch {
       return null;
     }
+  }
+
+  function startAudioKeepAlive(context = audioContextRef.current) {
+    try {
+      if (!context || audioKeepAliveRef.current) return;
+      const gain = context.createGain();
+      gain.gain.value = 0.00001;
+      const oscillator = context.createOscillator();
+      oscillator.frequency.value = 1;
+      oscillator.connect(gain);
+      gain.connect(context.destination);
+      oscillator.start();
+      audioKeepAliveRef.current = { oscillator, gain };
+    } catch {}
+  }
+
+  function stopAudioKeepAlive() {
+    try { audioKeepAliveRef.current?.oscillator?.stop?.(); } catch {}
+    try { audioKeepAliveRef.current?.oscillator?.disconnect?.(); } catch {}
+    try { audioKeepAliveRef.current?.gain?.disconnect?.(); } catch {}
+    audioKeepAliveRef.current = null;
   }
 
   async function ensureSharedAudioOutput() {
@@ -2522,6 +2583,7 @@ function seekTo(ratio) {
       if (context) {
         audioContextRef.current = context;
         context.resume?.().catch?.(() => {});
+        startAudioKeepAlive(context);
         const silent = context.createBuffer(1, 1, 22050);
         const source = context.createBufferSource();
         source.buffer = silent;
