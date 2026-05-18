@@ -2197,6 +2197,8 @@ function seekTo(ratio) {
   async function playCastTrack(item = track) {
     const url = castTrackUrl(item);
     if (!url) throw new Error('当前歌曲暂无可投放音源');
+    const castVolume = Math.round((userVolume > 0.05 ? userVolume : 0.6) * 100);
+    await api.castAction('volume', { volume: castVolume }).catch(() => {});
     const status = await api.castPlay(url, {
       title: item.title || '',
       artist: item.artist || '',
@@ -2205,8 +2207,6 @@ function seekTo(ratio) {
     setCastState(status.state || 'playing');
     if (audioRef.current) audioRef.current.pause();
     setIsPlaying(false);
-    const castVolume = Math.round((userVolume > 0.05 ? userVolume : 0.6) * 100);
-    await api.castAction('volume', { volume: castVolume }).catch(() => {});
     await api.playback('play').catch(() => {});
     return status;
   }

@@ -212,10 +212,10 @@ class CastManager extends EventEmitter {
       }
     };
     try {
-      return await this._loadWithClient(url, options);
+      return await this._loadDirect(url, options);
     } catch (err) {
       if (!this._isPrepareFallbackError(err)) throw err;
-      return this._loadDirect(url, options);
+      return this._loadWithClient(url, options);
     }
   }
 
@@ -306,6 +306,8 @@ class CastManager extends EventEmitter {
       CurrentURI: url,
       CurrentURIMetaData: metadata
     };
+    await this._postSoap('AVTransport', 'Stop', { InstanceID: instanceId }).catch(() => {});
+    await this._postSoap('AVTransport', 'SetPlayMode', { InstanceID: instanceId, NewPlayMode: 'NORMAL' }).catch(() => {});
     try {
       await this._postSoap('AVTransport', 'SetAVTransportURI', params);
     } catch (err) {

@@ -1,5 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import http from 'node:http';
 import { Readable } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
 import Fastify from 'fastify';
@@ -14,7 +15,7 @@ import { createRadioPlan } from './scheduler.js';
 import { getSpecialDates } from './special-dates.js';
 import { getVoicePublicConfig, synthesizeVoice, ttsFilePath, updateVoiceConfig } from './voice.js';
 import { castManager, getCastStatus } from './cast.js';
-import { buildCastUrl } from './cast-url.js';
+import { buildCastUrl, resolveCastHost } from './cast-url.js';
 import { callNetease, checkNeteaseQr, createNeteaseQr, getNeteaseLoginStatus } from './netease-auth.js';
 
 const store = new StateStore();
@@ -22,6 +23,7 @@ const app = Fastify({ logger: true });
 const webApp = Fastify({ logger: true });
 const clients = new Set();
 const castCacheDir = path.resolve(process.cwd(), 'data', 'cast-cache');
+const castMediaPort = Number(config.apiPort) + 1;
 
 await app.register(websocket);
 
@@ -344,7 +346,7 @@ app.post('/api/cast/connect', async (request, reply) => {
 app.post('/api/cast/play', async (request, reply) => {
   const { url, title, artist, album } = request.body || {};
   if (!url) return reply.code(400).send({ ok: false, message: '缺少音频 url' });
-  const stableUrl = await prepareCastMediaUrl(url).catch((err) => {
+  const stableUrl = await prepareCastMediaUrl(url, { requestHost: request.headers.host }).catch((err) => {
     app.log.warn('Cast media cache skipped: ' + err.message);
     return url;
   });
@@ -384,13 +386,13 @@ async function neteaseAudioUrl(id) {
   return data?.data?.[0]?.url || '';
 }
 
-async function prepareCastMediaUrl(url = '') {
+async function prepareCastMediaUrl(url = '', { requestHost = '' } = {}) {
   const id = mediaIdFromUrl(url);
   if (!/^\d+$/.test(id)) return url;
   await fs.promises.mkdir(castCacheDir, { recursive: true });
   const filePath = path.join(castCacheDir, `${id}.mp3`);
   const existing = await fs.promises.stat(filePath).catch(() => null);
-  if (existing?.size > 1024) return `/media/cast/${encodeURIComponent(id)}.mp3`;
+  if (existing?.size > 1024) return castMediaUrl(id, requestHost);
 
   const target = await neteaseAudioUrl(id);
   if (!/^https?:\/\//i.test(target)) throw new Error('invalid cast media url');
@@ -399,7 +401,12 @@ async function prepareCastMediaUrl(url = '') {
   const tmpPath = `${filePath}.${Date.now()}.tmp`;
   await pipeline(Readable.fromWeb(upstream.body), fs.createWriteStream(tmpPath));
   await fs.promises.rename(tmpPath, filePath);
-  return `/media/cast/${encodeURIComponent(id)}.mp3`;
+  return castMediaUrl(id, requestHost);
+}
+
+function castMediaUrl(id, requestHost = '') {
+  const host = resolveCastHost(requestHost);
+  return `http://${host}:${castMediaPort}/cast/${encodeURIComponent(id)}.mp3`;
 }
 
 function dlnaHeaders(size, { start = 0, end = size - 1, partial = false } = {}) {
@@ -440,6 +447,16 @@ async function sendCachedCastMedia(request, reply) {
 
   reply.code(partial ? 206 : 200);
   const headers = dlnaHeaders(stat.size, { start, end, partial });
+  request.log.info({
+    id,
+    method: request.method,
+    range: request.headers.range || '',
+    remoteAddress: request.ip,
+    start,
+    end,
+    size: stat.size,
+    partial
+  }, 'cast media request');
   if (request.method === 'HEAD') {
     reply.hijack();
     reply.raw.writeHead(partial ? 206 : 200, headers);
@@ -447,7 +464,14 @@ async function sendCachedCastMedia(request, reply) {
     return reply;
   }
   for (const [key, value] of Object.entries(headers)) reply.header(key, value);
-  return reply.send(fs.createReadStream(filePath, { start, end }));
+  const stream = fs.createReadStream(filePath, { start, end });
+  stream.on('close', () => {
+    request.log.info({ id, remoteAddress: request.ip }, 'cast media stream closed');
+  });
+  stream.on('error', (err) => {
+    request.log.warn({ id, remoteAddress: request.ip, err }, 'cast media stream error');
+  });
+  return reply.send(stream);
 }
 
 async function streamMediaAudio(request, reply, routeId = '') {
@@ -489,6 +513,72 @@ app.get('/media/cast/:fileName', async (request, reply) => {
   return sendCachedCastMedia(request, reply);
 });
 
+function sendRawCastMedia(req, res) {
+  const startedAt = Date.now();
+  const parsed = new URL(req.url || '/', `http://${req.headers.host || 'localhost'}`);
+  const match = parsed.pathname.match(/^\/cast\/(\d+)\.mp3$/);
+  if (!match || !['GET', 'HEAD'].includes(req.method || '')) {
+    res.writeHead(404).end();
+    return;
+  }
+  const id = match[1];
+  const filePath = path.join(castCacheDir, `${id}.mp3`);
+  fs.stat(filePath, (statErr, stat) => {
+    if (statErr || !stat?.size) {
+      res.writeHead(404).end();
+      return;
+    }
+
+    let start = 0;
+    let end = stat.size - 1;
+    let partial = false;
+    const range = String(req.headers.range || '');
+    const rangeMatch = range.match(/^bytes=(\d*)-(\d*)$/);
+    if (rangeMatch) {
+      partial = true;
+      start = rangeMatch[1] ? Number(rangeMatch[1]) : 0;
+      end = rangeMatch[2] ? Number(rangeMatch[2]) : end;
+      if (!Number.isFinite(start) || !Number.isFinite(end) || start > end || start >= stat.size) {
+        res.writeHead(416, { 'Content-Range': `bytes */${stat.size}` }).end();
+        return;
+      }
+      end = Math.min(end, stat.size - 1);
+    }
+
+    const headers = dlnaHeaders(stat.size, { start, end, partial });
+    res.writeHead(partial ? 206 : 200, headers);
+    app.log.info({
+      id,
+      method: req.method,
+      range,
+      remoteAddress: req.socket.remoteAddress,
+      start,
+      end,
+      size: stat.size,
+      partial
+    }, 'raw cast media request');
+    if (req.method === 'HEAD') {
+      res.end();
+      return;
+    }
+
+    const stream = fs.createReadStream(filePath, { start, end });
+    stream.on('close', () => {
+      app.log.info({
+        id,
+        remoteAddress: req.socket.remoteAddress,
+        ms: Date.now() - startedAt
+      }, 'raw cast media stream closed');
+    });
+    stream.on('error', (err) => {
+      app.log.warn({ id, remoteAddress: req.socket.remoteAddress, err }, 'raw cast media stream error');
+      if (!res.headersSent) res.writeHead(500);
+      res.end();
+    });
+    stream.pipe(res);
+  });
+}
+
 const distDir = path.resolve(process.cwd(), 'dist');
 if (fs.existsSync(distDir)) {
   await webApp.register(fastifyStatic, {
@@ -500,6 +590,12 @@ if (fs.existsSync(distDir)) {
 } else {
   app.log.warn('dist directory not found; web server was not started');
 }
+
+const castMediaServer = http.createServer(sendRawCastMedia);
+await new Promise((resolve) => {
+  castMediaServer.listen(castMediaPort, config.host, resolve);
+});
+app.log.info(`Cast media server listening on ${castMediaPort}`);
 
 await app.listen({ host: config.host, port: config.apiPort });
 
