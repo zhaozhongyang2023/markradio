@@ -1727,6 +1727,13 @@ export default function App() {
       if (!audio) return;
       // 解锁移动端音频自动播放（iOS Safari 要求在用户手势内触发首次播放）
       unlockMobileAudio();
+      // 在用户手势内预启动音乐（静音），确保移动端后续 playLocalMusic 不受自动播放限制
+      if (trackUrl) {
+        if (audio.src !== trackUrl) { audio.src = trackUrl; audio.load(); }
+        audio.volume = 0;
+        audio.muted = false;
+        try { await audio.play(); } catch { /* 静音预热; runCardIntro 中会重试 */ }
+      }
       audio.onended = handleEnded;
       const needsIntro = !options.skipIntro && introDoneFor !== track.id;
       const shouldReadStationIntro = !options.skipStationIntro && !introDoneFor;
@@ -1746,13 +1753,30 @@ export default function App() {
           await runCardIntro(idx, runId);
           if (!isPlaybackRunCurrent(runId)) return;
         }
+        if (!hasCastDevice() && audio && (audio.ended || mediaNearEnd(audio))) {
+          setIntroDoneFor(track.id);
+          setReading(false);
+          setReadingCardIndex(null);
+          setReadProgress(1);
+          await advanceEndedTrack();
+          return;
+        }
         // Phase 3: Fade music to full, show lyrics
         if (hasCastDevice()) {
           await playCastTrack(track);
           if (!isPlaybackRunCurrent(runId)) return;
         } else if (audio) {
           const started = await playLocalMusic({ ratio: 1, fade: true, runId });
-          if (!started || !isPlaybackRunCurrent(runId)) return;
+          if (!started || !isPlaybackRunCurrent(runId)) {
+            if (audio.ended || mediaNearEnd(audio)) {
+              setIntroDoneFor(track.id);
+              setReading(false);
+              setReadingCardIndex(null);
+              setReadProgress(1);
+              await advanceEndedTrack();
+            }
+            return;
+          }
         }
         setIntroDoneFor(track.id);
         setReading(false);
@@ -1885,7 +1909,11 @@ export default function App() {
       const ratio = hasDuration
         ? djAudio.currentTime / djAudio.duration
         : (performance.now() - fallbackStartedAt) / fallbackTotalMs;
-      syncReadProgress(ratio);
+      const elapsed = (performance.now() - fallbackStartedAt) / 1000;
+      const resolvedRatio = hasDuration && djAudio.duration > 0
+        ? Math.max(ratio, elapsed / djAudio.duration)
+        : ratio;
+      syncReadProgress(resolvedRatio);
       if (!djAudio.paused && !djAudio.ended && ratio < 1) {
         readRafRef.current = requestAnimationFrame(tick);
       }
@@ -1895,6 +1923,14 @@ export default function App() {
 
   function fallbackReadDurationMs(text = '') {
     return Math.max(2000, String(text || '').length * 160);
+  }
+
+  function mediaNearEnd(media) {
+    return Boolean(
+      media?.duration &&
+      Number.isFinite(media.duration) &&
+      media.currentTime >= media.duration - 0.35
+    );
   }
 
   function probeAudioDurationMs(url) {
@@ -2148,7 +2184,7 @@ export default function App() {
   }
 
   function startMediaElementDjNow(url, text, runId) {
-    const audio = audioRef.current;
+    const audio = djAudioRef.current;
     if (!audio || !url) return null;
     try {
       audio.pause();
@@ -2175,6 +2211,10 @@ export default function App() {
           audio.onended = null;
           audio.onerror = null;
           audio.onpause = null;
+          if (activeDjClipRef.current === audio) activeDjClipRef.current = null;
+          audio.pause();
+          audio.removeAttribute('src');
+          audio.load();
           resolve(ok);
         };
         const progressTimer = setInterval(() => {
@@ -2186,17 +2226,24 @@ export default function App() {
           const ratio = hasDuration
             ? audio.currentTime / audio.duration
             : (performance.now() - startedAt) / totalMs;
-          syncReadProgress(Math.min(1, ratio));
+          // 若duration刚加载，用实耗时间平滑过渡
+          const elapsed = (performance.now() - startedAt) / 1000;
+          const resolvedRatio = hasDuration && audio.duration > 0
+            ? Math.max(ratio, elapsed / audio.duration)
+            : ratio;
+          syncReadProgress(Math.min(1, resolvedRatio));
         }, lowPowerMode ? LOW_POWER_READ_PROGRESS_MS : 60);
         audio.onended = () => finish(true);
         audio.onerror = () => finish(false);
         audio.onpause = () => {
-          if (!isPlaybackRunCurrent(runId) || audio.ended) finish(false);
+          if (!isPlaybackRunCurrent(runId)) finish(false);
+          else if (audio.ended || mediaNearEnd(audio)) finish(true);
         };
         const playPromise = audio.play();
         if (playPromise) playPromise.catch(() => finish(false));
         watchdog = setTimeout(() => finish(true), totalMs + 6000);
       });
+      activeDjClipRef.current = audio;
       return promise;
     } catch {
       return null;
@@ -2293,13 +2340,14 @@ export default function App() {
           return;
         }
         if (clip.paused && !clip.ended && clip.currentTime > 0.03) {
-          fail();
+          if (mediaNearEnd(clip)) finish();
+          else fail();
         }
       }, 120);
       clip.onended = finish;
       clip.onerror = fail;
       clip.onpause = () => {
-        if (!isPlaybackRunCurrent(runId) || clip.ended) finish();
+        if (!isPlaybackRunCurrent(runId) || clip.ended || mediaNearEnd(clip)) finish();
         else if (clip.currentTime > 0.03) fail();
       };
       const playPromise = clip.play();
@@ -2325,8 +2373,7 @@ export default function App() {
     setReadingCardIndex(-1);
 
     if (audioRef.current) {
-      audioRef.current.pause();
-      audioRef.current.onended = null;
+      // 不 pause，保持移动端音频会话活跃；仅静音让 DJ 导读独占听觉
       audioRef.current.volume = 0;
     }
 
@@ -2498,14 +2545,14 @@ export default function App() {
 
   const refreshingRef = useRef(false);
 
-  async function handleEnded() {
-    const audio = audioRef.current;
-    if (!audio || refreshingRef.current || busy) return;
+  async function advanceEndedTrack() {
+    if (refreshingRef.current || busy) return;
     triggerPixelPulse();
     try {
       const currentIndex = queue.findIndex((item) => item.id === track.id);
       if (currentIndex >= 0 && currentIndex < queue.length - 1) {
-        await api.playback('next').catch(() => {});
+        const nextState = await api.playback('next').catch(() => null);
+        if (nextState?.now) setState(nextState);
         autoplayOptionsRef.current = { skipIntro: false, skipStationIntro: true };
         triggerPixelPulse();
         setAutoplayToken((value) => value + 1);
@@ -2517,6 +2564,12 @@ export default function App() {
     }
   }
 
+  async function handleEnded() {
+    const audio = audioRef.current;
+    if (!audio || reading) return;
+    await advanceEndedTrack();
+  }
+
   async function nextTrack() {
     if (refreshingRef.current || busy) return;
     triggerPixelPulse();
@@ -2524,7 +2577,8 @@ export default function App() {
     const currentIndex = queue.findIndex((item) => item.id === track.id);
     if (currentIndex >= 0 && currentIndex < queue.length - 1) {
       await pauseCastOnly();
-      await api.playback('next').catch(() => {});
+      const nextState = await api.playback('next').catch(() => null);
+      if (nextState?.now) setState(nextState);
       autoplayOptionsRef.current = { skipIntro: false, skipStationIntro: true };
       setAutoplayToken((value) => value + 1);
       return;
@@ -2819,6 +2873,14 @@ function seekTo(ratio) {
     audio.onended = handleEnded;
     audio.muted = false;
     applyMusicVolume(ratio);
+
+    // 如果音源未变且已在播放，只调整音量和视觉效果
+    if (!sourceChanged && !audio.paused) {
+      setIsPlaying(true);
+      startAudioVisuals(audio);
+      if (fade) fadeMusicIn();
+      return true;
+    }
 
     const tryPlay = async () => {
       try {
