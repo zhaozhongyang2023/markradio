@@ -27,6 +27,9 @@ const PULSE_DAMPING = 0.98;
 const PULSE_PIXEL_SIZE = 10;
 const PULSE_RING_COUNT = 4;
 const LOW_POWER_READ_PROGRESS_MS = 110;
+const CAST_LEASE_TTL_MS = 15 * 60 * 1000;
+const CAST_HEARTBEAT_INTERVAL_MS = 30 * 1000;
+const CAST_PLAYBACK_LEASE_BUFFER_MS = 2 * 60 * 1000;
 
 function detectLowPowerRuntime() {
   if (typeof navigator === 'undefined') return false;
@@ -1399,6 +1402,16 @@ export default function App() {
     }, 120);
   }
 
+  function castLeaseForDuration(seconds = 0) {
+    const durationMs = Math.max(0, Number(seconds) || 0) * 1000;
+    return Math.max(CAST_LEASE_TTL_MS, durationMs + CAST_PLAYBACK_LEASE_BUFFER_MS);
+  }
+
+  function refreshCastLease(ttlMs = CAST_LEASE_TTL_MS) {
+    if (!castDeviceRef.current) return;
+    api.castHeartbeat({ ttlMs }).catch(() => {});
+  }
+
   function startCastHeartbeat() {
     if (castHeartbeatTimerRef.current) return;
     const beat = () => {
@@ -1407,10 +1420,10 @@ export default function App() {
         castHeartbeatTimerRef.current = null;
         return;
       }
-      api.castHeartbeat({ ttlMs: 8000 }).catch(() => {});
+      refreshCastLease();
     };
     beat();
-    castHeartbeatTimerRef.current = setInterval(beat, 3000);
+    castHeartbeatTimerRef.current = setInterval(beat, CAST_HEARTBEAT_INTERVAL_MS);
   }
 
   function stopCastHeartbeat() {
@@ -1520,12 +1533,20 @@ export default function App() {
       if (!castDeviceRef.current && castStateRef.current === 'idle') return;
       castActionBeacon('stop');
     };
-    window.addEventListener('pagehide', stopCastOnExit);
+    // iOS Safari may fire pagehide on screen lock; beforeunload keeps real exits covered.
     window.addEventListener('beforeunload', stopCastOnExit);
     return () => {
-      window.removeEventListener('pagehide', stopCastOnExit);
       window.removeEventListener('beforeunload', stopCastOnExit);
     };
+  }, []);
+
+  useEffect(() => {
+    const resumeWhenVisible = () => {
+      if (document.visibilityState !== 'visible') return;
+      resumeSharedAudioContext();
+    };
+    document.addEventListener('visibilitychange', resumeWhenVisible);
+    return () => document.removeEventListener('visibilitychange', resumeWhenVisible);
   }, []);
 
   useEffect(() => {
@@ -1590,20 +1611,7 @@ export default function App() {
     }
     // First play: init autoplayToken so subsequent songs auto-advance
     if (autoplayToken === 0) setAutoplayToken(1);
-    // Create & resume AudioContext in user-gesture context (required by iOS)
-    const AudioCtx = window.AudioContext || window.webkitAudioContext;
-    if (AudioCtx) {
-      if (!audioContextRef.current) {
-        audioContextRef.current = new AudioCtx();
-      }
-      if (audioContextRef.current.state === 'suspended') {
-        await audioContextRef.current.resume();
-      }
-    }
-    // Route both audio elements through shared AudioContext so they can play
-    // simultaneously (music bed + DJ voice) and iOS keeps one Bluetooth session.
-    connectToAudioContext(audioRef.current);
-    connectToAudioContext(djAudioRef.current);
+    await ensureSharedAudioOutput();
     await startPlayback();
   }
 
@@ -1621,14 +1629,7 @@ export default function App() {
 
   function unlockMobileAudio() {
     // 在用户手势内恢复 AudioContext，解锁移动端音频自动播放
-    try {
-      const AudioContext = window.AudioContext || window.webkitAudioContext;
-      if (AudioContext) {
-        const ctx = audioContextRef.current || new AudioContext();
-        audioContextRef.current = ctx;
-        if (ctx.state === 'suspended') ctx.resume().catch(() => {});
-      }
-    } catch {}
+    ensureSharedAudioOutput();
     // 不在 unlock 中触碰 audio/djAudio，避免干扰后续播放流程
   }
 
@@ -1921,6 +1922,7 @@ export default function App() {
     }
 
     if (introUrl && djAudio) {
+      await ensureSharedAudioOutput();
       djAudio.pause();
       djAudio.src = introUrl;
       djAudio.currentTime = 0;
@@ -1997,6 +1999,7 @@ export default function App() {
     // Set background music to low volume
     const audio = audioRef.current;
     if (audio && trackUrl && !castDevice) {
+      await ensureSharedAudioOutput();
       if (audio.src !== trackUrl) audio.src = trackUrl;
       applyMusicVolume(BED_VOLUME);
       audio.play().catch(() => {});
@@ -2010,6 +2013,7 @@ export default function App() {
     const cardUrl = await resolveCardAudioUrl(cardIndex);
     const djAudio = djAudioRef.current;
     if (cardUrl && djAudio) {
+      await ensureSharedAudioOutput();
       djAudio.pause();
       djAudio.src = cardUrl;
       djAudio.currentTime = 0;
@@ -2336,9 +2340,31 @@ function seekTo(ratio) {
     paintLevels(particleRef.current, null);
   }
 
+  async function resumeSharedAudioContext() {
+    try {
+      const AudioContext = window.AudioContext || window.webkitAudioContext;
+      if (!AudioContext) return null;
+      const context = audioContextRef.current || new AudioContext();
+      audioContextRef.current = context;
+      if (context.state === 'suspended') {
+        await context.resume();
+      }
+      return context;
+    } catch {
+      return null;
+    }
+  }
+
+  async function ensureSharedAudioOutput() {
+    await resumeSharedAudioContext();
+    connectToAudioContext(audioRef.current);
+    connectToAudioContext(djAudioRef.current);
+  }
+
   function connectToAudioContext(mediaElement) {
     // Route audio element through shared AudioContext so iOS keeps one audio session
     try {
+      if (!mediaElement) return null;
       const AudioContext = window.AudioContext || window.webkitAudioContext;
       if (!AudioContext) return null;
       const context = audioContextRef.current || new AudioContext();
@@ -2348,12 +2374,16 @@ function seekTo(ratio) {
       }
       let sourceEntry = mediaSourcesRef.current.get(mediaElement);
       if (!sourceEntry) {
-        sourceEntry = { source: context.createMediaElementSource(mediaElement), connected: false };
+        sourceEntry = {
+          source: context.createMediaElementSource(mediaElement),
+          destinationConnected: false,
+          analyserConnected: false
+        };
         mediaSourcesRef.current.set(mediaElement, sourceEntry);
       }
-      if (!sourceEntry.connected) {
+      if (!sourceEntry.destinationConnected) {
         sourceEntry.source.connect(context.destination);
-        sourceEntry.connected = true;
+        sourceEntry.destinationConnected = true;
       }
       return sourceEntry;
     } catch {
@@ -2363,6 +2393,7 @@ function seekTo(ratio) {
 
   function setupAnalyser(mediaElement) {
     try {
+      if (!mediaElement) return null;
       const AudioContext = window.AudioContext || window.webkitAudioContext;
       if (!AudioContext) return null;
       const context = audioContextRef.current || new AudioContext();
@@ -2374,17 +2405,24 @@ function seekTo(ratio) {
       }
       let sourceEntry = mediaSourcesRef.current.get(mediaElement);
       if (!sourceEntry) {
-        sourceEntry = { source: context.createMediaElementSource(mediaElement), connected: false };
+        sourceEntry = {
+          source: context.createMediaElementSource(mediaElement),
+          destinationConnected: false,
+          analyserConnected: false
+        };
         mediaSourcesRef.current.set(mediaElement, sourceEntry);
       }
       const analyser = analyserRef.current || context.createAnalyser();
 
       analyser.fftSize = 128;
       analyser.smoothingTimeConstant = 0.72;
-      if (!sourceEntry.connected) {
+      if (!sourceEntry.destinationConnected) {
         sourceEntry.source.connect(context.destination);
+        sourceEntry.destinationConnected = true;
+      }
+      if (!sourceEntry.analyserConnected) {
         sourceEntry.source.connect(analyser);
-        sourceEntry.connected = true;
+        sourceEntry.analyserConnected = true;
       }
       analyserRef.current = analyser;
       analyserDataRef.current = new Uint8Array(analyser.frequencyBinCount);
@@ -2421,7 +2459,8 @@ function seekTo(ratio) {
     const status = await api.castPlay(url, {
       title: meta.title || 'MarkRadio',
       artist: meta.artist || 'MarkRadio',
-      album: meta.album || ''
+      album: meta.album || '',
+      leaseMs: castLeaseForDuration(meta.duration || 0)
     });
     const nextState = status.state || 'playing';
     castStateRef.current = nextState;
@@ -2438,7 +2477,8 @@ function seekTo(ratio) {
     const status = await api.castPlay(url, {
       title: item.title || '',
       artist: item.artist || '',
-      album: item.album || ''
+      album: item.album || '',
+      leaseMs: castLeaseForDuration(item.duration || duration)
     });
     const nextState = status.state || 'playing';
     castStateRef.current = nextState;
@@ -2446,6 +2486,7 @@ function seekTo(ratio) {
     if (audioRef.current) audioRef.current.pause();
     setIsPlaying(false);
     startCastProgress(item.duration || duration, 0);
+    refreshCastLease(castLeaseForDuration(item.duration || duration));
     await api.playback('play').catch(() => {});
     return status;
   }

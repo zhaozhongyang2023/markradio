@@ -24,7 +24,7 @@ const webApp = Fastify({ logger: true });
 const clients = new Set();
 const castCacheDir = path.resolve(process.cwd(), 'data', 'cast-cache');
 const castMediaPort = Number(config.apiPort) + 1;
-const CAST_HEARTBEAT_TTL_MS = 8000;
+const CAST_HEARTBEAT_TTL_MS = 15 * 60 * 1000;
 let castLeaseExpiresAt = 0;
 let castLeaseTimer = null;
 
@@ -353,7 +353,8 @@ function clearCastLease() {
 }
 
 function armCastLease(ttlMs = CAST_HEARTBEAT_TTL_MS) {
-  castLeaseExpiresAt = Date.now() + ttlMs;
+  const safeTtlMs = Math.max(8000, Math.min(Number(ttlMs) || CAST_HEARTBEAT_TTL_MS, 60 * 60 * 1000));
+  castLeaseExpiresAt = Date.now() + safeTtlMs;
   if (castLeaseTimer) return;
   const check = async () => {
     castLeaseTimer = null;
@@ -369,11 +370,11 @@ function armCastLease(ttlMs = CAST_HEARTBEAT_TTL_MS) {
       try { castManager.stop(); } catch (_) {}
     }
   };
-  castLeaseTimer = setTimeout(check, ttlMs);
+  castLeaseTimer = setTimeout(check, safeTtlMs);
 }
 
 app.post('/api/cast/play', async (request, reply) => {
-  const { url, title, artist, album } = request.body || {};
+  const { url, title, artist, album, leaseMs } = request.body || {};
   if (!url) return reply.code(400).send({ ok: false, message: '缺少音频 url' });
   const stableUrl = await prepareCastMediaUrl(url, { requestHost: request.headers.host }).catch((err) => {
     app.log.warn('Cast media cache skipped: ' + err.message);
@@ -381,6 +382,7 @@ app.post('/api/cast/play', async (request, reply) => {
   });
   const castUrl = buildCastUrl(stableUrl, { requestHost: request.headers.host, apiPort: config.apiPort });
   await castManager.play(castUrl, { title, artist, album });
+  armCastLease(leaseMs || CAST_HEARTBEAT_TTL_MS);
   return castManager.getStatus();
 });
 
