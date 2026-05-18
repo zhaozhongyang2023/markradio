@@ -42,11 +42,12 @@ function detectLowPowerRuntime() {
   const screenH = typeof window !== 'undefined' ? window.screen?.height || 0 : 0;
   const forced = typeof window !== 'undefined' && new URLSearchParams(window.location.search).has('lowPower');
   const kioskPortrait = /Linux/i.test(ua) && Math.min(screenW, screenH) <= 1200 && Math.max(screenW, screenH) >= 1600;
+  const isMobile = /Android|iPhone|iPad|iPod|webOS|BlackBerry|Mobile/i.test(ua);
   return forced ||
-    /Raspberry|armv|aarch64|Linux arm/i.test(`${ua} ${platform}`) ||
+    !isMobile && /Raspberry|armv|aarch64|Linux arm/i.test(`${ua} ${platform}`) ||
     kioskPortrait ||
-    (cores > 0 && cores <= 4) ||
-    (memory > 0 && memory <= 4);
+    !isMobile && (cores > 0 && cores <= 4) ||
+    !isMobile && (memory > 0 && memory <= 4);
 }
 
 function formatTime(seconds = 0) {
