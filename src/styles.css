@@ -1924,6 +1924,17 @@ p {
     grid-template-rows: auto minmax(176px, 28dvh) auto auto auto auto auto minmax(0, 1fr) auto auto;
   }
 
+  .v4-player-strip,
+  .v4-progress-row,
+  .v4-queue-head,
+  .v4-live-row,
+  .v4-plan-panel,
+  .v4-chat-log,
+  .v4-chat-input {
+    width: calc(100% - 20px);
+    justify-self: center;
+  }
+
   .v4-topbar {
     display: grid;
     grid-template-columns: minmax(0, 1fr) auto;
@@ -2006,8 +2017,8 @@ p {
   .v4-queue-head,
   .v4-live-row,
   .v4-plan-panel {
-    padding-left: 12px;
-    padding-right: 18px;
+    padding-left: 10px;
+    padding-right: 10px;
   }
 
   .v4-live-row {
