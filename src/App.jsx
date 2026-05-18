@@ -982,7 +982,7 @@ function V4RadioView({
 }
 
 export default function App() {
-  const [viewMode, setViewMode] = useState('v3');
+  const [viewMode, setViewMode] = useState('v4');
   const [state, setState] = useState(null);
   const [status, setStatus] = useState(null);
   const [selectedMood, setSelectedMood] = useState('平静');
@@ -1451,6 +1451,7 @@ export default function App() {
     stopAudioVisuals();
     audioRef.current?.pause();
     djAudioRef.current?.pause();
+    window.speechSynthesis?.cancel?.();
     setIsPlaying(false);
     setReading(false);
   }
@@ -1532,17 +1533,20 @@ export default function App() {
     clearTimeout(seekCommitTimerRef.current);
     cancelAnimationFrame(pulseFrameRef.current);
     speechRecognitionRef.current?.abort?.();
+    window.speechSynthesis?.cancel?.();
   }, []);
 
   useEffect(() => {
     const stopCastOnExit = () => {
       if (!castDeviceRef.current && castStateRef.current === 'idle') return;
-      castActionBeacon('stop');
+      castActionBeacon('stop', { reason: 'browser-exit' });
     };
-    // iOS Safari may fire pagehide on screen lock; beforeunload keeps real exits covered.
+    // beforeunload is weak on mobile Safari; pagehide covers tab close / refresh more reliably.
     window.addEventListener('beforeunload', stopCastOnExit);
+    window.addEventListener('pagehide', stopCastOnExit);
     return () => {
       window.removeEventListener('beforeunload', stopCastOnExit);
+      window.removeEventListener('pagehide', stopCastOnExit);
     };
   }, []);
 
@@ -1861,6 +1865,67 @@ export default function App() {
     });
   }
 
+  function pickSpeechVoice(text = '') {
+    const voices = window.speechSynthesis?.getVoices?.() || [];
+    const wantsChinese = /[\u3400-\u9fff]/.test(text);
+    return voices.find((voice) => wantsChinese && /zh|cmn|mandarin|chinese/i.test(`${voice.lang} ${voice.name}`))
+      || voices.find((voice) => !wantsChinese && /^en/i.test(voice.lang || ''))
+      || voices[0]
+      || null;
+  }
+
+  async function speakDjFallback(text, runId) {
+    const content = String(text || '').trim();
+    if (!content) return;
+    if (!window.speechSynthesis || typeof SpeechSynthesisUtterance === 'undefined') {
+      await readTextSegment(content, { runId });
+      return;
+    }
+    await new Promise((resolve) => {
+      const utterance = new SpeechSynthesisUtterance(content);
+      const voice = pickSpeechVoice(content);
+      if (voice) utterance.voice = voice;
+      utterance.lang = /[\u3400-\u9fff]/.test(content) ? 'zh-CN' : 'en-US';
+      utterance.rate = 0.92;
+      utterance.pitch = 0.95;
+      const totalMs = fallbackReadDurationMs(content);
+      const startedAt = performance.now();
+      setReadProgress(0);
+      setReading(true);
+      startFallbackVisuals();
+      let timer = null;
+      let watchdog = null;
+      let done = false;
+      const finish = () => {
+        if (done) return;
+        done = true;
+        if (timer) clearInterval(timer);
+        if (watchdog) clearTimeout(watchdog);
+        utterance.onend = null;
+        utterance.onerror = null;
+        stopAudioVisuals();
+        resolve();
+      };
+      timer = setInterval(() => {
+        if (!isPlaybackRunCurrent(runId)) {
+          window.speechSynthesis.cancel();
+          finish();
+          return;
+        }
+        syncReadProgress(Math.min(1, (performance.now() - startedAt) / totalMs));
+      }, lowPowerMode ? LOW_POWER_READ_PROGRESS_MS : 60);
+      utterance.onend = finish;
+      utterance.onerror = finish;
+      try {
+        window.speechSynthesis.cancel();
+        window.speechSynthesis.speak(utterance);
+        watchdog = setTimeout(finish, totalMs + 2500);
+      } catch {
+        finish();
+      }
+    });
+  }
+
   async function playCastVoiceClip(url, text, meta, runId) {
     const durationMs = await probeAudioDurationMs(url);
     if (!isPlaybackRunCurrent(runId)) return;
@@ -1957,13 +2022,13 @@ export default function App() {
       djAudio.pause();
       stopAudioVisuals();
       if (playRejected) {
-        // Browser blocked autoplay — use text-only fallback with proper timing
-        await readTextSegment(introText, { runId });
+        // Browser blocked the prepared TTS clip. Keep first-play DJ audible with platform speech.
+        await speakDjFallback(introText, runId);
       }
       return;
     }
-    // Fallback: text-only reading
-    await readTextSegment(introText, { runId });
+    // Fallback: keep first-play DJ audible even when server TTS is not ready.
+    await speakDjFallback(introText, runId);
   }
 
   async function runCardIntro(cardIndex, runId) {
@@ -2043,12 +2108,12 @@ export default function App() {
       djAudio.pause();
       if (playRejected) {
         // Use latest plan ref to avoid stale closure after async gap
-        await readTextSegment(planRef.current?.queue?.[cardIndex]?.reason || reason, { runId });
+        await speakDjFallback(planRef.current?.queue?.[cardIndex]?.reason || reason, runId);
       }
       return;
     }
     // Fallback — use latestPlan ref to avoid stale closure
-    await readTextSegment(planRef.current?.queue?.[cardIndex]?.reason || reason, { runId });
+    await speakDjFallback(planRef.current?.queue?.[cardIndex]?.reason || reason, runId);
   }
 
   async function finishIntro() {
@@ -2891,7 +2956,7 @@ function seekTo(ratio) {
           lowPowerMode={lowPowerMode}
           netease={netease}
           nextTrack={nextTrack}
-          onBack={() => setViewMode('v3')}
+          onBack={() => setViewMode('v4')}
           onCastOpen={() => setShowCastPanel(true)}
           onLogin={startNeteaseLogin}
           onRefresh={() => refreshPlan(selectedMood, false)}

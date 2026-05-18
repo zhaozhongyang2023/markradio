@@ -92,15 +92,19 @@ export const api = {
 export function castActionBeacon(action, body = {}) {
   if (typeof window === 'undefined') return;
   const payload = JSON.stringify(body);
-  const url = action === 'stop' ? '/api/cast/stop' : `${API_BASE}/api/cast/${action}`;
+  const urls = action === 'stop'
+    ? [...new Set(['/api/cast/stop', `${API_BASE}/api/cast/stop`].filter(Boolean))]
+    : [`${API_BASE}/api/cast/${action}`];
   const blob = new Blob([payload], { type: 'application/json' });
-  if (navigator.sendBeacon?.(url, blob)) return;
-  fetch(url, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: payload,
-    keepalive: true
-  }).catch(() => {});
+  urls.forEach((url) => {
+    if (navigator.sendBeacon?.(url, blob)) return;
+    fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: payload,
+      keepalive: true
+    }).catch(() => {});
+  });
 }
 
 export function streamUrl() {
