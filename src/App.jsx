@@ -1032,6 +1032,7 @@ export default function App() {
   const djAudioRef = useRef(null);
   const activeDjClipRef = useRef(null);
   const activeDjSourceRef = useRef(null);
+  const prestartedDjRef = useRef(null);
   const djAudioUnlockedRef = useRef(false);
   const speechRecognitionRef = useRef(null);
   const spectrumRef = useRef(null);
@@ -1489,6 +1490,7 @@ export default function App() {
     activeDjClipRef.current = null;
     try { activeDjSourceRef.current?.stop?.(); } catch {}
     activeDjSourceRef.current = null;
+    prestartedDjRef.current = null;
     stopAudioKeepAlive();
     window.speechSynthesis?.cancel?.();
     setIsPlaying(false);
@@ -1537,6 +1539,7 @@ export default function App() {
     activeDjClipRef.current = null;
     try { activeDjSourceRef.current?.stop?.(); } catch {}
     activeDjSourceRef.current = null;
+    prestartedDjRef.current = null;
     stopAudioKeepAlive();
     setReadingCardIndex(-1);
     if (track.id) triggerPixelPulse();
@@ -1727,6 +1730,9 @@ export default function App() {
       audio.onended = handleEnded;
       const needsIntro = !options.skipIntro && introDoneFor !== track.id;
       const shouldReadStationIntro = !options.skipStationIntro && !introDoneFor;
+      if (needsIntro && shouldReadStationIntro) {
+        startImmediateDjIntro(planRef.current?.tts?.text || introText, runId);
+      }
 
       if (needsIntro) {
         // Phase 1: Pre-intro (first play only) — pause music, read pre-intro DJ text
@@ -2010,6 +2016,13 @@ export default function App() {
     });
   }
 
+  function cachedIntroUrl(text = '') {
+    return planDjUrlRef.current
+      || introAudioCacheRef.current.get(text)
+      || introAudioCacheRef.current.get(planRef.current?.tts?.text || '')
+      || '';
+  }
+
   function getSharedAudioContext() {
     try {
       const AudioContext = window.AudioContext || window.webkitAudioContext;
@@ -2041,6 +2054,107 @@ export default function App() {
     });
     introBufferWarmupRef.current.set(url, task);
     return task;
+  }
+
+  function startBufferedDjClipNow(url, text, runId) {
+    const audioBuffer = introBufferCacheRef.current.get(url);
+    const context = getSharedAudioContext();
+    if (!url || !audioBuffer || !context) return null;
+    try {
+      context.resume?.().catch?.(() => {});
+      startAudioKeepAlive(context);
+      const source = context.createBufferSource();
+      source.buffer = audioBuffer;
+      source.connect(context.destination);
+      try { activeDjSourceRef.current?.stop?.(); } catch {}
+      activeDjSourceRef.current = source;
+      startFallbackVisuals();
+      setReading(true);
+      setReadProgress(0);
+      const promise = new Promise((resolve) => {
+        let done = false;
+        const totalMs = Math.max(800, audioBuffer.duration * 1000 || fallbackReadDurationMs(text));
+        const startedAt = performance.now();
+        const finish = (ok = true) => {
+          if (done) return;
+          done = true;
+          clearInterval(progressTimer);
+          source.onended = null;
+          if (activeDjSourceRef.current === source) activeDjSourceRef.current = null;
+          resolve(ok);
+        };
+        const progressTimer = setInterval(() => {
+          if (!isPlaybackRunCurrent(runId)) {
+            try { source.stop(); } catch {}
+            finish(false);
+            return;
+          }
+          syncReadProgress(Math.min(1, (performance.now() - startedAt) / totalMs));
+        }, lowPowerMode ? LOW_POWER_READ_PROGRESS_MS : 60);
+        source.onended = () => finish(true);
+        source.start(0);
+      });
+      return promise;
+    } catch {
+      return null;
+    }
+  }
+
+  function startSpeechDjNow(text, runId) {
+    const content = String(text || '').trim();
+    if (!content || !window.speechSynthesis || typeof SpeechSynthesisUtterance === 'undefined') return null;
+    try {
+      const utterance = new SpeechSynthesisUtterance(content);
+      const voice = pickSpeechVoice(content);
+      if (voice) utterance.voice = voice;
+      utterance.lang = /[\u3400-\u9fff]/.test(content) ? 'zh-CN' : 'en-US';
+      utterance.rate = 0.92;
+      utterance.pitch = 0.95;
+      window.speechSynthesis.cancel();
+      setReading(true);
+      setReadProgress(0);
+      startFallbackVisuals();
+      const promise = new Promise((resolve) => {
+        let done = false;
+        let watchdog = null;
+        const totalMs = fallbackReadDurationMs(content);
+        const startedAt = performance.now();
+        const finish = (ok = true) => {
+          if (done) return;
+          done = true;
+          clearInterval(progressTimer);
+          if (watchdog) clearTimeout(watchdog);
+          utterance.onend = null;
+          utterance.onerror = null;
+          resolve(ok);
+        };
+        const progressTimer = setInterval(() => {
+          if (!isPlaybackRunCurrent(runId)) {
+            window.speechSynthesis.cancel();
+            finish(false);
+            return;
+          }
+          syncReadProgress(Math.min(1, (performance.now() - startedAt) / totalMs));
+        }, lowPowerMode ? LOW_POWER_READ_PROGRESS_MS : 60);
+        utterance.onend = () => finish(true);
+        utterance.onerror = () => finish(false);
+        window.speechSynthesis.speak(utterance);
+        watchdog = setTimeout(() => finish(true), totalMs + 2500);
+      });
+      return promise;
+    } catch {
+      return null;
+    }
+  }
+
+  function startImmediateDjIntro(text, runId) {
+    if (hasCastDevice()) return null;
+    const introUrl = cachedIntroUrl(text);
+    const promise = startBufferedDjClipNow(introUrl, text, runId)
+      || startSpeechDjNow(text, runId);
+    if (!promise) return null;
+    prestartedDjRef.current = { runId, text, url: introUrl, promise };
+    return promise;
   }
 
   async function playLocalDjClip(url, text, runId) {
@@ -2157,6 +2271,17 @@ export default function App() {
       audioRef.current.pause();
       audioRef.current.onended = null;
       audioRef.current.volume = 0;
+    }
+
+    const prestarted = prestartedDjRef.current;
+    if (prestarted?.runId === runId) {
+      const ok = await prestarted.promise;
+      if (prestartedDjRef.current === prestarted) prestartedDjRef.current = null;
+      stopAudioVisuals();
+      if (!ok && isPlaybackRunCurrent(runId)) {
+        await readTextSegment(introText, { runId });
+      }
+      return;
     }
 
     // Try using pre-generated TTS
