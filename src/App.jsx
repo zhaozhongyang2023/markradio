@@ -2147,10 +2147,67 @@ export default function App() {
     }
   }
 
+  function startMediaElementDjNow(url, text, runId) {
+    const audio = audioRef.current;
+    if (!audio || !url) return null;
+    try {
+      audio.pause();
+      audio.onended = null;
+      audio.src = url;
+      audio.currentTime = 0;
+      audio.muted = false;
+      audio.volume = 1;
+      audio.load();
+      setIsPlaying(false);
+      setReading(true);
+      setReadProgress(0);
+      startFallbackVisuals();
+      const promise = new Promise((resolve) => {
+        let done = false;
+        let watchdog = null;
+        const totalMs = fallbackReadDurationMs(text);
+        const startedAt = performance.now();
+        const finish = (ok = true) => {
+          if (done) return;
+          done = true;
+          clearInterval(progressTimer);
+          if (watchdog) clearTimeout(watchdog);
+          audio.onended = null;
+          audio.onerror = null;
+          audio.onpause = null;
+          resolve(ok);
+        };
+        const progressTimer = setInterval(() => {
+          if (!isPlaybackRunCurrent(runId)) {
+            finish(false);
+            return;
+          }
+          const hasDuration = audio.duration && Number.isFinite(audio.duration);
+          const ratio = hasDuration
+            ? audio.currentTime / audio.duration
+            : (performance.now() - startedAt) / totalMs;
+          syncReadProgress(Math.min(1, ratio));
+        }, lowPowerMode ? LOW_POWER_READ_PROGRESS_MS : 60);
+        audio.onended = () => finish(true);
+        audio.onerror = () => finish(false);
+        audio.onpause = () => {
+          if (!isPlaybackRunCurrent(runId) || audio.ended) finish(false);
+        };
+        const playPromise = audio.play();
+        if (playPromise) playPromise.catch(() => finish(false));
+        watchdog = setTimeout(() => finish(true), totalMs + 6000);
+      });
+      return promise;
+    } catch {
+      return null;
+    }
+  }
+
   function startImmediateDjIntro(text, runId) {
     if (hasCastDevice()) return null;
     const introUrl = cachedIntroUrl(text);
-    const promise = startBufferedDjClipNow(introUrl, text, runId)
+    const promise = startMediaElementDjNow(introUrl, text, runId)
+      || startBufferedDjClipNow(introUrl, text, runId)
       || startSpeechDjNow(text, runId);
     if (!promise) return null;
     prestartedDjRef.current = { runId, text, url: introUrl, promise };
@@ -2320,7 +2377,10 @@ export default function App() {
     }
 
     if (introUrl) {
-      const played = await playLocalDjClip(introUrl, introText, runId);
+      const played = await (
+        startMediaElementDjNow(introUrl, introText, runId)
+        || playLocalDjClip(introUrl, introText, runId)
+      );
       if (!played) await speakDjFallback(introText, runId);
       return;
     }
@@ -2371,7 +2431,10 @@ export default function App() {
     // Play card DJ TTS
     const cardUrl = await resolveCardAudioUrl(cardIndex);
     if (cardUrl) {
-      const played = await playLocalDjClip(cardUrl, reason, runId);
+      const played = await (
+        startMediaElementDjNow(cardUrl, reason, runId)
+        || playLocalDjClip(cardUrl, reason, runId)
+      );
       if (!played) {
         await speakDjFallback(planRef.current?.queue?.[cardIndex]?.reason || reason, runId);
       }
