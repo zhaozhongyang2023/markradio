@@ -1928,9 +1928,7 @@ p {
     padding: 8px 24px 0;
   }
 
-  .hero-clock {
-    display: none;
-  }
+
 
   .brand-lockup h1 {
     font-size: 30px;
@@ -2489,9 +2487,7 @@ p {
     padding: env(safe-area-inset-top, 8px) 24px 0;
   }
 
-  .hero-clock {
-    display: none;
-  }
+
 
   .spectrum-canvas {
     bottom: 14px;
@@ -2694,9 +2690,7 @@ p {
     padding: 4px 28px 0;
   }
 
-  .hero-clock {
-    display: flex !important;
-  }
+
 
   .brand-lockup {
     align-items: flex-start !important;
@@ -2714,9 +2708,7 @@ p {
     margin-top: 13px !important;
   }
 
-  .pixel-pulse-canvas {
-    display: none !important;
-  }
+
 
   .spectrum-canvas {
     position: absolute;
@@ -2886,9 +2878,7 @@ p {
     flex: 0 0 auto !important;
   }
 
-  .hero-clock {
-    display: none !important;
-  }
+
 
   .topline {
     gap: 6px;

@@ -22,7 +22,7 @@ const moodIcon = {
 const BED_VOLUME = 0.10;
 const CARD_BED_VOLUME = 0.075;
 const PARTICLE_BARS = 48;
-const PULSE_PARTICLE_COUNT = 96;
+const PULSE_PARTICLE_COUNT = 48;
 const PULSE_DAMPING = 0.98;
 const PULSE_PIXEL_SIZE = 10;
 const PULSE_RING_COUNT = 4;
@@ -808,12 +808,12 @@ function V4RadioView({
         {audioNodes}
         <header className="v4-topbar">
           <div className="v4-brand">
-            <button className="v4-avatar" onClick={onBack} title="MarkRadio V4版本">
+            <button className="v4-avatar" onClick={onBack} title="自动荐歌">
               {netease.loggedIn && netease.profile?.avatarUrl ? (
                 <img alt="网易云头像" src={netease.profile.avatarUrl} />
               ) : pixelCafe()}
             </button>
-            <button className="v4-wordmark" onClick={onBack} title="MarkRadio V4版本">MarkRadio</button>
+            <button className="v4-wordmark" onClick={onBack} title="自动荐歌">MarkRadio</button>
           </div>
           <div className="v4-actions">
             <button onClick={onLogin}>{netease.loggedIn ? 'LOGGED' : 'LOGIN'}</button>
@@ -958,7 +958,7 @@ function V4RadioView({
             aria-label="AI寻歌输入"
             disabled={chatBusy}
             onChange={(event) => setChatInput(event.target.value)}
-            placeholder="AI 寻歌..."
+            placeholder="Ask for a song, a mood, a memory..."
             value={chatInput}
           />
           <button
@@ -1057,6 +1057,7 @@ export default function App() {
 
   useEffect(() => {
     viewModeRef.current = viewMode;
+    if (viewMode === 'v3') { triggerPixelPulse(true); startFallbackVisuals(); }
   }, [viewMode]);
 
   useEffect(() => {
@@ -1121,8 +1122,8 @@ export default function App() {
         const opacity = Math.max(0, 1 * (1 - lifeRatio) * (1 - ring * 0.1));
         const points = Math.min(132, Math.max(24, Math.floor(radius / 5)));
         ctx.globalAlpha = opacity;
-        ctx.fillStyle = lerpColor([255, 255, 255], [0, 245, 212], lifeRatio + ring * 0.08);
-        ctx.shadowColor = 'rgba(0,245,212,0.22)';
+        ctx.fillStyle = lerpColor([80, 120, 140], [0, 200, 180], lifeRatio + ring * 0.08);
+        ctx.shadowColor = 'rgba(0,180,160,0.12)';
         ctx.shadowBlur = 5;
         for (let i = 0; i < points; i += 1) {
           const angle = wave.seed + (i / points) * Math.PI * 2;
@@ -1153,9 +1154,9 @@ export default function App() {
       const fadeRatio = age > fadeStart ? (age - fadeStart) / 0.5 : 0;
       const opacity = Math.max(0, 1 - fadeRatio);
       const size = p.size * (1 - fadeRatio * 0.28);
-      ctx.globalAlpha = opacity * (0.86 + p.energy * 0.14);
-      ctx.fillStyle = lerpColor([255, 255, 255], [0, 245, 212], lifeRatio);
-      ctx.shadowColor = lifeRatio < 0.35 ? 'rgba(255,255,255,0.5)' : 'rgba(0,245,212,0.34)';
+      ctx.globalAlpha = opacity * (0.55 + p.energy * 0.12);
+      ctx.fillStyle = lerpColor([60, 100, 130], [0, 220, 190], lifeRatio);
+      ctx.shadowColor = lifeRatio < 0.35 ? 'rgba(0,180,160,0.25)' : 'rgba(0,200,180,0.2)';
       ctx.shadowBlur = 10;
       ctx.fillRect(Math.round(p.x), Math.round(p.y), Math.max(2, size), Math.max(2, size));
       p.opacity = opacity;
@@ -1303,7 +1304,7 @@ export default function App() {
   const ttsMatchesTrack = Boolean(
     ttsText && track.title && normalizeTitleText(ttsText).includes(normalizeTitleText(track.title))
   );
-  const planDjUrl = isPlanIntroTrack && Boolean(plan?.tts?.url) && (ttsMatchesTrack || !ttsText)
+  const planDjUrl = isPlanIntroTrack && Boolean(plan?.tts?.url)
     ? apiAssetUrl(plan.tts.url)
     : '';
   // 服务健康检查：AI、语音、音乐源均正常则为 OK
@@ -1793,7 +1794,7 @@ export default function App() {
   function startDjProgressLoop(djAudio, textLen) {
     cancelAnimationFrame(readRafRef.current);
     const len = textLen || introText.length;
-    const fallbackTotalMs = Math.max(4000, len * 200);
+    const fallbackTotalMs = Math.max(2000, len * 160);
     const fallbackStartedAt = performance.now() - Math.max(0, djAudio.currentTime || 0) * 1000;
     const tick = () => {
       const hasDuration = djAudio.duration && Number.isFinite(djAudio.duration);
@@ -1809,7 +1810,7 @@ export default function App() {
   }
 
   function fallbackReadDurationMs(text = '') {
-    return Math.max(3500, String(text || '').length * 220);
+    return Math.max(2000, String(text || '').length * 160);
   }
 
   function probeAudioDurationMs(url) {
@@ -2889,7 +2890,7 @@ function seekTo(ratio) {
           lowPowerMode={lowPowerMode}
           netease={netease}
           nextTrack={nextTrack}
-          onBack={() => setViewMode('v4')}
+          onBack={() => setViewMode('v3')}
           onCastOpen={() => setShowCastPanel(true)}
           onLogin={startNeteaseLogin}
           onRefresh={() => refreshPlan(selectedMood, false)}
@@ -2928,13 +2929,13 @@ function seekTo(ratio) {
           <header className="hero-panel">
             <div className="topline">
               <div className="brand-lockup">
-                <button className="avatar" onClick={() => setViewMode('v4')} title="进入 MarkRadio V4版本">
+                <button className="avatar" onClick={() => setViewMode('v4')} title="AI寻歌">
                   {netease.loggedIn && netease.profile?.avatarUrl ? (
                     <img alt="网易云头像" src={netease.profile.avatarUrl} />
                   ) : pixelCafe()}
                 </button>
                 <div>
-                  <button className="brand-title-button" onClick={() => setViewMode('v4')} title="进入 MarkRadio V4版本">
+                  <button className="brand-title-button" onClick={() => setViewMode('v4')} title="AI寻歌">
                     <h1>MarkRadio</h1>
                   </button>
                   <div className={`speaking${servicesOk ? '' : ' idle'}`}>
@@ -2972,12 +2973,12 @@ function seekTo(ratio) {
                 <time>{formatTime(progress || clock.getSeconds())}</time>
               </div>
             </div>
-            {( () => {
+{lowPowerMode && (() => {
               const weekdays = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
               const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
               return (
                 <div className="hero-clock">
-                  <PixelClockCanvas hours={clock.getHours()} minutes={clock.getMinutes()} />
+                  <PixelClockCanvas hours={clock.getHours()} minutes={clock.getMinutes()} lowPower={true} />
                   <p className="hero-clock-weekday">{weekdays[clock.getDay()]}</p>
                   <p className="hero-clock-date">{clock.getDate()} {months[clock.getMonth()]} {clock.getFullYear()}</p>
                   <div className={`hero-clock-status${servicesOk ? '' : ' idle'}`}>

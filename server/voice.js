@@ -74,7 +74,7 @@ export async function synthesizeVoice({ store, text, mood, voiceStyle, nonce = '
           path: apiUrl.pathname,
           method: 'POST',
           rejectUnauthorized: false,
-          timeout: 30000,
+          timeout: 10000,
           headers: {
             Authorization: `Bearer ${config.fishApiKey}`,
             'Content-Type': 'application/json',
