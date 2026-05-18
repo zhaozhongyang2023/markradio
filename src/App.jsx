@@ -808,12 +808,12 @@ function V4RadioView({
         {audioNodes}
         <header className="v4-topbar">
           <div className="v4-brand">
-            <button className="v4-avatar" onClick={onBack} title="返回 V3">
+            <button className="v4-avatar" onClick={onBack} title="MarkRadio V4版本">
               {netease.loggedIn && netease.profile?.avatarUrl ? (
                 <img alt="网易云头像" src={netease.profile.avatarUrl} />
               ) : pixelCafe()}
             </button>
-            <button className="v4-wordmark" onClick={onBack} title="返回 V3">MarkRadio</button>
+            <button className="v4-wordmark" onClick={onBack} title="MarkRadio V4版本">MarkRadio</button>
           </div>
           <div className="v4-actions">
             <button onClick={onLogin}>{netease.loggedIn ? 'LOGGED' : 'LOGIN'}</button>
@@ -981,7 +981,7 @@ function V4RadioView({
 }
 
 export default function App() {
-  const [viewMode, setViewMode] = useState('v3');
+  const [viewMode, setViewMode] = useState('v4');
   const [state, setState] = useState(null);
   const [status, setStatus] = useState(null);
   const [selectedMood, setSelectedMood] = useState('平静');
@@ -1366,7 +1366,7 @@ export default function App() {
     : '';
   const trackIsFavorite = Boolean(track.id && favoriteTrackIds.includes(track.id));
 
-  // V3: pulse only on song switch / refresh / load, not periodic
+  // Keep pulse light: only on song switch / refresh / load, not periodic.
 
   function applyMusicVolume(ratio = 1) {
     const nextVolume = Math.max(0, Math.min(1, userVolume * ratio));
@@ -2889,7 +2889,7 @@ function seekTo(ratio) {
           lowPowerMode={lowPowerMode}
           netease={netease}
           nextTrack={nextTrack}
-          onBack={() => setViewMode('v3')}
+          onBack={() => setViewMode('v4')}
           onCastOpen={() => setShowCastPanel(true)}
           onLogin={startNeteaseLogin}
           onRefresh={() => refreshPlan(selectedMood, false)}

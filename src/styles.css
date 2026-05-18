@@ -1908,6 +1908,108 @@ p {
 }
 
 @media (min-width: 900px) and (orientation: landscape) and (hover: hover) {
+  .stage {
+    padding: max(18px, env(safe-area-inset-top, 18px)) max(18px, env(safe-area-inset-right, 18px)) max(18px, env(safe-area-inset-bottom, 18px)) max(18px, env(safe-area-inset-left, 18px));
+  }
+
+  .phone {
+    width: min(560px, calc(100vw - 36px));
+    max-width: 560px;
+    height: min(860px, calc(100dvh - 36px));
+    min-height: 0;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 22px;
+    box-shadow: 0 0 44px rgba(0, 0, 0, 0.58);
+  }
+
+  .hero-panel {
+    flex: 0 0 clamp(184px, 24dvh, 220px);
+    min-height: 184px;
+    padding: 8px 24px 0;
+  }
+
+  .hero-clock {
+    display: none;
+  }
+
+  .brand-lockup h1 {
+    font-size: 30px;
+  }
+
+  .avatar {
+    width: 36px;
+    height: 36px;
+  }
+
+  .spectrum-canvas {
+    position: relative !important;
+    left: auto !important;
+    right: auto !important;
+    bottom: auto !important;
+    width: calc(100% - 20px) !important;
+    height: 70px !important;
+    margin: 4px 10px 0 !important;
+  }
+
+  .card {
+    margin: 0 10px 10px;
+    padding: 14px 18px 16px;
+    border-radius: 18px;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .song-head h2 {
+    max-width: 100%;
+    font-size: 22px;
+  }
+
+  .dj-feed {
+    flex: 1 1 210px;
+    min-height: 190px;
+    max-height: none;
+    margin-top: 12px;
+    padding: 12px 14px 10px;
+  }
+
+  .queue-preview {
+    gap: 5px;
+    margin-top: 8px;
+    padding: 6px 12px;
+  }
+
+  .mood-strip button {
+    min-width: 0;
+    min-height: 40px;
+    padding: 3px 1px;
+    gap: 1px;
+  }
+
+  .bottom-player {
+    position: relative;
+    right: auto;
+    bottom: auto;
+    left: auto;
+    height: 52px;
+    gap: 8px;
+    margin-top: 8px;
+    padding: 0 14px max(12px, env(safe-area-inset-bottom, 12px));
+  }
+
+  .bottom-player > span {
+    flex-basis: 38px;
+  }
+
+  .bottom-player button {
+    width: 44px;
+    height: 44px;
+    min-width: 44px;
+  }
+
+  .side-panel {
+    display: none;
+  }
+
   .v4-shell {
     display: flex;
     align-items: center;
