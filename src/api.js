@@ -84,6 +84,20 @@ export const api = {
     })
 };
 
+export function castActionBeacon(action, body = {}) {
+  if (typeof window === 'undefined') return;
+  const payload = JSON.stringify(body);
+  const url = `${API_BASE}/api/cast/${action}`;
+  const blob = new Blob([payload], { type: 'application/json' });
+  if (navigator.sendBeacon?.(url, blob)) return;
+  fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: payload,
+    keepalive: true
+  }).catch(() => {});
+}
+
 export function streamUrl() {
   if (WS_BASE) return WS_BASE;
   const apiBase = API_BASE || window.location.origin;

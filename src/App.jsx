@@ -1,5 +1,5 @@
 import { useEffect, useId, useMemo, useRef, useState } from 'react';
-import { api, apiAssetUrl, streamUrl } from './api.js';
+import { api, apiAssetUrl, castActionBeacon, streamUrl } from './api.js';
 
 const moodLabels = [
   { name: '开心', iconKey: 'happy', icon: '☼', en: 'Joy', tone: '#f0c96a' },
@@ -856,7 +856,6 @@ function V4RadioView({
               max="100"
               min="0"
               onChange={(event) => onVolumeChange(Number(event.currentTarget.value) / 100)}
-              onInput={(event) => onVolumeChange(Number(event.currentTarget.value) / 100)}
               type="range"
               value={Math.round(userVolume * 100)}
             />
@@ -1038,6 +1037,9 @@ export default function App() {
   const planDjUrlRef = useRef(null);
   const planIdRef = useRef(null);
   const castDeviceRef = useRef(null);
+  const castStateRef = useRef('idle');
+  const castVolumeTimerRef = useRef(null);
+  const pendingCastVolumeRef = useRef(null);
   const [seekDraftRatio, setSeekDraftRatio] = useState(null);
   const lowPowerMode = useMemo(() => detectLowPowerRuntime(), []);
   const viewModeRef = useRef(viewMode);
@@ -1049,6 +1051,10 @@ export default function App() {
   useEffect(() => {
     castDeviceRef.current = castDevice;
   }, [castDevice]);
+
+  useEffect(() => {
+    castStateRef.current = castState;
+  }, [castState]);
 
   function syncReadProgress(ratio) {
     const safeRatio = Math.min(1, Math.max(0, ratio));
@@ -1365,12 +1371,24 @@ export default function App() {
       setVolumeTarget(audio.volume);
     }
     if (castDeviceRef.current || castDevice) {
-      api.castAction('volume', { volume: safeVolume * 100 }).catch(() => {});
+      scheduleCastVolume(safeVolume);
     }
   }
 
   function hasCastDevice() {
     return Boolean(castDeviceRef.current || castDevice);
+  }
+
+  function scheduleCastVolume(volume) {
+    pendingCastVolumeRef.current = Math.round(Math.max(0, Math.min(1, volume)) * 100);
+    if (castVolumeTimerRef.current) return;
+    castVolumeTimerRef.current = setTimeout(() => {
+      const nextVolume = pendingCastVolumeRef.current;
+      castVolumeTimerRef.current = null;
+      pendingCastVolumeRef.current = null;
+      if (nextVolume == null || !castDeviceRef.current) return;
+      api.castAction('volume', { volume: nextVolume }).catch(() => {});
+    }, 120);
   }
 
   useEffect(() => {
@@ -1419,11 +1437,25 @@ export default function App() {
   useEffect(() => () => {
     clearInterval(typeTimerRef.current);
     clearInterval(fadeTimerRef.current);
+    clearTimeout(castVolumeTimerRef.current);
     cancelAnimationFrame(readRafRef.current);
     stopAudioVisuals();
     clearTimeout(seekCommitTimerRef.current);
     cancelAnimationFrame(pulseFrameRef.current);
     speechRecognitionRef.current?.abort?.();
+  }, []);
+
+  useEffect(() => {
+    const stopCastOnExit = () => {
+      if (!castDeviceRef.current && castStateRef.current === 'idle') return;
+      castActionBeacon('stop');
+    };
+    window.addEventListener('pagehide', stopCastOnExit);
+    window.addEventListener('beforeunload', stopCastOnExit);
+    return () => {
+      window.removeEventListener('pagehide', stopCastOnExit);
+      window.removeEventListener('beforeunload', stopCastOnExit);
+    };
   }, []);
 
   useEffect(() => {
