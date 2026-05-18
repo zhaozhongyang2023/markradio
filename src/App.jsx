@@ -982,7 +982,7 @@ function V4RadioView({
 }
 
 export default function App() {
-  const [viewMode, setViewMode] = useState('v4');
+  const [viewMode, setViewMode] = useState('v3');
   const [state, setState] = useState(null);
   const [status, setStatus] = useState(null);
   const [selectedMood, setSelectedMood] = useState('平静');
@@ -2427,8 +2427,7 @@ function seekTo(ratio) {
       const cleanup = () => {
         if (djAudio.getAttribute('src') === SILENT_AUDIO_URL) {
           djAudio.pause();
-          djAudio.removeAttribute('src');
-          djAudio.load();
+          djAudio.currentTime = 0;
         }
         djAudio.muted = false;
         djAudio.volume = 1;
@@ -2955,7 +2954,7 @@ function seekTo(ratio) {
           lowPowerMode={lowPowerMode}
           netease={netease}
           nextTrack={nextTrack}
-          onBack={() => setViewMode('v4')}
+          onBack={() => setViewMode('v3')}
           onCastOpen={() => setShowCastPanel(true)}
           onLogin={startNeteaseLogin}
           onRefresh={() => refreshPlan(selectedMood, false)}
