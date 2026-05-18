@@ -1879,6 +1879,73 @@ export default function App() {
     return url;
   }
 
+  // 等待主导读 TTS URL 就绪 — 轮询 plan 更新，超时后调用 API 生成
+  async function waitForIntroTtsUrl(readingText, runId) {
+    // 先检查 planRef 中是否已有匹配的 URL
+    if (planDjUrlRef.current && planRef.current?.tts?.text === readingText) {
+      return planDjUrlRef.current;
+    }
+    // 轮询 plan 更新（TTS 异步生成中）
+    const polled = await new Promise((resolve) => {
+      const start = Date.now();
+      const maxWait = 30000; // 最多等 30 秒
+      const check = () => {
+        if (!isPlaybackRunCurrent(runId)) { resolve(''); return; }
+        if (planDjUrlRef.current && planRef.current?.tts?.text === readingText) {
+          resolve(planDjUrlRef.current); return;
+        }
+        if (Date.now() - start > maxWait) { resolve(''); return; }
+        setTimeout(check, 300);
+      };
+      check();
+    });
+    if (polled) return polled;
+    if (!isPlaybackRunCurrent(runId)) return '';
+    // 超时后调用 API 强制生成
+    try {
+      return await resolveIntroAudioUrl(readingText, { waitMs: 5000, synthesize: true });
+    } catch {
+      return '';
+    }
+  }
+
+  // 等待歌曲导读 TTS URL — 轮询 cardTts 或调用 API 生成
+  async function waitForCardTtsUrl(cardIndex, readingReason) {
+    // 先检查 cardTts 是否已就绪
+    const latestPlan = planRef.current;
+    const cardTts = latestPlan?.cardTts?.[cardIndex];
+    if (cardTts?.ok && cardTts.url) return apiAssetUrl(cardTts.url);
+    // 检查缓存
+    const cached = introAudioCacheRef.current.get(readingReason);
+    if (cached) return cached;
+    // 轮询 cardTts 更新
+    const polled = await new Promise((resolve) => {
+      const start = Date.now();
+      const maxWait = 30000;
+      const check = async () => {
+        try {
+          const now = await api.now();
+          const p = now?.plan;
+          const ct = p?.cardTts?.[cardIndex];
+          if (ct?.ok && ct.url) { resolve(apiAssetUrl(ct.url)); return; }
+        } catch {}
+        if (Date.now() - start > maxWait) { resolve(''); return; }
+        setTimeout(check, 300);
+      };
+      check();
+    });
+    if (polled) return polled;
+    // 超时后调用 API 生成
+    try {
+      const result = await api.voicePreview({ text: readingReason, mood: selectedMood });
+      const url = result?.ok && result.url ? apiAssetUrl(result.url) : '';
+      if (url) introAudioCacheRef.current.set(readingReason, url);
+      return url;
+    } catch {
+      return '';
+    }
+  }
+
   function fadeMusicIn() {
     const audio = audioRef.current;
     if (!audio) return;
@@ -1987,66 +2054,9 @@ export default function App() {
     });
   }
 
-  function pickSpeechVoice(text = '') {
-    const voices = window.speechSynthesis?.getVoices?.() || [];
-    const wantsChinese = /[\u3400-\u9fff]/.test(text);
-    return voices.find((voice) => wantsChinese && /zh|cmn|mandarin|chinese/i.test(`${voice.lang} ${voice.name}`))
-      || voices.find((voice) => !wantsChinese && /^en/i.test(voice.lang || ''))
-      || voices[0]
-      || null;
-  }
+  // pickSpeechVoice 已移除 — 所有 DJ 朗读必须使用 Fish Audio API TTS
 
-  async function speakDjFallback(text, runId) {
-    const content = String(text || '').trim();
-    if (!content) return;
-    if (!window.speechSynthesis || typeof SpeechSynthesisUtterance === 'undefined') {
-      await readTextSegment(content, { runId });
-      return;
-    }
-    await new Promise((resolve) => {
-      const utterance = new SpeechSynthesisUtterance(content);
-      const voice = pickSpeechVoice(content);
-      if (voice) utterance.voice = voice;
-      utterance.lang = /[\u3400-\u9fff]/.test(content) ? 'zh-CN' : 'en-US';
-      utterance.rate = 0.92;
-      utterance.pitch = 0.95;
-      const totalMs = fallbackReadDurationMs(content);
-      const startedAt = performance.now();
-      setReadProgress(0);
-      setReading(true);
-      startFallbackVisuals();
-      let timer = null;
-      let watchdog = null;
-      let done = false;
-      const finish = () => {
-        if (done) return;
-        done = true;
-        if (timer) clearInterval(timer);
-        if (watchdog) clearTimeout(watchdog);
-        utterance.onend = null;
-        utterance.onerror = null;
-        stopAudioVisuals();
-        resolve();
-      };
-      timer = setInterval(() => {
-        if (!isPlaybackRunCurrent(runId)) {
-          window.speechSynthesis.cancel();
-          finish();
-          return;
-        }
-        syncReadProgress(Math.min(1, (performance.now() - startedAt) / totalMs));
-      }, lowPowerMode ? LOW_POWER_READ_PROGRESS_MS : 60);
-      utterance.onend = finish;
-      utterance.onerror = finish;
-      try {
-        window.speechSynthesis.cancel();
-        window.speechSynthesis.speak(utterance);
-        watchdog = setTimeout(finish, totalMs + 2500);
-      } catch {
-        finish();
-      }
-    });
-  }
+  // speakDjFallback 已移除 — 所有 DJ 朗读必须使用 Fish Audio API TTS
 
   async function playCastVoiceClip(url, text, meta, runId) {
     const durationMs = await probeAudioDurationMs(url);
@@ -2060,10 +2070,11 @@ export default function App() {
   }
 
   function cachedIntroUrl(text = '') {
-    return planDjUrlRef.current
-      || introAudioCacheRef.current.get(text)
-      || introAudioCacheRef.current.get(planRef.current?.tts?.text || '')
-      || '';
+    // 必须验证 text 匹配，防止旧 plan 的 TTS URL 被误用
+    if (planDjUrlRef.current && planRef.current?.tts?.text === text) {
+      return planDjUrlRef.current;
+    }
+    return introAudioCacheRef.current.get(text) || '';
   }
 
   function getSharedAudioContext() {
@@ -2143,52 +2154,7 @@ export default function App() {
     }
   }
 
-  function startSpeechDjNow(text, runId) {
-    const content = String(text || '').trim();
-    if (!content || !window.speechSynthesis || typeof SpeechSynthesisUtterance === 'undefined') return null;
-    try {
-      const utterance = new SpeechSynthesisUtterance(content);
-      const voice = pickSpeechVoice(content);
-      if (voice) utterance.voice = voice;
-      utterance.lang = /[\u3400-\u9fff]/.test(content) ? 'zh-CN' : 'en-US';
-      utterance.rate = 0.92;
-      utterance.pitch = 0.95;
-      window.speechSynthesis.cancel();
-      setReading(true);
-      setReadProgress(0);
-      startFallbackVisuals();
-      const promise = new Promise((resolve) => {
-        let done = false;
-        let watchdog = null;
-        const totalMs = fallbackReadDurationMs(content);
-        const startedAt = performance.now();
-        const finish = (ok = true) => {
-          if (done) return;
-          done = true;
-          clearInterval(progressTimer);
-          if (watchdog) clearTimeout(watchdog);
-          utterance.onend = null;
-          utterance.onerror = null;
-          resolve(ok);
-        };
-        const progressTimer = setInterval(() => {
-          if (!isPlaybackRunCurrent(runId)) {
-            window.speechSynthesis.cancel();
-            finish(false);
-            return;
-          }
-          syncReadProgress(Math.min(1, (performance.now() - startedAt) / totalMs));
-        }, lowPowerMode ? LOW_POWER_READ_PROGRESS_MS : 60);
-        utterance.onend = () => finish(true);
-        utterance.onerror = () => finish(false);
-        window.speechSynthesis.speak(utterance);
-        watchdog = setTimeout(() => finish(true), totalMs + 2500);
-      });
-      return promise;
-    } catch {
-      return null;
-    }
-  }
+  // startSpeechDjNow 已移除 — 所有 DJ 朗读必须使用 Fish Audio API TTS
 
   function startMediaElementDjNow(url, text, runId) {
     const audio = djAudioRef.current;
@@ -2260,9 +2226,9 @@ export default function App() {
   function startImmediateDjIntro(text, runId) {
     if (hasCastDevice()) return null;
     const introUrl = cachedIntroUrl(text);
+    if (!introUrl) return null; // TTS 未就绪，等 runPreIntro 中轮询
     const promise = startMediaElementDjNow(introUrl, text, runId)
-      || startBufferedDjClipNow(introUrl, text, runId)
-      || startSpeechDjNow(text, runId);
+      || startBufferedDjClipNow(introUrl, text, runId);
     if (!promise) return null;
     prestartedDjRef.current = { runId, text, url: introUrl, promise };
     return promise;
@@ -2370,7 +2336,7 @@ export default function App() {
   }
 
   async function runPreIntro(runId) {
-    // Read pre-intro DJ text — background music paused
+    // Read pre-intro DJ text — 所有 DJ 朗读使用 Fish Audio API TTS
     // 捕获当前 introText，防止 async 期间 plan 更新导致文字/语音不一致
     const readingText = introText;
     readingTextRef.current = readingText;
@@ -2393,41 +2359,20 @@ export default function App() {
       if (prestartedDjRef.current === prestarted) prestartedDjRef.current = null;
       stopAudioVisuals();
       if (!ok && isPlaybackRunCurrent(runId)) {
-        await readTextSegment(readingText, { runId });
+        // 预启动失败，等待 TTS URL 就绪
+        const fallbackUrl = await waitForIntroTtsUrl(readingText, runId);
+        if (fallbackUrl && isPlaybackRunCurrent(runId)) {
+          await playLocalDjClip(fallbackUrl, readingText, runId);
+        }
       }
       return;
     }
 
-    // Try using pre-generated TTS
-    let introUrl = '';
-    if (planDjUrlRef.current && planRef.current?.tts?.text === readingText) {
-      introUrl = planDjUrlRef.current;
-    }
-    if (!introUrl && planRef.current?.tts?.pending) {
-      introUrl = await new Promise((resolve) => {
-        const start = Date.now();
-        const check = () => {
-          if (planDjUrlRef.current && planRef.current?.tts?.text === readingText) {
-            resolve(planDjUrlRef.current); return;
-          }
-          if (Date.now() - start > 900) { resolve(''); return; }
-          setTimeout(check, 150);
-        };
-        check();
-      });
-    }
-    if (!introUrl) {
-      try {
-        introUrl = await resolveIntroAudioUrl(planRef.current?.tts?.text || readingText, {
-          waitMs: 900,
-          synthesize: false
-        });
-      } catch {
-        introUrl = '';
-      }
-    }
+    // Wait for TTS URL — poll plan updates or generate via API
+    const introUrl = await waitForIntroTtsUrl(readingText, runId);
+    if (!introUrl || !isPlaybackRunCurrent(runId)) return;
 
-    if (introUrl && hasCastDevice()) {
+    if (hasCastDevice()) {
       startFallbackVisuals();
       try {
         await playCastVoiceClip(introUrl, readingText, { title: 'MarkRadio DJ', artist: 'MarkRadio' }, runId);
@@ -2438,20 +2383,18 @@ export default function App() {
       }
     }
 
-    if (introUrl) {
-      const played = await (
-        startMediaElementDjNow(introUrl, readingText, runId)
-        || playLocalDjClip(introUrl, readingText, runId)
-      );
-      if (!played) await speakDjFallback(readingText, runId);
-      return;
+    const played = await (
+      startMediaElementDjNow(introUrl, readingText, runId)
+      || playLocalDjClip(introUrl, readingText, runId)
+    );
+    if (!played && isPlaybackRunCurrent(runId)) {
+      // 播放失败，用 readTextSegment 保持视觉进度
+      await readTextSegment(readingText, { runId });
     }
-    // Fallback: keep first-play DJ audible even when server TTS is not ready.
-    await speakDjFallback(readingText, runId);
   }
 
   async function runCardIntro(cardIndex, runId) {
-    // Read song card DJ intro — music at low volume, DJ voice prominent
+    // Read song card DJ intro — 所有 DJ 朗读使用 Fish Audio API TTS
     // 捕获当前 reason，防止 async 期间 plan 更新导致文字/语音不一致
     const latestPlan = planRef.current;
     const readingReason = latestPlan?.queue?.[cardIndex]?.reason
@@ -2467,8 +2410,8 @@ export default function App() {
 
     if (hasCastDevice()) {
       startFallbackVisuals();
-      const cardUrl = await resolveCardAudioUrl(cardIndex);
-      if (cardUrl) {
+      const cardUrl = await waitForCardTtsUrl(cardIndex, readingReason);
+      if (cardUrl && isPlaybackRunCurrent(runId)) {
         try {
           await playCastVoiceClip(cardUrl, readingReason, { title: `${track.title || 'MarkRadio'} 导读`, artist: 'MarkRadio' }, runId);
           stopAudioVisuals();
@@ -2477,6 +2420,7 @@ export default function App() {
           stopAudioVisuals();
         }
       }
+      // 无 TTS 时保持视觉进度
       await readTextSegment(readingReason, { runId });
       stopAudioVisuals();
       return;
@@ -2490,20 +2434,22 @@ export default function App() {
 
     // Start fallback visuals before DJ TTS plays
     startFallbackVisuals();
-    // Play card DJ TTS
-    const cardUrl = await resolveCardAudioUrl(cardIndex);
-    if (cardUrl) {
+    // Play card DJ TTS — 等待 API TTS 就绪
+    const cardUrl = await waitForCardTtsUrl(cardIndex, readingReason);
+    if (cardUrl && isPlaybackRunCurrent(runId)) {
       const played = await (
         startMediaElementDjNow(cardUrl, readingReason, runId)
         || playLocalDjClip(cardUrl, readingReason, runId)
       );
-      if (!played) {
-        await speakDjFallback(readingReason, runId);
+      if (!played && isPlaybackRunCurrent(runId)) {
+        await readTextSegment(readingReason, { runId });
       }
       return;
     }
-    // Fallback — use readingReason captured at function start
-    await speakDjFallback(readingReason, runId);
+    // API TTS 未就绪，保持视觉进度
+    if (isPlaybackRunCurrent(runId)) {
+      await readTextSegment(readingReason, { runId });
+    }
   }
 
   async function finishIntro() {
