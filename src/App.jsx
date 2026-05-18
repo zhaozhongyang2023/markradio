@@ -1765,9 +1765,11 @@ export default function App() {
     }
   }
   
-    async function resolveIntroAudioUrl(text) {
+    async function resolveIntroAudioUrl(text, options = {}) {
     const t = text || '';
     if (!t) return '';
+    const waitMs = options.waitMs ?? 15000;
+    const synthesize = options.synthesize !== false;
     // 优先 planRef 中的 URL
     const latestPlan = planRef.current;
     const djUrl = latestPlan?.tts?.url ? apiAssetUrl(latestPlan.tts.url) : '';
@@ -1781,12 +1783,13 @@ export default function App() {
           const u = now?.plan?.tts?.url;
           if (u) { resolve(apiAssetUrl(u)); return; }
         } catch {}
-        if (Date.now() - start > 15000) { resolve(''); return; }
+        if (Date.now() - start > waitMs) { resolve(''); return; }
         setTimeout(check, 300);
       };
       check();
     });
     if (waited) return waited;
+    if (!synthesize) return '';
     // 回退：实时生成
     const cached = introAudioCacheRef.current.get(t);
     if (cached) return cached;
@@ -1987,7 +1990,7 @@ export default function App() {
         const start = Date.now();
         const check = () => {
           if (planDjUrlRef.current) { resolve(planDjUrlRef.current); return; }
-          if (Date.now() - start > 15000) { resolve(''); return; }
+          if (Date.now() - start > 900) { resolve(''); return; }
           setTimeout(check, 150);
         };
         check();
@@ -1995,7 +1998,10 @@ export default function App() {
     }
     if (!introUrl) {
       try {
-        introUrl = await resolveIntroAudioUrl(planRef.current?.tts?.text || introText);
+        introUrl = await resolveIntroAudioUrl(planRef.current?.tts?.text || introText, {
+          waitMs: 900,
+          synthesize: false
+        });
       } catch {
         introUrl = '';
       }
