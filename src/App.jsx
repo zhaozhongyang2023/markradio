@@ -736,7 +736,9 @@ function V4RadioView({
   const casting = castState === 'playing';
   const queueCount = queue?.length || 0;
   const lastMessages = chatMessages.slice(-10);
-  const planTitle = plan?.plan?.planTitle || 'DJ SONG PLAN';
+  const planTitle = plan?.plan?.planTitle
+    ? `自动推荐歌曲 · ${plan.plan.planTitle}`
+    : '自动推荐歌曲模块';
   const planSummary = plan?.plan?.planSummary || plan?.plan?.reason || '';
 
   const eqRef = useRef(null);
@@ -764,7 +766,7 @@ function V4RadioView({
     return (
       <div className="v4-plan-card">
         <div className="v4-plan-title">
-          <span>{messagePlan.title || 'DJ SONG PLAN'}</span>
+          <span>{messagePlan.title ? `自动推荐歌曲 · ${messagePlan.title}` : '自动推荐歌曲模块'}</span>
           <small>{planQueue.length} TRACKS</small>
         </div>
         {messagePlan.summary ? <p>{messagePlan.summary}</p> : null}
@@ -800,7 +802,7 @@ function V4RadioView({
 
   return (
     <main className={`v4-shell${lowPowerMode ? ' low-power' : ''}`}>
-      <section className={`v4-radio${lowPowerMode ? ' low-power' : ''}${isPlaying || reading || casting ? ' is-active' : ''}`} aria-label="MarkRadio V4 播放器聊天室">
+      <section className={`v4-radio${lowPowerMode ? ' low-power' : ''}${isPlaying || reading || casting ? ' is-active' : ''}`} aria-label="MarkRadio V4版本">
         <canvas className="pixel-pulse-canvas" ref={pulseCanvasRef} aria-hidden="true" />
         {audioNodes}
         <header className="v4-topbar">
@@ -902,7 +904,7 @@ function V4RadioView({
         </section>
 
         {queue?.length ? (
-          <section className="v4-plan-panel" aria-label="DJ 歌曲计划">
+          <section className="v4-plan-panel" aria-label="自动推荐歌曲模块">
             <div className="v4-plan-title">
               <span>{planTitle}</span>
               <button onClick={onRefresh} type="button">ADJUST</button>
@@ -932,7 +934,7 @@ function V4RadioView({
           </section>
         ) : null}
 
-        <section className="v4-chat-log" aria-label="DJ 对话记录">
+        <section className="v4-chat-log" aria-label="AI寻歌模块">
           <p className="v4-system-line">Connected to MarkRadio server</p>
           {lastMessages.map((message) => (
             <article className={`v4-message ${message.role}`} key={message.id}>
@@ -952,10 +954,10 @@ function V4RadioView({
 
         <form className="v4-chat-input" onSubmit={handleChatSubmit}>
           <input
-            aria-label="和 MarkRadio 对话"
+            aria-label="AI寻歌输入"
             disabled={chatBusy}
             onChange={(event) => setChatInput(event.target.value)}
-            placeholder="Talk to DJ..."
+            placeholder="AI 寻歌..."
             value={chatInput}
           />
           <button
@@ -2887,13 +2889,13 @@ function seekTo(ratio) {
           <header className="hero-panel">
             <div className="topline">
               <div className="brand-lockup">
-                <button className="avatar" onClick={() => setViewMode('v4')} title="进入 MarkRadio V4">
+                <button className="avatar" onClick={() => setViewMode('v4')} title="进入 MarkRadio V4版本">
                   {netease.loggedIn && netease.profile?.avatarUrl ? (
                     <img alt="网易云头像" src={netease.profile.avatarUrl} />
                   ) : pixelCafe()}
                 </button>
                 <div>
-                  <button className="brand-title-button" onClick={() => setViewMode('v4')} title="进入 MarkRadio V4">
+                  <button className="brand-title-button" onClick={() => setViewMode('v4')} title="进入 MarkRadio V4版本">
                     <h1>MarkRadio</h1>
                   </button>
                   <div className={`speaking${servicesOk ? '' : ' idle'}`}>
