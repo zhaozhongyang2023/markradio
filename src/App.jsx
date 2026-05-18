@@ -157,6 +157,18 @@ function currentLyricIndex(lyrics, seconds) {
   return index;
 }
 
+function estimatedPlainLyricIndex(lyrics, seconds, duration) {
+  if (!lyrics?.length) return 0;
+  const total = Number(duration) || 0;
+  if (total > 12) {
+    const leadIn = Math.min(8, total * 0.05);
+    const activeSeconds = Math.max(1, total - leadIn);
+    const ratio = Math.min(0.999, Math.max(0, (Number(seconds) - leadIn) / activeSeconds));
+    return Math.min(lyrics.length - 1, Math.max(0, Math.floor(ratio * lyrics.length)));
+  }
+  return Math.min(lyrics.length - 1, Math.max(0, currentLyricIndex(lyrics, seconds)));
+}
+
 function isCreditLine(text = '') {
   return /^(作词|作曲|编曲|制作人|词|曲)\s*[:：]/.test(String(text).trim());
 }
@@ -548,15 +560,15 @@ function DjFeed({ introSegments, lyrics, lyricIndex, lyricsSynced, plan, queue, 
     <div className={reading ? 'dj-feed is-reading' : 'dj-feed'}>
       {showLyrics ? (
         <div className="lyrics-view">
-          <span className="feed-meta">MarkRadio · {lyricsSynced ? formatTime(lyrics[lyricIndex]?.time || 0) : 'LYRICS'}</span>
-          {(lyricsSynced ? [-1, 0, 1] : [0, 1, 2]).map((offset) => {
+          <span className="feed-meta">MarkRadio · {lyricsSynced ? formatTime(lyrics[lyricIndex]?.time || 0) : 'LYRICS · EST'}</span>
+          {[-1, 0, 1].map((offset) => {
             const idx = lyricIndex + offset;
             const line = lyrics[idx];
             if (!line?.text) return null;
             const dist = Math.abs(offset);
             const cls = lyricsSynced
               ? (dist === 0 ? 'active' : `distance-${dist}`)
-              : 'plain';
+              : (dist === 0 ? 'active plain' : `distance-${dist} plain`);
             return (
               <p key={idx} className={`lyric-line ${cls}`}>
                 {line.text}
@@ -1375,7 +1387,9 @@ export default function App() {
       ? realLyrics.filter((line) => line.synced !== false && Number.isFinite(line.time))
       : realLyrics
   ), [lyricsSynced, realLyrics]);
-  const lyricIndex = lyricsSynced ? currentLyricIndex(lyrics, progress) : 0;
+  const lyricIndex = lyricsSynced
+    ? currentLyricIndex(lyrics, progress)
+    : estimatedPlainLyricIndex(lyrics, progress, duration);
   const showLyrics = introDoneFor === track.id && !reading && lyrics.length > 0;
   const liveLyricLine = showLyrics && (isPlaying || castState === 'playing')
     ? lyrics[Math.max(0, lyricIndex)]?.text || ''
