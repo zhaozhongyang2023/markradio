@@ -19,8 +19,7 @@ const moodIcon = {
   愤怒: '⚡'
 };
 
-const BED_VOLUME = 0.10;
-const CARD_BED_VOLUME = 0.075;
+const BED_VOLUME = 0.13;
 const PARTICLE_BARS = 48;
 const PULSE_PARTICLE_COUNT = 48;
 const PULSE_DAMPING = 0.98;
@@ -1034,6 +1033,7 @@ export default function App() {
   const activeDjSourceRef = useRef(null);
   const prestartedDjRef = useRef(null);
   const djAudioUnlockedRef = useRef(false);
+  const readingTextRef = useRef('');
   const speechRecognitionRef = useRef(null);
   const spectrumRef = useRef(null);
   const particleRef = useRef(null);
@@ -1356,8 +1356,10 @@ export default function App() {
   const weather = plan?.weather || {};
   const metaLine = `${weather.city || '本地'} | ${weatherIcon(weather.condition)} ${weather.temperature ? `${Math.round(weather.temperature)}°` : weather.condition || '天气'} | ${moodIcon[selectedMood]} ${selectedMood} | 十三哥的音乐之声`;
   const introText = useMemo(() => {
+    // 朗读中冻结文字，防止 WebSocket 更新 plan 导致显示/语音不一致
+    if (reading && readingTextRef.current) return readingTextRef.current;
     return buildTrackIntroText({ isPlanIntroTrack, plan, queueIndex, track, ttsText });
-  }, [isPlanIntroTrack, plan, queueIndex, track, ttsText]);
+  }, [isPlanIntroTrack, plan, queueIndex, track, ttsText, reading]);
   const readingSequence = useMemo(() => {
     const parts = [{ text: introText, cardIndex: -1 }];
     if (queue[0]?.reason) parts.push({ text: queue[0].reason, cardIndex: 0 });
@@ -1843,9 +1845,9 @@ export default function App() {
     if (!t) return '';
     const waitMs = options.waitMs ?? 15000;
     const synthesize = options.synthesize !== false;
-    // 优先 planRef 中的 URL
+    // 优先 planRef 中的 URL，但必须文本一致
     const latestPlan = planRef.current;
-    const djUrl = latestPlan?.tts?.url ? apiAssetUrl(latestPlan.tts.url) : '';
+    const djUrl = (latestPlan?.tts?.url && latestPlan?.tts?.text === t) ? apiAssetUrl(latestPlan.tts.url) : '';
     if (djUrl) return djUrl;
     const cached = introAudioCacheRef.current.get(t);
     if (cached) return cached;
@@ -2364,6 +2366,9 @@ export default function App() {
 
   async function runPreIntro(runId) {
     // Read pre-intro DJ text — background music paused
+    // 捕获当前 introText，防止 async 期间 plan 更新导致文字/语音不一致
+    const readingText = introText;
+    readingTextRef.current = readingText;
     clearInterval(typeTimerRef.current);
     clearInterval(fadeTimerRef.current);
     cancelAnimationFrame(readRafRef.current);
@@ -2383,18 +2388,23 @@ export default function App() {
       if (prestartedDjRef.current === prestarted) prestartedDjRef.current = null;
       stopAudioVisuals();
       if (!ok && isPlaybackRunCurrent(runId)) {
-        await readTextSegment(introText, { runId });
+        await readTextSegment(readingText, { runId });
       }
       return;
     }
 
     // Try using pre-generated TTS
-    let introUrl = planDjUrlRef.current;
+    let introUrl = '';
+    if (planDjUrlRef.current && planRef.current?.tts?.text === readingText) {
+      introUrl = planDjUrlRef.current;
+    }
     if (!introUrl && planRef.current?.tts?.pending) {
       introUrl = await new Promise((resolve) => {
         const start = Date.now();
         const check = () => {
-          if (planDjUrlRef.current) { resolve(planDjUrlRef.current); return; }
+          if (planDjUrlRef.current && planRef.current?.tts?.text === readingText) {
+            resolve(planDjUrlRef.current); return;
+          }
           if (Date.now() - start > 900) { resolve(''); return; }
           setTimeout(check, 150);
         };
@@ -2403,7 +2413,7 @@ export default function App() {
     }
     if (!introUrl) {
       try {
-        introUrl = await resolveIntroAudioUrl(planRef.current?.tts?.text || introText, {
+        introUrl = await resolveIntroAudioUrl(planRef.current?.tts?.text || readingText, {
           waitMs: 900,
           synthesize: false
         });
@@ -2415,7 +2425,7 @@ export default function App() {
     if (introUrl && hasCastDevice()) {
       startFallbackVisuals();
       try {
-        await playCastVoiceClip(introUrl, introText, { title: 'MarkRadio DJ', artist: 'MarkRadio' }, runId);
+        await playCastVoiceClip(introUrl, readingText, { title: 'MarkRadio DJ', artist: 'MarkRadio' }, runId);
         stopAudioVisuals();
         return;
       } catch {
@@ -2425,26 +2435,26 @@ export default function App() {
 
     if (introUrl) {
       const played = await (
-        startMediaElementDjNow(introUrl, introText, runId)
-        || playLocalDjClip(introUrl, introText, runId)
+        startMediaElementDjNow(introUrl, readingText, runId)
+        || playLocalDjClip(introUrl, readingText, runId)
       );
-      if (!played) await speakDjFallback(introText, runId);
+      if (!played) await speakDjFallback(readingText, runId);
       return;
     }
     // Fallback: keep first-play DJ audible even when server TTS is not ready.
-    await speakDjFallback(introText, runId);
+    await speakDjFallback(readingText, runId);
   }
 
   async function runCardIntro(cardIndex, runId) {
     // Read song card DJ intro — music at low volume, DJ voice prominent
+    // 捕获当前 reason，防止 async 期间 plan 更新导致文字/语音不一致
+    const latestPlan = planRef.current;
+    const readingReason = latestPlan?.queue?.[cardIndex]?.reason
+      || `来自${latestPlan?.mood || '此刻'}的选曲。${latestPlan?.plan?.segue || '下一首，继续把情绪慢慢放平。'}`;
+    readingTextRef.current = readingReason;
     clearInterval(typeTimerRef.current);
     cancelAnimationFrame(readRafRef.current);
     stopAudioVisuals();
-    
-    // Use ref to stay in sync with latest plan, avoiding stale closure queue
-    const latestPlan = planRef.current;
-    const reason = latestPlan?.queue?.[cardIndex]?.reason
-      || `来自${latestPlan?.mood || '此刻'}的选曲。${latestPlan?.plan?.segue || '下一首，继续把情绪慢慢放平。'}`;
 
     setReading(true);
     setReadProgress(0);
@@ -2455,14 +2465,14 @@ export default function App() {
       const cardUrl = await resolveCardAudioUrl(cardIndex);
       if (cardUrl) {
         try {
-          await playCastVoiceClip(cardUrl, reason, { title: `${track.title || 'MarkRadio'} 导读`, artist: 'MarkRadio' }, runId);
+          await playCastVoiceClip(cardUrl, readingReason, { title: `${track.title || 'MarkRadio'} 导读`, artist: 'MarkRadio' }, runId);
           stopAudioVisuals();
           return;
         } catch {
           stopAudioVisuals();
         }
       }
-      await readTextSegment(planRef.current?.queue?.[cardIndex]?.reason || reason, { runId });
+      await readTextSegment(readingReason, { runId });
       stopAudioVisuals();
       return;
     }
@@ -2479,16 +2489,16 @@ export default function App() {
     const cardUrl = await resolveCardAudioUrl(cardIndex);
     if (cardUrl) {
       const played = await (
-        startMediaElementDjNow(cardUrl, reason, runId)
-        || playLocalDjClip(cardUrl, reason, runId)
+        startMediaElementDjNow(cardUrl, readingReason, runId)
+        || playLocalDjClip(cardUrl, readingReason, runId)
       );
       if (!played) {
-        await speakDjFallback(planRef.current?.queue?.[cardIndex]?.reason || reason, runId);
+        await speakDjFallback(readingReason, runId);
       }
       return;
     }
-    // Fallback — use latestPlan ref to avoid stale closure
-    await speakDjFallback(planRef.current?.queue?.[cardIndex]?.reason || reason, runId);
+    // Fallback — use readingReason captured at function start
+    await speakDjFallback(readingReason, runId);
   }
 
   async function finishIntro() {
@@ -2535,12 +2545,16 @@ export default function App() {
     clearInterval(fadeTimerRef.current);
     const audio = audioRef.current;
     if (!audio) return;
+    const target = userVolume;
     fadeTimerRef.current = setInterval(() => {
-      const next = Math.min(1, audio.volume + 0.035);
+      const next = Math.min(target, audio.volume + 0.05);
       audio.volume = next;
       setVolumeTarget(next);
-      if (next >= 1) clearInterval(fadeTimerRef.current);
-    }, 160);
+      if (next >= target) {
+        clearInterval(fadeTimerRef.current);
+        applyMusicVolume(1);
+      }
+    }, 120);
   }
 
   const refreshingRef = useRef(false);
