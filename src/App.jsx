@@ -1030,6 +1030,8 @@ export default function App() {
   const [speechMessage, setSpeechMessage] = useState('');
   const audioRef = useRef(null);
   const djAudioRef = useRef(null);
+  const activeDjClipRef = useRef(null);
+  const activeDjSourceRef = useRef(null);
   const djAudioUnlockedRef = useRef(false);
   const speechRecognitionRef = useRef(null);
   const spectrumRef = useRef(null);
@@ -1479,6 +1481,10 @@ export default function App() {
     stopAudioVisuals();
     audioRef.current?.pause();
     djAudioRef.current?.pause();
+    activeDjClipRef.current?.pause();
+    activeDjClipRef.current = null;
+    try { activeDjSourceRef.current?.stop?.(); } catch {}
+    activeDjSourceRef.current = null;
     window.speechSynthesis?.cancel?.();
     setIsPlaying(false);
     setReading(false);
@@ -1522,6 +1528,10 @@ export default function App() {
       djAudioRef.current.pause();
       djAudioRef.current.removeAttribute('src');
     }
+    activeDjClipRef.current?.pause();
+    activeDjClipRef.current = null;
+    try { activeDjSourceRef.current?.stop?.(); } catch {}
+    activeDjSourceRef.current = null;
     setReadingCardIndex(-1);
     if (track.id) triggerPixelPulse();
   }, [track.id]);
@@ -1668,7 +1678,7 @@ export default function App() {
     // 在用户手势内恢复 AudioContext，解锁移动端音频自动播放
     ensureSharedAudioOutput();
     primeDjAudioForMobile();
-    // 只预热 DJ 音频元素，后续真正的主导读仍由 runPreIntro 接管。
+    // 用临时静音音频预热，避免污染真正的 DJ 导读音频元素。
   }
 
   async function startPlayback(options = {}) {
@@ -1967,6 +1977,106 @@ export default function App() {
     });
   }
 
+  async function playLocalDjClip(url, text, runId) {
+    if (!url) return false;
+    const context = await resumeSharedAudioContext();
+    if (context) {
+      try {
+        const response = await fetch(url, { cache: 'force-cache' });
+        const bytes = await response.arrayBuffer();
+        const audioBuffer = await context.decodeAudioData(bytes.slice(0));
+        if (!isPlaybackRunCurrent(runId)) return false;
+        const source = context.createBufferSource();
+        source.buffer = audioBuffer;
+        source.connect(context.destination);
+        try { activeDjSourceRef.current?.stop?.(); } catch {}
+        activeDjSourceRef.current = source;
+        startFallbackVisuals();
+        await new Promise((resolve) => {
+          let done = false;
+          const totalMs = Math.max(800, audioBuffer.duration * 1000 || fallbackReadDurationMs(text));
+          const startedAt = performance.now();
+          const finish = () => {
+            if (done) return;
+            done = true;
+            clearInterval(progressTimer);
+            source.onended = null;
+            resolve();
+          };
+          const progressTimer = setInterval(() => {
+            if (!isPlaybackRunCurrent(runId)) {
+              try { source.stop(); } catch {}
+              finish();
+              return;
+            }
+            syncReadProgress(Math.min(1, (performance.now() - startedAt) / totalMs));
+          }, lowPowerMode ? LOW_POWER_READ_PROGRESS_MS : 60);
+          source.onended = finish;
+          source.start(0);
+        });
+        if (activeDjSourceRef.current === source) activeDjSourceRef.current = null;
+        stopAudioVisuals();
+        return isPlaybackRunCurrent(runId);
+      } catch {
+        if (activeDjSourceRef.current) activeDjSourceRef.current = null;
+        stopAudioVisuals();
+      }
+    }
+
+    const clip = djAudioRef.current || new Audio();
+    activeDjClipRef.current?.pause();
+    activeDjClipRef.current = clip;
+    clip.crossOrigin = 'anonymous';
+    clip.preload = 'auto';
+    clip.playsInline = true;
+    clip.muted = false;
+    clip.volume = 1;
+    clip.src = url;
+    clip.load();
+    startFallbackVisuals();
+    let failed = false;
+    await new Promise((resolve) => {
+      let done = false;
+      const finish = () => {
+        if (done) return;
+        done = true;
+        clearInterval(cancelTimer);
+        clip.onended = null;
+        clip.onerror = null;
+        clip.onpause = null;
+        resolve();
+      };
+      const fail = () => {
+        failed = true;
+        finish();
+      };
+      const cancelTimer = setInterval(() => {
+        if (!isPlaybackRunCurrent(runId)) {
+          finish();
+          return;
+        }
+        if (clip.paused && !clip.ended && clip.currentTime > 0.03) {
+          fail();
+        }
+      }, 120);
+      clip.onended = finish;
+      clip.onerror = fail;
+      clip.onpause = () => {
+        if (!isPlaybackRunCurrent(runId) || clip.ended) finish();
+        else if (clip.currentTime > 0.03) fail();
+      };
+      const playPromise = clip.play();
+      if (playPromise) playPromise.catch(fail);
+      startDjProgressLoop(clip, String(text || '').length);
+    });
+    if (activeDjClipRef.current === clip) activeDjClipRef.current = null;
+    clip.pause();
+    clip.removeAttribute('src');
+    clip.load();
+    stopAudioVisuals();
+    return !failed && isPlaybackRunCurrent(runId);
+  }
+
   async function runPreIntro(runId) {
     // Read pre-intro DJ text — background music paused
     clearInterval(typeTimerRef.current);
@@ -2007,7 +2117,6 @@ export default function App() {
       }
     }
 
-    const djAudio = djAudioRef.current;
     if (introUrl && hasCastDevice()) {
       startFallbackVisuals();
       try {
@@ -2019,45 +2128,9 @@ export default function App() {
       }
     }
 
-    if (introUrl && djAudio) {
-      await ensureSharedAudioOutput();
-      djAudio.pause();
-      djAudio.src = introUrl;
-      djAudio.currentTime = 0;
-      djAudio.muted = false;
-      djAudio.volume = 1.0;
-      djAudio.load();
-      // Play DJ audio natively — drive visuals with fallback levels
-      startFallbackVisuals();
-      let playRejected = false;
-      await new Promise((resolve) => {
-        const finish = () => {
-          clearInterval(cancelTimer);
-          djAudio.onended = null;
-          djAudio.onerror = null;
-          djAudio.onpause = null;
-          resolve();
-        };
-        const cancelTimer = setInterval(() => {
-          if (!isPlaybackRunCurrent(runId)) finish();
-        }, 120);
-        djAudio.onended = finish;
-        djAudio.onerror = finish;
-        djAudio.onpause = () => {
-          if (!isPlaybackRunCurrent(runId)) finish();
-        };
-        const playPromise = djAudio.play();
-        if (playPromise) {
-          playPromise.catch(() => { playRejected = true; finish(); });
-        }
-        startDjProgressLoop(djAudio);
-      });
-      djAudio.pause();
-      stopAudioVisuals();
-      if (playRejected) {
-        // Browser blocked the prepared TTS clip. Keep first-play DJ audible with platform speech.
-        await speakDjFallback(introText, runId);
-      }
+    if (introUrl) {
+      const played = await playLocalDjClip(introUrl, introText, runId);
+      if (!played) await speakDjFallback(introText, runId);
       return;
     }
     // Fallback: keep first-play DJ audible even when server TTS is not ready.
@@ -2106,41 +2179,9 @@ export default function App() {
     startFallbackVisuals();
     // Play card DJ TTS
     const cardUrl = await resolveCardAudioUrl(cardIndex);
-    const djAudio = djAudioRef.current;
-    if (cardUrl && djAudio) {
-      await ensureSharedAudioOutput();
-      djAudio.pause();
-      djAudio.src = cardUrl;
-      djAudio.currentTime = 0;
-      djAudio.muted = false;
-      djAudio.volume = 1.0;
-      djAudio.load();
-      let playRejected = false;
-      await new Promise((resolve) => {
-        const finish = () => {
-          clearInterval(cancelTimer);
-          djAudio.onended = null;
-          djAudio.onerror = null;
-          djAudio.onpause = null;
-          resolve();
-        };
-        const cancelTimer = setInterval(() => {
-          if (!isPlaybackRunCurrent(runId)) finish();
-        }, 120);
-        djAudio.onended = finish;
-        djAudio.onerror = finish;
-        djAudio.onpause = () => {
-          if (!isPlaybackRunCurrent(runId)) finish();
-        };
-        const playPromise = djAudio.play();
-        if (playPromise) {
-          playPromise.catch(() => { playRejected = true; finish(); });
-        }
-        startDjProgressLoop(djAudio, reason.length);
-      });
-      djAudio.pause();
-      if (playRejected) {
-        // Use latest plan ref to avoid stale closure after async gap
+    if (cardUrl) {
+      const played = await playLocalDjClip(cardUrl, reason, runId);
+      if (!played) {
         await speakDjFallback(planRef.current?.queue?.[cardIndex]?.reason || reason, runId);
       }
       return;
@@ -2348,7 +2389,7 @@ function seekTo(ratio) {
 
   function seekIntroTo(ratio) {
     const safeRatio = Math.min(1, Math.max(0, ratio));
-    const djAudio = djAudioRef.current;
+    const djAudio = activeDjClipRef.current || djAudioRef.current;
     if (djAudio?.duration && Number.isFinite(djAudio.duration)) {
       djAudio.currentTime = safeRatio * djAudio.duration;
     }
@@ -2449,22 +2490,19 @@ function seekTo(ratio) {
   }
 
   function primeDjAudioForMobile() {
-    const djAudio = djAudioRef.current;
-    if (!djAudio || djAudioUnlockedRef.current) return;
+    if (djAudioUnlockedRef.current) return;
     try {
       djAudioUnlockedRef.current = true;
-      djAudio.muted = true;
-      djAudio.volume = 0;
-      djAudio.src = SILENT_AUDIO_URL;
-      djAudio.load();
-      const playPromise = djAudio.play();
+      const unlockAudio = new Audio(SILENT_AUDIO_URL);
+      unlockAudio.muted = true;
+      unlockAudio.volume = 0;
+      unlockAudio.preload = 'auto';
+      unlockAudio.playsInline = true;
+      const playPromise = unlockAudio.play();
       const cleanup = () => {
-        if (djAudio.getAttribute('src') === SILENT_AUDIO_URL) {
-          djAudio.pause();
-          djAudio.currentTime = 0;
-        }
-        djAudio.muted = false;
-        djAudio.volume = 1;
+        unlockAudio.pause();
+        unlockAudio.removeAttribute('src');
+        unlockAudio.load();
       };
       if (playPromise) {
         playPromise.then(cleanup).catch(() => {
