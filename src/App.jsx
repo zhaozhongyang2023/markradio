@@ -1232,7 +1232,21 @@ export default function App() {
       setStatus(statusData);
       setState(nowData);
       setNetease(neteaseData);
-      setSelectedMood(nowData.now?.mood || '平静');
+      const initialMood = nowData.now?.mood || '平静';
+      setSelectedMood(initialMood);
+      if (!nowData.plan?.queue?.length && !nowData.now?.track) {
+        setBusy(true);
+        api.planToday(initialMood)
+          .then((nextPlan) => api.now().then((nextNow) => {
+            if (!mounted) return;
+            setState({ ...nextNow, plan: nextPlan });
+            setSelectedMood(nextPlan?.mood || nextNow.now?.mood || initialMood);
+          }))
+          .catch(() => {})
+          .finally(() => {
+            if (mounted) setBusy(false);
+          });
+      }
     }).catch(() => {});
     // Draw idle spectrum on mount — retry until canvas has valid dimensions
     let idleTries = 0;
