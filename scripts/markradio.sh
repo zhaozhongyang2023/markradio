@@ -316,8 +316,8 @@ stop() {
   stop_radio
   stop_netease
   echo -n "清理音频进程..."
-  pkill -9 ffplay 2>/dev/null || true
-  pkill -9 ffmpeg 2>/dev/null || true
+  pkill -9 -f ffplay 2>/dev/null || true
+  pkill -9 -f ffmpeg 2>/dev/null || true
   green " ✓"
   echo
   status
@@ -328,8 +328,8 @@ refresh() {
   stop_chromium
   stop_radio
   echo -n "清理音频进程..."
-  pkill -9 ffplay 2>/dev/null || true
-  pkill -9 ffmpeg 2>/dev/null || true
+  pkill -9 -f ffplay 2>/dev/null || true
+  pkill -9 -f ffmpeg 2>/dev/null || true
   green " ✓"
   clear_cache
   start_netease
