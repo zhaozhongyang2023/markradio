@@ -36,9 +36,9 @@ has_display() {
 
 APP_NAME="${MOODWAVE_NAME:-MoodWave}"
 MARKRADIO_DIR="${MOODWAVE_DIR:-${MARKRADIO_DIR:-$HOME/markradio}}"
-NETEASE_DIR="${NETEASE_DIR:-$HOME/netease-cloud-music-api}"
-API_PORT="${MOODWAVE_API_PORT:-${MOODWAVE_PORT:-${MARKRADIO_API_PORT:-8765}}}"
-WEB_PORT="${MOODWAVE_WEB_PORT:-${MARKRADIO_WEB_PORT:-8080}}"
+NETEASE_DIR="${NETEASE_DIR:-$HOME/netease-api}"
+API_PORT="${MOODWAVE_API_PORT:-${MOODWAVE_PORT:-${MARKRADIO_API_PORT:-38765}}}"
+WEB_PORT="${MOODWAVE_WEB_PORT:-${MARKRADIO_WEB_PORT:-38080}}"
 NETEASE_PORT="${NETEASE_PORT:-3000}"
 
 MARKRADIO_PID="$MARKRADIO_DIR/markradio.pid"
@@ -85,7 +85,7 @@ status() {
     red   "  Radio API  ($API_PORT)  ✗ 未启动"
   fi
 
-  if pgrep -f "node index.js" | grep -v server > /dev/null 2>&1 || \
+  if pgrep -f "node run.js" | grep -v server > /dev/null 2>&1 || \
      port_listening "$NETEASE_PORT"; then
     green "  Netease API ($NETEASE_PORT) ✓ 运行中"
   else
@@ -108,7 +108,7 @@ start_netease() {
 
   echo -n "启动 Netease API..."
   cd "$NETEASE_DIR"
-  PORT="$NETEASE_PORT" nohup node index.js > "$NETEASE_LOG" 2>&1 &
+  PORT="$NETEASE_PORT" nohup node run.js > "$NETEASE_LOG" 2>&1 &
   echo $! > "$NETEASE_PID"
 
   for i in $(seq 1 20); do
@@ -276,7 +276,7 @@ stop_netease() {
     rm -f "$NETEASE_PID"
   fi
   # 兜底
-  pkill -f "node index.js" 2>/dev/null || true
+  pkill -f "node run.js" 2>/dev/null || true
 }
 
 stop_radio() {

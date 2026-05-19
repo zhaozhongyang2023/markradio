@@ -25,6 +25,7 @@ WEATHER_KEY="${OPENWEATHER_API_KEY:-}"
 WEATHER_CITY="${OPENWEATHER_CITY:-}"
 SKIP_PLUGIN=0
 SKIP_DESKTOP=0
+SKIP_NETEASE=0
 
 # ── 自动检测运行环境 ──
 IS_SSH=0
@@ -88,6 +89,7 @@ while [[ $# -gt 0 ]]; do
     --api-base) AI_BASE="$2"; shift 2 ;;
     --skip-plugin) SKIP_PLUGIN=1; shift ;;
     --skip-desktop) SKIP_DESKTOP=1; shift ;;
+    --skip-netease) SKIP_NETEASE=1; shift ;;
     --fish-key) FISH_KEY="$2"; shift 2 ;;
     --fish-voice) FISH_VOICE="$2"; shift 2 ;;
     --netease-url) NETEASE_URL="$2"; shift 2 ;;
@@ -128,9 +130,9 @@ if [[ -z "$AI_KEY" ]]; then
   echo ""
 
   if [[ "$IS_TTY" = "1" ]]; then
-    ask "AI Key（输入时不显示，粘贴后按回车）: "
+    ask "AI Key（直接粘贴后按回车）: "
     read -r AI_KEY
-    echo ""
+    echo "  已输入: ${AI_KEY:0:8}...${AI_KEY: -4}"
   else
     warn "未检测到终端输入，跳过 AI Key 配置（服务将以 Demo 模式运行）"
   fi
@@ -363,6 +365,57 @@ RestartSec=3
 WantedBy=default.target
 EOF
 done_msg "服务文件已创建"
+
+
+# ═══════════════════════════════════════════
+# 第十步：安装网易云 API（可选，用于真实歌曲）
+# ═══════════════════════════════════════════
+NETEASE_INSTALL_DIR="${HOME}/netease-api"
+
+if [[ "$SKIP_NETEASE" = "0" ]]; then
+  say "安装网易云音乐 API..."
+
+  if [[ ! -d "$NETEASE_INSTALL_DIR" ]]; then
+    mkdir -p "$NETEASE_INSTALL_DIR"
+    cat > "${NETEASE_INSTALL_DIR}/package.json" <<'PJSON'
+{"name":"netease-api-runner","private":true,"dependencies":{"NeteaseCloudMusicApi":"latest"}}
+PJSON
+    (cd "$NETEASE_INSTALL_DIR" && npm install --silent 2>&1) || warn "网易云 API 依赖安装失败（不影响核心功能）"
+
+    cat > "${NETEASE_INSTALL_DIR}/run.js" <<'RUNJS'
+const { server } = require('NeteaseCloudMusicApi');
+server.serveNcmApi({ port: 3000, host: '127.0.0.1', checkVersion: false })
+  .then(() => console.log('Netease API started on port 3000'))
+  .catch(err => { console.error('Failed:', err.message); process.exit(1); });
+RUNJS
+  fi
+
+  # systemd 服务
+  mkdir -p "${HOME}/.config/systemd/user"
+  cat > "${HOME}/.config/systemd/user/netease-api.service" <<NETEOF
+[Unit]
+Description=NeteaseCloudMusicApi
+After=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=${NETEASE_INSTALL_DIR}
+ExecStart=${NODE_BIN:-node} run.js
+Restart=always
+RestartSec=3
+
+[Install]
+WantedBy=default.target
+NETEOF
+
+  if systemctl --user list-jobs >/dev/null 2>&1; then
+    systemctl --user daemon-reload
+    systemctl --user enable --now netease-api.service 2>/dev/null || true
+    done_msg "网易云 API 已安装并启动 ✓"
+  fi
+else
+  say "跳过网易云 API 安装（可使用 Demo 歌单）"
+fi
 
 # 尝试启动 systemd 用户服务
 if systemctl --user list-jobs >/dev/null 2>&1; then

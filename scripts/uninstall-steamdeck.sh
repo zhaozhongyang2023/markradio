@@ -6,6 +6,8 @@ CONFIG_DIR="${CONFIG_DIR:-$HOME/.config/moodwave}"
 SERVICE_FILE="$HOME/.config/systemd/user/moodwave.service"
 DESKTOP_FILE="$HOME/Desktop/MoodWave.desktop"
 PLUGIN_DIR="$HOME/homebrew/plugins/moodwave-deck-companion"
+NETEASE_DIR="$HOME/netease-api"
+NETEASE_SERVICE="$HOME/.config/systemd/user/netease-api.service"
 KEEP_CONFIG=""
 NON_INTERACTIVE=0
 
@@ -54,9 +56,11 @@ ask_keep_config() {
   esac
 }
 
-echo "[MoodWave] Stopping service"
+echo "[MoodWave] Stopping services"
 systemctl --user disable --now moodwave.service 2>/dev/null || true
+systemctl --user disable --now netease-api.service 2>/dev/null || true
 rm -f "$SERVICE_FILE"
+rm -f "$NETEASE_SERVICE"
 systemctl --user daemon-reload 2>/dev/null || true
 
 echo "[MoodWave] Removing desktop shortcut and Decky plugin"
@@ -65,6 +69,7 @@ rm -rf "$PLUGIN_DIR"
 
 echo "[MoodWave] Removing application files"
 rm -rf "$PREFIX"
+rm -rf "$NETEASE_DIR"
 
 ask_keep_config
 if [[ "$KEEP_CONFIG" = "1" ]]; then
