@@ -179,6 +179,13 @@ function Content() {
     });
   }
 
+  async function nextRadio() {
+    await run('换个氛围', async () => {
+      await apiRequest(apiBase, '/api/ai/next-radio', { scene: query, mode: 'steamdeck', deferTts: true });
+      await apiRequest(apiBase, '/api/play', {});
+    });
+  }
+
   async function startGameRadio(label = '游戏电台') {
     const vibe = gameVibes.find((item) => item.id === gameVibe);
     await run(label, async () => {
@@ -197,27 +204,28 @@ function Content() {
     <div className="mw-root">
       <style>{`
         .mw-root {
-          padding: 8px 10px 10px;
+          padding: 6px 10px 54px;
           color: rgba(255,255,255,.86);
           font-size: 12px;
           letter-spacing: 0;
+          min-width: 0;
         }
         .mw-status {
           display: flex;
           align-items: center;
           justify-content: space-between;
           gap: 8px;
-          margin: 0 0 8px;
+          margin: 0 0 6px;
           color: rgba(255,255,255,.52);
           font-size: 10px;
-          line-height: 16px;
+          line-height: 14px;
           min-width: 0;
         }
         .mw-tabs {
           display: grid;
           grid-template-columns: repeat(4, minmax(0, 1fr));
           gap: 4px;
-          margin-bottom: 8px;
+          margin-bottom: 6px;
         }
         .mw-grid {
           display: grid;
@@ -230,15 +238,15 @@ function Content() {
         .mw-button {
           width: 100%;
           min-width: 0;
-          height: 31px;
+          height: 28px;
           padding: 0 6px;
           border: 1px solid rgba(255,255,255,.11);
           border-radius: 6px;
           background: rgba(255,255,255,.055);
           color: rgba(255,255,255,.76);
-          font-size: 11px;
+          font-size: 10.5px;
           font-weight: 700;
-          line-height: 29px;
+          line-height: 26px;
           letter-spacing: 0;
           text-align: center;
           white-space: nowrap;
@@ -258,21 +266,59 @@ function Content() {
           outline-offset: 1px;
         }
         .mw-card {
-          padding: 8px 9px;
+          padding: 7px 8px;
           border: 1px solid rgba(255,255,255,.08);
           border-radius: 7px;
           background: rgba(255,255,255,.04);
           min-width: 0;
         }
-        .mw-dj {
+        .mw-mini {
           margin-bottom: 7px;
-          color: #42d8b2;
+        }
+        .mw-mini-head {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 8px;
+          margin-bottom: 6px;
+        }
+        .mw-mini-title {
+          min-width: 0;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+          color: rgba(255,255,255,.82);
           font-size: 11px;
+          font-weight: 800;
+        }
+        .mw-mini-state {
+          flex: 0 0 auto;
+          color: rgba(66,216,178,.86);
+          font-size: 9.5px;
+          font-weight: 800;
+        }
+        .mw-section-title {
+          margin: 7px 0 5px;
+          color: rgba(255,255,255,.9);
+          font-size: 15px;
+          font-weight: 800;
+          line-height: 18px;
+        }
+        .mw-action-row {
+          display: grid;
+          grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+          gap: 5px;
+          margin-top: 8px;
+        }
+        .mw-dj {
+          margin-bottom: 5px;
+          color: #42d8b2;
+          font-size: 10.5px;
           font-weight: 700;
-          line-height: 1.45;
+          line-height: 1.35;
         }
         .mw-song {
-          padding: 5px 0;
+          padding: 4px 0;
           border-top: 1px solid rgba(255,255,255,.06);
           min-width: 0;
         }
@@ -288,7 +334,7 @@ function Content() {
         }
         .mw-song-title {
           color: rgba(255,255,255,.82);
-          font-size: 11px;
+          font-size: 10.5px;
           font-weight: 700;
         }
         .mw-song-artist,
@@ -326,9 +372,24 @@ function Content() {
         <AppButton active={page === 'settings'} onClick={() => setPage('settings')}>设置</AppButton>
       </div>
 
+      <div className="mw-card mw-mini">
+        <div className="mw-mini-head">
+          <div className="mw-mini-title">{trackLine}</div>
+          <div className="mw-mini-state">{playing ? '播放中' : '待机'}</div>
+        </div>
+        <div className="mw-grid">
+          <AppButton disabled={busy} onClick={() => run(playing ? '暂停' : '播放', () => apiRequest(apiBase, playing ? '/api/pause' : '/api/play', {}))}>
+            {playing ? '暂停' : '播放'}
+          </AppButton>
+          <AppButton disabled={busy} onClick={() => run('上一首', () => apiRequest(apiBase, '/api/prev', {}))}>上一首</AppButton>
+          <AppButton disabled={busy} onClick={() => run('下一首', () => apiRequest(apiBase, '/api/next', {}))}>下一首</AppButton>
+        </div>
+      </div>
+
       {page === 'radio' && (
-        <PanelSection title="AI Radio">
-          <PanelSectionRow>
+        <div>
+          <div className="mw-section-title">AI Radio</div>
+          <div className="mw-card">
             <div className="mw-grid">
               {moods.map((mood) => (
                 <AppButton
@@ -341,13 +402,14 @@ function Content() {
                 </AppButton>
               ))}
             </div>
-          </PanelSectionRow>
-        </PanelSection>
+          </div>
+        </div>
       )}
 
       {page === 'search' && (
-        <PanelSection title="AI 寻歌">
-          <PanelSectionRow>
+        <div>
+          <div className="mw-section-title">AI 寻歌</div>
+          <div className="mw-card">
             <div className="mw-grid two">
               {searchExamples.map((example) => (
                 <AppButton
@@ -361,7 +423,7 @@ function Content() {
                 </AppButton>
               ))}
             </div>
-          </PanelSectionRow>
+          </div>
           <PanelSectionRow>
             <TextField
               label="一句话描述"
@@ -369,15 +431,17 @@ function Content() {
               onChange={(event: ChangeEvent<HTMLInputElement>) => setQuery(event.target.value)}
             />
           </PanelSectionRow>
-          <PanelSectionRow>
+          <div className="mw-action-row">
             <AppButton active disabled={busy || !query.trim()} onClick={searchRadio}>开始电台</AppButton>
-          </PanelSectionRow>
-        </PanelSection>
+            <AppButton disabled={busy} onClick={nextRadio}>换氛围</AppButton>
+          </div>
+        </div>
       )}
 
       {page === 'game' && (
-        <PanelSection title="游戏电台">
-          <PanelSectionRow>
+        <div>
+          <div className="mw-section-title">游戏电台</div>
+          <div className="mw-card">
             <div className="mw-grid two">
               {gameVibes.map((vibe) => (
                 <AppButton
@@ -391,7 +455,16 @@ function Content() {
                 </AppButton>
               ))}
             </div>
-          </PanelSectionRow>
+          </div>
+          <div className="mw-action-row">
+            <AppButton active disabled={busy || !gameVibe} onClick={() => startGameRadio('游戏开台')}>开始</AppButton>
+            <AppButton disabled={busy || !gameVibe} onClick={() => startGameRadio('换个氛围')}>换氛围</AppButton>
+          </div>
+        </div>
+      )}
+
+      {page === 'settings' && (
+        <PanelSection title="连接">
           <PanelSectionRow>
             <TextField
               label="在玩什么"
@@ -399,17 +472,6 @@ function Content() {
               onChange={(event: ChangeEvent<HTMLInputElement>) => setGameName(event.target.value)}
             />
           </PanelSectionRow>
-          <PanelSectionRow>
-            <div className="mw-grid two">
-              <AppButton active disabled={busy || !gameVibe} onClick={() => startGameRadio('游戏开台')}>开始</AppButton>
-              <AppButton disabled={busy || !gameVibe} onClick={() => startGameRadio('换个氛围')}>换氛围</AppButton>
-            </div>
-          </PanelSectionRow>
-        </PanelSection>
-      )}
-
-      {page === 'settings' && (
-        <PanelSection title="连接">
           <PanelSectionRow>
             <TextField
               label="API Base"
@@ -424,36 +486,19 @@ function Content() {
       )}
 
       {(djLine || queue.length > 0) && (
-        <PanelSection title="AI DJ">
-          <PanelSectionRow>
-            <div className="mw-card">
-              {djLine ? <div className="mw-dj">{djLine}</div> : null}
-              {queue.slice(0, 3).map((item, index) => (
-                <div className="mw-song" key={item.id || index}>
-                  <div className="mw-song-title">{item.title || '未知歌曲'}</div>
-                  {item.artist ? <div className="mw-song-artist">{item.artist}</div> : null}
-                  {item.reason ? <div className="mw-song-reason">{item.reason}</div> : null}
-                </div>
-              ))}
-            </div>
-          </PanelSectionRow>
-        </PanelSection>
-      )}
-
-      <PanelSection title="播放">
-        <PanelSectionRow>
+        <div>
+          <div className="mw-section-title">AI DJ</div>
           <div className="mw-card">
-            <div className="mw-track">{trackLine}</div>
-            <div className="mw-grid">
-              <AppButton disabled={busy} onClick={() => run(playing ? '暂停' : '播放', () => apiRequest(apiBase, playing ? '/api/pause' : '/api/play', {}))}>
-                {playing ? '暂停' : '播放'}
-              </AppButton>
-              <AppButton disabled={busy} onClick={() => run('上一首', () => apiRequest(apiBase, '/api/prev', {}))}>上一首</AppButton>
-              <AppButton disabled={busy} onClick={() => run('下一首', () => apiRequest(apiBase, '/api/next', {}))}>下一首</AppButton>
-            </div>
+            {djLine ? <div className="mw-dj">{djLine}</div> : null}
+            {queue.slice(0, 2).map((item, index) => (
+              <div className="mw-song" key={item.id || index}>
+                <div className="mw-song-title">{item.title || '未知歌曲'}</div>
+                {item.artist ? <div className="mw-song-artist">{item.artist}</div> : null}
+              </div>
+            ))}
           </div>
-        </PanelSectionRow>
-      </PanelSection>
+        </div>
+      )}
     </div>
   );
 }
