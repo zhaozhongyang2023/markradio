@@ -129,7 +129,7 @@ if [[ -z "$AI_KEY" ]]; then
 
   if [[ "$IS_TTY" = "1" ]]; then
     ask "AI Key（输入时不显示，粘贴后按回车）: "
-    read -r -s AI_KEY
+    read -r AI_KEY
     echo ""
   else
     warn "未检测到终端输入，跳过 AI Key 配置（服务将以 Demo 模式运行）"
@@ -152,7 +152,7 @@ if [[ -z "$FISH_KEY" && "$IS_TTY" = "1" ]]; then
   echo "  Fish Audio 免费注册: fish.audio"
   echo ""
   ask "Fish Audio Key（跳过请直接回车）: "
-  read -r -s FISH_KEY
+  read -r FISH_KEY
   echo ""
   if [[ -n "$FISH_KEY" ]]; then
     ask "Fish Audio 音色 ID（跳过用默认）: "
@@ -190,7 +190,7 @@ if [[ -z "$WEATHER_KEY" && "$IS_TTY" = "1" ]]; then
   echo "  免费注册: openweathermap.org"
   echo ""
   ask "OpenWeather Key（跳过请直接回车）: "
-  read -r -s WEATHER_KEY
+  read -r WEATHER_KEY
   echo ""
   if [[ -n "$WEATHER_KEY" ]]; then
     ask "你的城市（如 Beijing,CN）: "
