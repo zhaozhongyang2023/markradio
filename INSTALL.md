@@ -1,5 +1,7 @@
 # 🎵 MoodWave V5 — Steam Deck 完整安装手册
 
+> 🆕 **已经装过旧版？** → [升级到最新版](#升级到最新版)
+
 > 预计 20～40 分钟 ｜ 零基础可操作 ｜ 全程复制粘贴
 
 ---
@@ -255,6 +257,21 @@ cd ~/moodwave && git pull && npm install --production && npm run build && system
 ```
 
 ---
+
+## 升级到最新版
+
+如果之前装过 MoodWave，只需更新代码并重启：
+
+```bash
+cd ~/moodwave
+git pull
+npm install --omit=dev
+npm run build
+systemctl --user restart moodwave.service
+```
+
+> Decky 插件会自动跟随 Steam 重启加载最新版。如果插件没更新，回到游戏模式 → Decky → ⚙ → Reload Plugins。
+
 
 ## 卸载
 

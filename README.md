@@ -86,12 +86,22 @@ bash scripts/install-steamdeck.sh --repo https://github.com/zhaozhongyang2023/ma
 ### 树莓派部署
 
 ```bash
-git clone https://github.com/zhaozhongyang2023/markradio.git ~/markradio
-cd ~/markradio
+git clone https://github.com/zhaozhongyang2023/markradio.git ~/moodwave
+cd ~/moodwave
 npm install
 cp .env.example .env   # 编辑填入 AI Key 等配置
 npm run build
 npm start
+
+管理命令：
+
+```bash
+bash scripts/moodwave.sh start    # 启动全部服务（含 Firefox 全屏）
+bash scripts/moodwave.sh stop     # 停止全部服务
+bash scripts/moodwave.sh refresh  # 刷新（清理缓存 + 重启）
+bash scripts/moodwave.sh status   # 查看服务状态
+bash scripts/moodwave.sh server   # 仅启动后端（无浏览器）
+```
 ```
 
 ### 本地开发
