@@ -36,16 +36,16 @@ export function normalizePlan(plan) {
   }
   return {
     intent: String(plan.intent || 'create'),
-    reply: String(plan.reply || '收到。我会按此刻的心情重新整理队列。'),
+    reply: String(plan.reply || '今晚适合慢一点。'),
     say: String(plan.say || '夜色缓缓铺开，声音是最好的陪伴。我们从一首契合此刻的歌开始。'),
     play: playIds.slice(0, MAX_AI_PLAN_TRACKS),
     trackReasons,
-    planTitle: String(plan.planTitle || plan.title || 'MarkRadio 播出计划'),
+    planTitle: String(plan.planTitle || plan.title || 'MoodWave 播出计划'),
     planSummary: String(plan.planSummary || plan.summary || plan.reason || '根据当前对话生成的播出计划。'),
     changes: Array.isArray(plan.changes) ? plan.changes.map(String).slice(0, 12) : [],
     shouldSwitchNow: Boolean(plan.shouldSwitchNow),
-    reason: String(plan.reason || '根据当前心情和你的听歌习惯生成。'),
-    segue: String(plan.segue || '下一首，同一个夜晚，另一种心情。'),
+    reason: String(plan.reason || '今晚适合慢一点。'),
+    segue: String(plan.segue || '下一首，继续留在这个夜里。'),
     mood: String(plan.mood || '平静'),
     tags: Array.isArray(plan.tags) ? plan.tags.map(String).slice(0, 8) : [],
     voiceStyle: String(plan.voiceStyle || '语速适中，温柔克制，停顿自然。')
@@ -87,14 +87,14 @@ export function demoPlan(fallbackTracks, mood, reason = 'Demo 模式') {
   const title = first?.title || '这首歌';
   const artist = first?.artist || '';
   return {
-    reply: `收到。今晚先按${mood}的方向整理一组歌。`,
-    say: `窗外夜色正好。此刻的${mood}，让人想起一些声音。${artist ? artist + '的' : ''}《${title}》，是一首适合这个时间的歌。`,
+    reply: `今晚先按${mood}，慢慢听。`,
+    say: `今晚适合安静一点。从${artist ? artist + '的' : ''}《${title}》开始。`,
     play: fallbackTracks.slice(0, 5).map((track) => track.id),
-    trackReasons: first ? { [first.id]: `${artist ? artist + '——' : ''}《${title}》。${mood}的质地，藏在旋律的间隙里。` } : {},
+    trackReasons: first ? { [first.id]: `${artist ? artist + '的' : ''}《${title}》，适合戴耳机慢慢听。` } : {},
     reason,
-    segue: '下一首，同样的夜晚，不同的光影。',
+    segue: '下一首，把声音再放低一点。',
     mood,
-    tags: [mood, '私人电台', '记忆'],
-    voiceStyle: '语速偏慢，温柔克制，句尾自然停顿，像在耳边说话。'
+    tags: [mood, 'MoodWave', '深夜电台'],
+    voiceStyle: '语速偏慢，温柔，句子短，句尾自然停顿，像深夜电台。'
   };
 }

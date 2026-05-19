@@ -1,0 +1,10 @@
+{
+  "name": "MoodWave Deck Companion",
+  "author": "MoodWave",
+  "flags": ["debug"],
+  "api_version": 1,
+  "publish": {
+    "tags": ["music", "ai", "steam-deck", "radio"],
+    "description": "AI DJ Radio companion for Steam Deck game mode."
+  }
+}

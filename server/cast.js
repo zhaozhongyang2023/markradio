@@ -28,8 +28,8 @@ function escapeXml(value = '') {
 function buildAudioMetadata(url, metadata = {}, contentType = 'audio/mpeg') {
   const dlnaFeatures = 'DLNA.ORG_PN=MP3;DLNA.ORG_OP=01;DLNA.ORG_CI=0;DLNA.ORG_FLAGS=01700000000000000000000000000000';
   const protocolInfo = `http-get:*:${contentType}:${dlnaFeatures}`;
-  const title = metadata.title || 'MarkRadio';
-  const creator = metadata.artist || metadata.creator || 'MarkRadio';
+  const title = metadata.title || 'MoodWave';
+  const creator = metadata.artist || metadata.creator || 'MoodWave';
   const album = metadata.album || '';
   return [
     '<DIDL-Lite xmlns="urn:schemas-upnp-org:metadata-1-0/DIDL-Lite/" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:upnp="urn:schemas-upnp-org:metadata-1-0/upnp/">',
@@ -205,7 +205,7 @@ class CastManager extends EventEmitter {
       autoplay: true,
       contentType: 'audio/mpeg',
       metadata: {
-        title: metadata.title || 'MarkRadio',
+        title: metadata.title || 'MoodWave',
         creator: metadata.artist || '',
         album: metadata.album || '',
         ...metadata

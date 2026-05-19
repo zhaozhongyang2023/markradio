@@ -1,14 +1,22 @@
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 
-const envPath = path.resolve(process.cwd(), '.env');
-if (fs.existsSync(envPath)) {
+const envPaths = [
+  process.env.MOODWAVE_CONFIG,
+  path.join(os.homedir(), '.config', 'moodwave', 'config.env'),
+  path.resolve(process.cwd(), '.env')
+].filter(Boolean);
+
+for (const envPath of envPaths) {
+  if (!fs.existsSync(envPath)) continue;
   const lines = fs.readFileSync(envPath, 'utf8').split(/\r?\n/);
   for (const line of lines) {
     const trimmed = line.trim();
     if (!trimmed || trimmed.startsWith('#') || !trimmed.includes('=')) continue;
     const [key, ...rest] = trimmed.split('=');
-    if (!process.env[key]) process.env[key] = rest.join('=');
+    const value = rest.join('=').replace(/^['"]|['"]$/g, '');
+    if (!process.env[key]) process.env[key] = value;
   }
 }
 
@@ -17,15 +25,16 @@ function firstExistingPath(paths) {
 }
 
 export const config = {
-  host: process.env.MARKRADIO_HOST || '0.0.0.0',
-  apiPort: Number(process.env.MARKRADIO_API_PORT || 8765),
-  webPort: Number(process.env.MARKRADIO_WEB_PORT || 8080),
-  webOrigin: process.env.MARKRADIO_WEB_ORIGIN || 'http://192.168.2.33:8080',
+  appMode: process.env.APP_MODE || 'standard',
+  host: process.env.MOODWAVE_HOST || process.env.MARKRADIO_HOST || '0.0.0.0',
+  apiPort: Number(process.env.MOODWAVE_API_PORT || process.env.MOODWAVE_PORT || process.env.MARKRADIO_API_PORT || 8765),
+  webPort: Number(process.env.MOODWAVE_WEB_PORT || process.env.MARKRADIO_WEB_PORT || 8080),
+  webOrigin: process.env.MOODWAVE_WEB_ORIGIN || process.env.MARKRADIO_WEB_ORIGIN || 'http://192.168.2.33:8080',
   aiProvider: process.env.AI_PROVIDER || (process.env.DEEPSEEK_API_KEY ? 'deepseek' : 'openai'),
   aiBaseUrl: process.env.AI_BASE_URL || process.env.DEEPSEEK_BASE_URL || (process.env.DEEPSEEK_API_KEY ? 'https://api.deepseek.com' : ''),
-  aiApiKey: process.env.DEEPSEEK_API_KEY || process.env.OPENAI_API_KEY || '',
+  aiApiKey: process.env.AI_API_KEY || process.env.DEEPSEEK_API_KEY || process.env.OPENAI_API_KEY || '',
   aiModel: process.env.AI_MODEL || process.env.DEEPSEEK_MODEL || (process.env.DEEPSEEK_API_KEY ? 'deepseek-chat' : process.env.OPENAI_MODEL || 'gpt-5.5'),
-  openaiApiKey: process.env.OPENAI_API_KEY || '',
+  openaiApiKey: process.env.OPENAI_API_KEY || (process.env.AI_PROVIDER === 'openai' ? process.env.AI_API_KEY : '') || '',
   openaiModel: process.env.OPENAI_MODEL || 'gpt-5.5',
   voiceProvider: process.env.VOICE_PROVIDER || 'local-voice',
   localVoiceSamplePath: process.env.LOCAL_VOICE_SAMPLE_PATH || firstExistingPath([
@@ -43,5 +52,10 @@ export const config = {
   fishApiBase: process.env.FISH_AUDIO_API_BASE || 'https://api.fish.audio',
   openWeatherApiKey: process.env.OPENWEATHER_API_KEY || '',
   openWeatherCity: process.env.OPENWEATHER_CITY || '',
-  neteaseApiBase: process.env.NETEASE_API_BASE || ''
+  neteaseApiBase: process.env.NETEASE_API_BASE || '',
+  musicDir: process.env.MUSIC_DIR || '',
+  enableTts: process.env.ENABLE_TTS !== 'false',
+  enableWeather: process.env.ENABLE_WEATHER !== 'false',
+  enableHoliday: process.env.ENABLE_HOLIDAY !== 'false',
+  enableLocation: process.env.ENABLE_LOCATION !== 'false'
 };

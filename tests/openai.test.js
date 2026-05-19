@@ -13,10 +13,18 @@ test('parseDjJson accepts fenced JSON', () => {
 
 test('normalizePlan provides defaults', () => {
   const plan = normalizePlan({});
-  assert.ok(plan.reply.includes('收到'));
+  assert.ok(plan.reply.includes('今晚'));
   assert.ok(plan.say.includes('夜色缓缓铺开'));
   assert.deepEqual(plan.play, []);
   assert.equal(plan.mood, '平静');
+});
+
+test('demoPlan uses MoodWave DJ style copy', () => {
+  const tracks = [{ id: 'track-1', title: 'Song 1', artist: 'Artist' }];
+  const plan = demoPlan(tracks, '治愈');
+  assert.match(plan.reply, /今晚/);
+  assert.match(plan.say, /安静|开始/);
+  assert.doesNotMatch(plan.reply + plan.say, /推荐系统|计算完成|正在分析/);
 });
 
 test('demoPlan can provide five tracks for V4 plan panel', () => {

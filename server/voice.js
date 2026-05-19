@@ -162,6 +162,11 @@ async function synthesizeLocalVoice({ store, text, mood, voiceStyle, hash, fileP
       timeout: config.localTtsTimeoutMs,
       env: {
         ...process.env,
+        MOODWAVE_TTS_TEXT: text,
+        MOODWAVE_TTS_MOOD: mood,
+        MOODWAVE_TTS_STYLE: voiceStyle,
+        MOODWAVE_TTS_REFERENCE: config.localVoiceSamplePath,
+        MOODWAVE_TTS_OUTPUT: filePath,
         MARKRADIO_TTS_TEXT: text,
         MARKRADIO_TTS_MOOD: mood,
         MARKRADIO_TTS_STYLE: voiceStyle,

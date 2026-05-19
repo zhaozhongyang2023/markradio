@@ -4,6 +4,8 @@ const WS_BASE = import.meta.env.VITE_WS_BASE || '';
 function runtimeApiBase() {
   if (typeof window === 'undefined') return '';
   if (window.location.port === '8765') return '';
+  if (window.location.port === '38765') return '';
+  if (window.location.port === '38080') return `${window.location.protocol}//${window.location.hostname}:38765`;
   return `${window.location.protocol}//${window.location.hostname}:8765`;
 }
 
@@ -22,6 +24,7 @@ async function request(path, options = {}) {
 }
 
 export const api = {
+  health: () => request('/api/health'),
   status: () => request('/api/status'),
   now: () => request('/api/now'),
   planToday: (mood) =>
@@ -84,6 +87,26 @@ export const api = {
     }),
   voicePreview: (body) =>
     request('/api/voice/preview', {
+      method: 'POST',
+      body: JSON.stringify(body)
+    }),
+  aiRadio: (body = {}) =>
+    request('/api/ai/radio', {
+      method: 'POST',
+      body: JSON.stringify(body)
+    }),
+  aiSearch: (body = {}) =>
+    request('/api/ai/search', {
+      method: 'POST',
+      body: JSON.stringify(body)
+    }),
+  aiNextRadio: (body = {}) =>
+    request('/api/ai/next-radio', {
+      method: 'POST',
+      body: JSON.stringify(body)
+    }),
+  v5Playback: (action, body = {}) =>
+    request(`/api/${action}`, {
       method: 'POST',
       body: JSON.stringify(body)
     })

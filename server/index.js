@@ -39,11 +39,20 @@ app.addHook('onRequest', async (request, reply) => {
   if (request.method === 'OPTIONS') return reply.send();
 });
 
+function publicStation() {
+  return {
+    ...station,
+    apiHost: config.host === '0.0.0.0' ? station.apiHost : config.host,
+    apiPort: config.apiPort,
+    webPort: config.webPort
+  };
+}
+
 function publicNow() {
   const now = store.get('now');
   const plan = store.get('planToday');
   return {
-    station,
+    station: publicStation(),
     now: now || {
       track: plan?.queue?.[0] || null,
       progress: 0,
@@ -86,23 +95,55 @@ async function hydrateCurrentLyric() {
   }
 }
 
-app.get('/api/status', async () => ({
-  station,
-  api: `http://${station.apiHost}:${station.apiPort}`,
-  web: `http://${station.apiHost}:${station.webPort}`,
-  ai: {
-    provider: config.aiProvider,
-    configured: Boolean(config.aiApiKey),
-    model: config.aiModel,
-    baseUrl: config.aiBaseUrl || 'default'
-  },
-  openai: { configured: Boolean(config.openaiApiKey), model: config.openaiModel },
-  voice: getVoicePublicConfig(store),
-  fishAudio: { configured: Boolean(config.fishApiKey && config.fishVoiceId) },
-  weather: { configured: Boolean(config.openWeatherApiKey && config.openWeatherCity) },
-  music: { mode: config.neteaseApiBase ? 'netease' : 'demo' },
-  cast: getCastStatus()
+function publicStatus() {
+  const apiHost = config.host === '0.0.0.0' ? station.apiHost : config.host;
+  return {
+    app: {
+      name: 'MoodWave',
+      version: process.env.npm_package_version || '5.0.0',
+      mode: config.appMode,
+      legacyName: 'MarkRadio'
+    },
+    station: publicStation(),
+    api: `http://${apiHost}:${config.apiPort}`,
+    web: `http://${apiHost}:${config.webPort}`,
+    ai: {
+      provider: config.aiProvider,
+      configured: Boolean(config.aiApiKey),
+      model: config.aiModel,
+      baseUrl: config.aiBaseUrl || 'default'
+    },
+    openai: { configured: Boolean(config.openaiApiKey), model: config.openaiModel },
+    voice: getVoicePublicConfig(store),
+    fishAudio: { configured: Boolean(config.fishApiKey && config.fishVoiceId) },
+    weather: { configured: Boolean(config.openWeatherApiKey && config.openWeatherCity) },
+    music: {
+      mode: config.neteaseApiBase ? 'netease' : 'demo',
+      localDirConfigured: Boolean(config.musicDir)
+    },
+    features: {
+      tts: config.enableTts,
+      weather: config.enableWeather,
+      holiday: config.enableHoliday,
+      location: config.enableLocation,
+      steamDeck: config.appMode === 'steamdeck'
+    },
+    cast: getCastStatus()
+  };
+}
+
+app.get('/api/health', async () => ({
+  ok: true,
+  name: 'MoodWave',
+  mode: config.appMode,
+  apiPort: config.apiPort,
+  webPort: config.webPort,
+  aiConfigured: Boolean(config.aiApiKey),
+  musicMode: config.neteaseApiBase ? 'netease' : 'demo',
+  at: new Date().toISOString()
 }));
+
+app.get('/api/status', async () => publicStatus());
 
 app.get('/api/netease/status', async () => getNeteaseLoginStatus(store));
 
@@ -170,7 +211,7 @@ app.get('/api/voice', async () => getVoicePublicConfig(store));
 app.put('/api/voice', async (request) => updateVoiceConfig(store, request.body || {}));
 
 app.post('/api/voice/preview', async (request) => {
-  const text = String(request.body?.text || '这里是十三哥的音乐之声。今晚，我们慢慢听。');
+  const text = String(request.body?.text || '这里是 MoodWave。今晚，我们慢慢听。');
   const mood = normalizeMood(request.body?.mood);
   const voice = store.get('voice') || {};
   return synthesizeVoice({ store, text, mood, voiceStyle: voice.style || '' }).catch((error) => ({
@@ -258,7 +299,7 @@ app.post('/api/chat', async (request) => {
   broadcast('plan', plan);
   broadcast('now', publicNow());
   return {
-    reply: plan.plan?.reply || `收到。十三哥的音乐之声已经按${plan.mood}重新整理队列。`,
+    reply: plan.plan?.reply || `今晚按${plan.mood}，慢慢听。`,
     plan,
     planMessage
   };
@@ -267,23 +308,22 @@ app.post('/api/chat', async (request) => {
 function buildPlanMessage(plan) {
   return {
     type: 'plan',
-    title: plan.plan?.planTitle || 'MarkRadio 播出计划',
+    title: plan.plan?.planTitle || 'MoodWave 播出计划',
     summary: plan.plan?.planSummary || plan.plan?.reason || '',
     changes: plan.plan?.changes || [],
     queue: plan.queue || []
   };
 }
 
-app.post('/api/playback/:action', async (request) => {
-  const action = request.params.action;
+async function applyPlaybackAction(action, body = {}) {
   const state = publicNow();
   const now = state.now;
   if (action === 'play') now.playing = true;
   if (action === 'pause') now.playing = false;
-  if (action === 'seek') now.progress = Number(request.body?.progress || 0);
+  if (action === 'seek') now.progress = Number(body?.progress || 0);
   if (action === 'select' && state.plan?.queue?.length) {
-    const index = Number.isInteger(request.body?.index) ? request.body.index : -1;
-    const trackId = String(request.body?.trackId || '');
+    const index = Number.isInteger(body?.index) ? body.index : -1;
+    const trackId = String(body?.trackId || '');
     const nextTrack = index >= 0
       ? state.plan.queue[index]
       : state.plan.queue.find((track) => track.id === trackId);
@@ -320,7 +360,94 @@ app.post('/api/playback/:action', async (request) => {
   store.set('now', now);
   broadcast('now', publicNow());
   return publicNow();
+}
+
+app.post('/api/playback/:action', async (request) => {
+  return applyPlaybackAction(request.params.action, request.body || {});
 });
+
+app.post('/api/ai/radio', async (request) => {
+  const mood = request.body?.mood || request.body?.currentMood || null;
+  const userRequest = String(request.body?.scene || request.body?.prompt || '').trim();
+  const plan = await createRadioPlan({
+    store,
+    mood,
+    userRequest,
+    deferTts: true,
+    onTtsReady: (updatedPlan) => {
+      broadcast('plan', updatedPlan);
+      broadcast('now', publicNow());
+    }
+  });
+  broadcast('plan', plan);
+  broadcast('now', publicNow());
+  return {
+    ok: true,
+    dj_intro: plan.tts?.text || plan.plan?.say || '',
+    songs: plan.queue || [],
+    plan,
+    now: publicNow().now
+  };
+});
+
+app.post('/api/ai/search', async (request) => {
+  const query = String(request.body?.query || request.body?.message || request.body?.prompt || '').trim();
+  const currentPlan = store.get('planToday');
+  const plan = await createRadioPlan({
+    store,
+    mood: request.body?.mood || store.get('mood')?.current,
+    userRequest: query,
+    currentPlan,
+    deferTts: true,
+    onTtsReady: (updatedPlan) => {
+      broadcast('plan', updatedPlan);
+      broadcast('now', publicNow());
+    }
+  });
+  const planMessage = buildPlanMessage(plan);
+  broadcast('plan', plan);
+  broadcast('now', publicNow());
+  return {
+    ok: true,
+    reply: plan.plan?.reply || '今晚适合慢一点。',
+    dj_intro: plan.tts?.text || plan.plan?.say || '',
+    songs: plan.queue || [],
+    plan,
+    planMessage,
+    now: publicNow().now
+  };
+});
+
+app.post('/api/ai/next-radio', async (request) => {
+  const currentPlan = store.get('planToday');
+  const mood = request.body?.mood || currentPlan?.mood || store.get('mood')?.current;
+  const scene = String(request.body?.scene || request.body?.prompt || '换个氛围').trim();
+  const plan = await createRadioPlan({
+    store,
+    mood,
+    userRequest: scene,
+    currentPlan,
+    deferTts: true,
+    onTtsReady: (updatedPlan) => {
+      broadcast('plan', updatedPlan);
+      broadcast('now', publicNow());
+    }
+  });
+  broadcast('plan', plan);
+  broadcast('now', publicNow());
+  return {
+    ok: true,
+    dj_intro: plan.tts?.text || plan.plan?.say || '',
+    songs: plan.queue || [],
+    plan,
+    now: publicNow().now
+  };
+});
+
+app.post('/api/play', async (request) => applyPlaybackAction('play', request.body || {}));
+app.post('/api/pause', async (request) => applyPlaybackAction('pause', request.body || {}));
+app.post('/api/next', async (request) => applyPlaybackAction('next', request.body || {}));
+app.post('/api/prev', async (request) => applyPlaybackAction('prev', request.body || {}));
 
 app.get('/ws/stream', { websocket: true }, (socket) => {
   clients.add(socket);

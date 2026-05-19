@@ -1,5 +1,6 @@
 node_modules/
 dist/
+release/
 data/*.db
 data/*.db-*
 data/cache/
@@ -10,6 +11,8 @@ npm-debug.log*
 # Test artifacts
 .playwright-cli/
 .venv-tts/
+deck-companion/node_modules/
+deck-companion/dist/
 
 # Screenshots
 *.png

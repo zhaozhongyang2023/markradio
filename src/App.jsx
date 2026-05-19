@@ -49,6 +49,15 @@ function detectLowPowerRuntime() {
     !isMobile && (memory > 0 && memory <= 4);
 }
 
+function detectDeckRuntime() {
+  if (typeof navigator === 'undefined' || typeof window === 'undefined') return false;
+  const params = new URLSearchParams(window.location.search);
+  if (params.has('deck') || params.has('gameMode')) return true;
+  const ua = navigator.userAgent || '';
+  const platform = navigator.platform || '';
+  return /Steam Deck|SteamOS|Gamescope/i.test(`${ua} ${platform}`);
+}
+
 function formatTime(seconds = 0) {
   const safe = Math.max(0, Math.floor(seconds));
   return `${String(Math.floor(safe / 60)).padStart(1, '0')}:${String(safe % 60).padStart(2, '0')}`;
@@ -559,7 +568,7 @@ function DjFeed({ introSegments, lyrics, lyricIndex, lyricsSynced, plan, queue, 
     <div className={reading ? 'dj-feed is-reading' : 'dj-feed'}>
       {showLyrics ? (
         <div className="lyrics-view">
-          <span className="feed-meta">MarkRadio · {lyricsSynced ? formatTime(lyrics[lyricIndex]?.time || 0) : 'LYRICS · EST'}</span>
+          <span className="feed-meta">MoodWave · {lyricsSynced ? formatTime(lyrics[lyricIndex]?.time || 0) : 'LYRICS · EST'}</span>
           {[-1, 0, 1].map((offset) => {
             const idx = lyricIndex + offset;
             const line = lyrics[idx];
@@ -579,7 +588,7 @@ function DjFeed({ introSegments, lyrics, lyricIndex, lyricsSynced, plan, queue, 
         <>
           {showIntroPara ? (
           <p>
-            <span className="feed-meta">MarkRadio · 0:01</span>
+            <span className="feed-meta">MoodWave · 0:01</span>
             <span className="typing-line word-line">
               {reading && readingCardIndex === -1 ? (
                 introSegments.map((segment, index) => (
@@ -613,7 +622,7 @@ function DjFeed({ introSegments, lyrics, lyricIndex, lyricsSynced, plan, queue, 
               <div className={`dj-track-card${isReadingThis ? ' is-reading-card' : ''}${isFinished ? ' is-finished' : ''}`} key={track.id || i}>
                 {reason ? (
                 <p className={i === 0 ? 'soft-line' : 'muted-line'}>
-                  <span className="feed-meta">MarkRadio · {i === 0 ? '0:08' : '0:14'}</span>
+                  <span className="feed-meta">MoodWave · {i === 0 ? '0:08' : '0:14'}</span>
                   <span>
                     {isReadingThis && cardSegments.length > 0 ? (
                       cardSegments.map((segment, idx) => (
@@ -815,7 +824,7 @@ function V4RadioView({
 
   return (
     <main className={`v4-shell${lowPowerMode ? ' low-power' : ''}`}>
-      <section className={`v4-radio${lowPowerMode ? ' low-power' : ''}${isPlaying || reading || casting ? ' is-active' : ''}`} aria-label="MarkRadio V4版本">
+      <section className={`v4-radio${lowPowerMode ? ' low-power' : ''}${isPlaying || reading || casting ? ' is-active' : ''}`} aria-label="MoodWave V5 Deck 模式">
         <canvas className="pixel-pulse-canvas" ref={pulseCanvasRef} aria-hidden="true" />
         {audioNodes}
         <header className="v4-topbar">
@@ -825,7 +834,7 @@ function V4RadioView({
                 <img alt="网易云头像" src={netease.profile.avatarUrl} />
               ) : pixelCafe()}
             </button>
-            <button className="v4-wordmark" onClick={onBack} title="自动荐歌">MarkRadio</button>
+            <button className="v4-wordmark" onClick={onBack} title="自动荐歌">MoodWave</button>
           </div>
           <div className="v4-actions">
             <button onClick={onLogin}>{netease.loggedIn ? 'LOGGED' : 'LOGIN'}</button>
@@ -910,7 +919,7 @@ function V4RadioView({
             <div className="v4-live-lyric">{liveLyricLine}</div>
           ) : (
             <>
-              <div><span /> MarkRadio</div>
+              <div><span /> MoodWave</div>
               <strong>{servicesOk ? 'LIVE' : 'LOCAL'}</strong>
             </>
           )}
@@ -948,14 +957,14 @@ function V4RadioView({
         ) : null}
 
         <section className="v4-chat-log" aria-label="AI寻歌模块">
-          <p className="v4-system-line">Connected to MarkRadio server</p>
+          <p className="v4-system-line">Connected to MoodWave server</p>
           {lastMessages.map((message) => (
             <article className={`v4-message ${message.role}`} key={message.id}>
               <div className="v4-message-avatar">
                 <V4PersonaAvatar role={message.role} />
               </div>
               <div>
-                <span>{message.role === 'user' ? 'MMGUO' : 'MARKRADIO'}</span>
+                <span>{message.role === 'user' ? 'MMGUO' : 'MOODWAVE'}</span>
                 {message.text ? <p>{message.text}</p> : null}
                 {message.type === 'plan' ? renderPlanCard(message.plan, message.id) : null}
                 {message.meta ? <small>{message.meta}</small> : null}
@@ -993,7 +1002,7 @@ function V4RadioView({
 }
 
 export default function App() {
-  const [viewMode, setViewMode] = useState('v3');
+  const [viewMode, setViewMode] = useState(() => (detectDeckRuntime() ? 'v4' : 'v3'));
   const [state, setState] = useState(null);
   const [status, setStatus] = useState(null);
   const [selectedMood, setSelectedMood] = useState('平静');
@@ -1022,7 +1031,7 @@ export default function App() {
   const [chatMessages, setChatMessages] = useState(() => [{
     id: 'hello',
     role: 'dj',
-    text: '我是 MarkRadio，十三哥的音乐之声。你可以告诉我今晚想听什么，我会重新规划歌单。',
+    text: '我是 MoodWave。告诉我此刻的状态，我来开一段电台。',
     meta: 'READY'
   }]);
   const [speechState, setSpeechState] = useState('idle');
@@ -1354,7 +1363,7 @@ export default function App() {
   const progressRatio = Math.min(1, Math.max(0, progress / duration));
   const displayProgressRatio = seekDraftRatio ?? progressRatio;
   const weather = plan?.weather || {};
-  const metaLine = `${weather.city || '本地'} | ${weatherIcon(weather.condition)} ${weather.temperature ? `${Math.round(weather.temperature)}°` : weather.condition || '天气'} | ${moodIcon[selectedMood]} ${selectedMood} | 十三哥的音乐之声`;
+  const metaLine = `${weather.city || '本地'} | ${weatherIcon(weather.condition)} ${weather.temperature ? `${Math.round(weather.temperature)}°` : weather.condition || '天气'} | ${moodIcon[selectedMood]} ${selectedMood} | MoodWave`;
   const introText = useMemo(() => {
     // 朗读中冻结文字，防止 WebSocket 更新 plan 导致显示/语音不一致
     if (reading && readingTextRef.current) return readingTextRef.current;
@@ -2375,7 +2384,7 @@ export default function App() {
     if (hasCastDevice()) {
       startFallbackVisuals();
       try {
-        await playCastVoiceClip(introUrl, readingText, { title: 'MarkRadio DJ', artist: 'MarkRadio' }, runId);
+        await playCastVoiceClip(introUrl, readingText, { title: 'MoodWave DJ', artist: 'MoodWave' }, runId);
         stopAudioVisuals();
         return;
       } catch {
@@ -2413,7 +2422,7 @@ export default function App() {
       const cardUrl = await waitForCardTtsUrl(cardIndex, readingReason);
       if (cardUrl && isPlaybackRunCurrent(runId)) {
         try {
-          await playCastVoiceClip(cardUrl, readingReason, { title: `${track.title || 'MarkRadio'} 导读`, artist: 'MarkRadio' }, runId);
+          await playCastVoiceClip(cardUrl, readingReason, { title: `${track.title || 'MoodWave'} 导读`, artist: 'MoodWave' }, runId);
           stopAudioVisuals();
           return;
         } catch {
@@ -2976,8 +2985,8 @@ function seekTo(ratio) {
     if (!url) throw new Error('暂无可投放音频');
     stopCastProgress();
     const status = await api.castPlay(url, {
-      title: meta.title || 'MarkRadio',
-      artist: meta.artist || 'MarkRadio',
+      title: meta.title || 'MoodWave',
+      artist: meta.artist || 'MoodWave',
       album: meta.album || '',
       leaseMs: castLeaseForDuration(meta.duration || 0)
     });
@@ -3375,7 +3384,7 @@ function seekTo(ratio) {
 
   return (
     <main className="shell">
-      <section className="stage" aria-label="十三哥的音乐之声播放器">
+      <section className="stage" aria-label="MoodWave AI DJ 电台">
         <div className="aura" />
         <div className="phone">
           <canvas className="pixel-pulse-canvas" ref={pulseCanvasRef} aria-hidden="true" />
@@ -3390,7 +3399,7 @@ function seekTo(ratio) {
                 </button>
                 <div>
                   <button className="brand-title-button" onClick={() => setViewMode('v4')} title="AI寻歌">
-                    <h1>MarkRadio</h1>
+                    <h1>MoodWave</h1>
                   </button>
                   <div className={`speaking${servicesOk ? '' : ' idle'}`}>
                     <span />

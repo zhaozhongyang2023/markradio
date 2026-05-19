@@ -1,6 +1,8 @@
 export const station = {
-  title: '十三哥的音乐之声',
-  subtitle: 'mark radio',
+  title: 'MoodWave',
+  subtitle: 'AI DJ Radio',
+  legacyTitle: '十三哥的音乐之声',
+  legacySubtitle: 'mark radio',
   apiHost: '192.168.2.33',
   webPort: 8080,
   apiPort: 8765
@@ -70,7 +72,7 @@ export const demoTracks = [
 ];
 
 export const defaultTaste = {
-  taste: '偏爱有记忆感、旋律清晰、能在夜晚独处时慢慢听进去的歌。不要太吵，情绪要有层次。',
-  routines: '早晨需要轻微提神；夜晚需要平静和回忆；重要日期优先播放有纪念感的歌。',
-  moodRules: '开心要明亮，欢乐要有节奏，悲伤要被接住，平静要低刺激，焦虑要稳定，愤怒要先释放再回落。'
+  taste: '偏爱有记忆感、旋律清晰、能在夜晚独处或游戏时慢慢听进去的歌。不要太吵，情绪要有层次。',
+  routines: '早晨需要轻微提神；夜晚需要平静和回忆；游戏时需要沉浸、不抢注意力；重要日期优先播放有纪念感的歌。',
+  moodRules: '开心要明亮，忧郁要有留白，悲伤要被接住，平静要低刺激，治愈要温柔回落，愤怒要先释放再放缓。'
 };

@@ -1,11 +1,15 @@
 #!/bin/bash
-# markradio.sh - Mark Radio 服务管理脚本
+# markradio.sh - MoodWave / Mark Radio 服务管理脚本
 # 用法: ./markradio.sh {start|stop|refresh|status|server}
 
 set -e
 
-MARKRADIO_DIR="$HOME/markradio"
-NETEASE_DIR="$HOME/netease-cloud-music-api"
+APP_NAME="${MOODWAVE_NAME:-MoodWave}"
+MARKRADIO_DIR="${MOODWAVE_DIR:-${MARKRADIO_DIR:-$HOME/markradio}}"
+NETEASE_DIR="${NETEASE_DIR:-$HOME/netease-cloud-music-api}"
+API_PORT="${MOODWAVE_API_PORT:-${MOODWAVE_PORT:-${MARKRADIO_API_PORT:-8765}}}"
+WEB_PORT="${MOODWAVE_WEB_PORT:-${MARKRADIO_WEB_PORT:-8080}}"
+NETEASE_PORT="${NETEASE_PORT:-3000}"
 
 MARKRADIO_PID="$MARKRADIO_DIR/markradio.pid"
 NETEASE_PID="$NETEASE_DIR/netease-api.pid"
@@ -16,11 +20,15 @@ FIREFOX_LOG="$MARKRADIO_DIR/firefox-kiosk.log"
 FIREFOX_PROFILE="$MARKRADIO_DIR/firefox-kiosk-profile"
 
 DISPLAY="${DISPLAY:-:0}"
-KIOSK_URL="http://localhost:8080/?lowPower=1"
+KIOSK_URL="${KIOSK_URL:-http://localhost:${WEB_PORT}/?lowPower=1}"
 
 red()    { echo -e "\033[31m$1\033[0m"; }
 green()  { echo -e "\033[32m$1\033[0m"; }
 yellow() { echo -e "\033[33m$1\033[0m"; }
+
+port_listening() {
+  ss -tln 2>/dev/null | awk '{print $4}' | grep -Eq "(^|:)${1}$"
+}
 
 clear_cache() {
   echo -n "清理缓存..."
@@ -39,19 +47,19 @@ clear_cache() {
 }
 
 status() {
-  echo "====== Mark Radio 服务状态 ======"
+  echo "====== $APP_NAME 服务状态 ======"
 
   if pgrep -f "node server/index.js" > /dev/null 2>&1; then
-    green "  Radio API  (8765)  ✓ 运行中"
+    green "  Radio API  ($API_PORT)  ✓ 运行中"
   else
-    red   "  Radio API  (8765)  ✗ 未启动"
+    red   "  Radio API  ($API_PORT)  ✗ 未启动"
   fi
 
   if pgrep -f "node index.js" | grep -v server > /dev/null 2>&1 || \
-     ss -tlnp 2>/dev/null | grep -q ':3000'; then
-    green "  Netease API (3000) ✓ 运行中"
+     port_listening "$NETEASE_PORT"; then
+    green "  Netease API ($NETEASE_PORT) ✓ 运行中"
   else
-    red   "  Netease API (3000) ✗ 未启动"
+    red   "  Netease API ($NETEASE_PORT) ✗ 未启动"
   fi
 
   if pgrep -f "firefox.*--kiosk" > /dev/null 2>&1; then
@@ -63,19 +71,19 @@ status() {
 }
 
 start_netease() {
-  if ss -tlnp 2>/dev/null | grep -q ':3000'; then
-    yellow "[skip] Netease API 已在运行 (端口 3000)"
+  if port_listening "$NETEASE_PORT"; then
+    yellow "[skip] Netease API 已在运行 (端口 $NETEASE_PORT)"
     return
   fi
 
   echo -n "启动 Netease API..."
   cd "$NETEASE_DIR"
-  nohup node index.js > "$NETEASE_LOG" 2>&1 &
+  PORT="$NETEASE_PORT" nohup node index.js > "$NETEASE_LOG" 2>&1 &
   echo $! > "$NETEASE_PID"
 
   for i in $(seq 1 20); do
     sleep 0.5
-    if ss -tlnp 2>/dev/null | grep -q ':3000'; then
+    if port_listening "$NETEASE_PORT"; then
       green " ✓ (PID $(cat $NETEASE_PID))"
       return
     fi
@@ -84,19 +92,25 @@ start_netease() {
 }
 
 start_radio() {
-  if ss -tlnp 2>/dev/null | grep -q ':8765'; then
-    yellow "[skip] Radio API 已在运行 (端口 8765)"
+  if port_listening "$API_PORT"; then
+    yellow "[skip] Radio API 已在运行 (端口 $API_PORT)"
     return
   fi
 
   echo -n "启动 Radio API + Web 前端..."
   cd "$MARKRADIO_DIR"
-  NODE_ENV=production nohup node server/index.js > "$MARKRADIO_LOG" 2>&1 &
+  NODE_ENV=production \
+  MOODWAVE_API_PORT="$API_PORT" \
+  MOODWAVE_PORT="$API_PORT" \
+  MOODWAVE_WEB_PORT="$WEB_PORT" \
+  MARKRADIO_API_PORT="$API_PORT" \
+  MARKRADIO_WEB_PORT="$WEB_PORT" \
+  nohup node server/index.js > "$MARKRADIO_LOG" 2>&1 &
   echo $! > "$MARKRADIO_PID"
 
   for i in $(seq 1 20); do
     sleep 0.5
-    if ss -tlnp 2>/dev/null | grep -q ':8765'; then
+    if port_listening "$API_PORT"; then
       green " ✓ (PID $(cat $MARKRADIO_PID))"
       return
     fi
@@ -202,7 +216,7 @@ start_chromium() {
 }
 
 start() {
-  echo "========== 启动 Mark Radio =========="
+  echo "========== 启动 $APP_NAME =========="
   clear_cache
   start_netease
   start_radio
@@ -232,6 +246,9 @@ stop_radio() {
   if command -v systemctl >/dev/null 2>&1 && systemctl list-unit-files markradio.service >/dev/null 2>&1; then
     sudo -n systemctl stop markradio.service 2>/dev/null || true
   fi
+  if command -v systemctl >/dev/null 2>&1 && systemctl list-unit-files moodwave.service >/dev/null 2>&1; then
+    sudo -n systemctl stop moodwave.service 2>/dev/null || true
+  fi
   if [ -f "$MARKRADIO_PID" ]; then
     local pid=$(cat "$MARKRADIO_PID")
     if kill -0 "$pid" 2>/dev/null; then
@@ -257,7 +274,7 @@ stop_chromium() {
 }
 
 stop() {
-  echo "========== 停止 Mark Radio =========="
+  echo "========== 停止 $APP_NAME =========="
   stop_chromium
   stop_radio
   stop_netease
@@ -266,7 +283,7 @@ stop() {
 }
 
 refresh() {
-  echo "========== 刷新 Mark Radio =========="
+  echo "========== 刷新 $APP_NAME =========="
   stop_chromium
   stop_radio
   clear_cache
@@ -283,14 +300,14 @@ refresh() {
 }
 
 server() {
-  echo "========== 启动 Mark Radio (服务端模式) =========="
+  echo "========== 启动 $APP_NAME (服务端模式) =========="
   clear_cache
   stop_chromium
   enable_screen_blank
   start_netease
   start_radio
   echo
-  echo "后端服务已启动，手机/浏览器访问 http://$(hostname -I 2>/dev/null | awk '{print $1}'):8080"
+  echo "后端服务已启动，手机/浏览器访问 http://$(hostname -I 2>/dev/null | awk '{print $1}'):$WEB_PORT"
   echo
   status
 }

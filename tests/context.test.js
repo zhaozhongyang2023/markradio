@@ -48,3 +48,23 @@ test('buildDjContext includes requested song names', () => {
   assert.match(messages[1].content, /"requestedSongs": \[/);
   assert.match(messages[1].content, /乌兰巴托的夜/);
 });
+
+test('buildDjContext includes MoodWave Steam Deck DJ direction', () => {
+  const context = buildDjContext({
+    taste: {},
+    mood: '治愈',
+    specialDates: [],
+    weather: {},
+    recentPlays: [],
+    tracks: [{ id: 'demo-1', title: 'If', artist: 'Bread', mood: ['治愈'], energy: 0.4, reason: 'demo' }],
+    nowPlaying: null,
+    voice: { style: '温柔' },
+    timeContext: { local: '05-16 星期六 23:10' },
+    userRequest: '适合 JRPG 夜晚探索'
+  });
+
+  assert.match(context.system, /MoodWave/);
+  assert.match(context.system, /Steam Deck/);
+  assert.match(context.system, /10-40/);
+  assert.match(context.system, /禁止客服语气/);
+});
