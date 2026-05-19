@@ -1,135 +1,107 @@
-# 🎵 MoodWave V5 — Steam Deck 完整安装与验证指南
+# 🎵 MoodWave V5 — Steam Deck 完整安装手册
 
-> 耗时：15～30 分钟（取决于网速）
-> 难度：⭐ 会用桌面模式即可，全程复制粘贴
+> 预计 20～40 分钟 ｜ 零基础可操作 ｜ 全程复制粘贴
 
 ---
 
-## 第一步：进入桌面模式
+## 准备工作
 
-1. 按 **Steam 键** → 「电源」→「切换至桌面模式」
-2. 等系统进入 KDE Plasma 桌面
+### 你需要的
+
+- Steam Deck 联网
+- 一个 **DeepSeek API Key**（免费注册：前往 [platform.deepseek.com](https://platform.deepseek.com) → 注册 → API Keys → 创建新 Key → 复制备用）
+- 一把 **USB-C  Hub 接键盘鼠标**（推荐，触摸屏也能操作只是慢一点）
+
+### 进入桌面模式
+
+按住 **电源键** → 选择「**切换至桌面模式**」
+
+---
+
+## 第一步：设置密码（首次需要）
+
+> 如果之前设过密码，跳过这一步。
+
+左下角菜单 → **System Settings** → **Users** → 点你的用户名 deck → **Change Password**
+
+设一个简单密码，比如 `deck`，后面装东西要用。
 
 ---
 
 ## 第二步：打开终端
 
-左下角菜单 → 搜 `Konsole` → 打开
+左下角菜单 → 搜索 `Konsole` → 打开黑色终端窗口。
 
-> 以下所有命令，逐行复制到终端，按回车执行。
+> 以下所有命令，**逐行复制粘贴**到终端，按回车执行。出现密码提示就输入刚才设的密码。
 
 ---
 
-## 第三步：安装 Node.js（如果还没装）
+## 第三步：初始化系统（首次需要）
 
 ```bash
-# 检查是否已安装
-node -v
-```
-
-如果显示 `command not found`，执行安装：
-
-```bash
-# 初始化 pacman 密钥环（Steam Deck 首次需要）
+# 初始化 pacman 密钥环（Steam Deck 首次装软件需要）
 sudo pacman-key --init
 sudo pacman-key --populate archlinux holo
+```
 
+看到 `gpg: Done` 就完成了。这一步只需做一次。
+
+---
+
+## 第四步：安装 Node.js
+
+```bash
 # 安装 Node.js 和 npm
 sudo pacman -Sy --needed --noconfirm nodejs npm
 
-# 验证
-node -v   # 应显示 v22 或更高
-npm -v    # 应显示 10.x 或更高
+# 验证安装
+node -v
+npm -v
 ```
 
-> 提示输入密码时，输入你设的 sudo 密码（不显示是正常的）
+应该显示版本号（v22 或更高）。
 
 ---
 
-## 第四步：确保 Git 已安装
+## 第五步：安装 MoodWave
 
 ```bash
-git --version
-```
-
-如果没装：`sudo pacman -S --needed git --noconfirm`
-
----
-
-## 第五步：克隆 + 一键安装
-
-> ⚠️ **如果你之前装过**：安装脚本会检测到旧版本并询问是否清除。
-> 选 Y（默认）会彻底清理旧程序、旧服务、旧桌面图标，保持干净后再安装。
-> 旧配置文件（`~/.config/moodwave/config.env`）不会被删除，重装后仍保留你的 AI Key。
-
-## 第五步：克隆 + 一键安装
-
-```bash
-# 克隆项目
+# 克隆项目到本地
 git clone --depth 1 https://github.com/zhaozhongyang2023/markradio.git ~/moodwave
 
 # 进入目录
 cd ~/moodwave
 
-# 一键安装（脚本会依次问 AI Key、语音、音乐源、天气，全部可回车跳过）
+# 一键安装
 bash scripts/install-steamdeck.sh --repo https://github.com/zhaozhongyang2023/markradio.git
 ```
 
-### 安装过程中会问你：
+### 安装过程中会依次问你：
 
-| 问题 | 做什么 |
-|------|--------|
-| Git 仓库地址 | 已通过 `--repo` 传入，自动跳过 |
-| **AI Key** ⭐ | 至少填这个。去 [platform.deepseek.com](https://platform.deepseek.com) 免费注册 → API Keys → 创建 → 粘贴 |
-| 语音 Key | Fish Audio 的 Key，用于 DJ 朗读开场白。跳过也可 |
-| 网易云 API 地址 | 真实音乐源。跳过用 Demo 歌单 |
-| 天气 Key | OpenWeather 免费注册。跳过用默认晴天 |
+| 顺序 | 问题 | 怎么做 |
+|------|------|--------|
+| 1 | **AI Key** ⭐ | 粘贴你的 DeepSeek Key，**必须填** |
+| 2 | Fish Audio Key | 语音朗读 DJ 开场白，**回车跳过** |
+| 3 | 网易云 API 地址 | 真实音乐库，**回车跳过**（用 Demo 歌单） |
+| 4 | OpenWeather Key | 根据天气调氛围，**回车跳过** |
 
-> **最少只需要一个 DeepSeek AI Key**，其余全部回车跳过即可正常使用。
+> 最少只填一个 AI Key，其余全部回车跳过即可正常使用。
 
----
-
-## 第六步：启用后台服务
-
-如果安装脚本最后提示 `systemd 用户会话未就绪`，执行：
-
-```bash
-# 允许后台服务持久化（只需一次）
-loginctl enable-linger $USER
-
-# 启动服务
-systemctl --user daemon-reload
-systemctl --user enable --now moodwave.service
-
-# 检查
-systemctl --user status moodwave.service
-```
-
-看到 `active (running)` ✅
-
-> 如果桌面模式安装，通常会自动启动，这步可跳过。
+安装过程约 5～10 分钟（主要是下载依赖包），看到「🎉 MoodWave 安装完成！」就代表成功。
 
 ---
 
-## 第七步：打开 MoodWave
+## 第六步：验证安装
 
-### 方式一：桌面图标
+### 打开 MoodWave
 
-双击桌面上的 **MoodWave** 图标
-
-### 方式二：浏览器
-
-打开浏览器，地址栏输入：
+桌面双击 **MoodWave** 图标，或浏览器打开：
 
 ```
 http://127.0.0.1:38080/?deck=1
 ```
 
----
-
-## 第八步：验证运行
-
-### 8.1 健康检查
+### 健康检查
 
 浏览器打开：
 
@@ -137,48 +109,75 @@ http://127.0.0.1:38080/?deck=1
 http://127.0.0.1:38080/api/health
 ```
 
-应显示：
+应该显示：
 
 ```json
 {"ok":true,"name":"MoodWave","mode":"steamdeck"}
 ```
 
-### 8.2 完整状态
+### 快速体验
 
-```
-http://127.0.0.1:38080/api/status
-```
-
-应显示 AI、语音、音乐源等配置状态。
-
-### 8.3 试试 AI DJ
-
-在浏览器界面：
-1. 点一个心情（比如"平静"）
+1. 网页中点一个心情按钮（比如「平静」）
 2. 等待 AI 生成 DJ 开场白和歌单
-3. 点播放按钮 ▶
+3. 点 ▶ 播放
 
-听到电台就成功了 🎉
+听到音乐就成功了 ✅
 
 ---
 
-## 第九步：安装 Decky 游戏模式插件
+## 第七步：安装 Decky Loader（游戏模式插件平台）
 
-### 9.1 安装 Decky Loader
+> Decky Loader 是 Steam Deck 的插件平台，装好它才能装 MoodWave 的游戏模式插件。
 
-桌面模式浏览器打开：
+### 7.1 下载安装脚本
+
+桌面模式，浏览器打开：
 
 ```
 https://github.com/SteamDeckHomebrew/decky-loader
 ```
 
-按页面说明安装（通常是一行命令执行即可）。
+或者直接终端执行：
 
-### 9.2 安装 MoodWave 插件（已自动完成）
+```bash
+curl -L https://github.com/SteamDeckHomebrew/decky-loader/raw/main/dist/install_release.sh | sh
+```
 
-安装脚本已自动把插件文件放到 `~/homebrew/plugins/moodwave-deck-companion/`。
+输入 sudo 密码，等待安装完成。
 
-重启 Steam，回到游戏模式，按 `...` 按钮 → Decky 插件 → MoodWave → 看到三个 Tab：
+### 7.2 验证 Decky 安装
+
+- 回到 **游戏模式**（桌面双击「Return to Gaming Mode」或电源菜单切换）
+- 按右侧 `...` 按钮（三个点）
+- 左侧菜单底部应该出现 **🔌 插件图标**
+
+如果看不到，重启一次 Steam Deck。
+
+---
+
+## 第八步：安装 MoodWave 游戏模式插件
+
+### 插件已自动复制
+
+安装脚本已经把插件文件放到了正确位置：
+
+```
+~/homebrew/plugins/moodwave-deck-companion/
+```
+
+### 重启 Steam 生效
+
+回到游戏模式，**完全退出 Steam 再重新打开**：
+
+1. 游戏模式中按 Steam 键
+2. 电源 → 重启 Steam
+3. 等 Steam 重新打开
+
+### 验证
+
+按 `...` 按钮 → 🔌 插件 → 应该看到 **MoodWave**
+
+点击进入，能看到三个 Tab：
 
 - 🎧 **AI Radio** — 按心情开电台
 - 🎮 **Game Radio** — 选游戏氛围配 BGM
@@ -186,17 +185,88 @@ https://github.com/SteamDeckHomebrew/decky-loader
 
 ---
 
-## 验证清单
+## 第九步：Game Radio 使用指南
 
-逐项检查，全部打勾即安装成功：
+### 打开
 
-- [ ] `systemctl --user status moodwave.service` 显示 `active (running)`
-- [ ] 浏览器 `http://127.0.0.1:38080/api/health` 返回 `{"ok":true}`
-- [ ] 浏览器 `http://127.0.0.1:38080/?deck=1` 显示 MoodWave 界面
-- [ ] 点一个心情 → AI 生成歌单 → 点播放能听到
-- [ ] 桌面 MoodWave 图标双击能打开
-- [ ] Decky 插件里能看到三个 Tab
-- [ ] Game Radio Tab 选择氛围 → 点开始电台 → 返回推荐
+游戏模式中按 `...` → 🔌 插件 → MoodWave → 切换到 `🎮 Game Radio` Tab
+
+### 操作流程
+
+1. **选游戏氛围**
+   - 🗡️ Boss战 —— 燃一点
+   - 🗺️ 探索地图 —— 适合慢慢跑图
+   - 🏎️ 赛车竞速 —— 今晚速度别停
+   - 🌾 种田放松 —— 今晚别太累了
+   - 📺 模拟器怀旧 —— 像小时候一样
+
+2. **（可选）输入游戏名**
+   - 比如输入「塞尔达」「老头环」「星露谷」
+
+3. **点「▶ 开始游戏电台」**
+
+4. AI DJ 会：
+   - 生成适合当前游戏场景的 DJ 开场白
+   - 推荐歌单并显示推荐理由
+   - 自动开始播放
+
+5. 切回游戏继续打，音乐在后面放着
+
+### 换氛围
+
+在 Game Radio 页面点 **「↻ 换个氛围」**，AI 会重新配一批不同的歌。
+
+### 手动切歌
+
+按 `⏭` 跳到下一首。
+
+---
+
+## 日常使用
+
+| 场景 | 怎么做 |
+|------|--------|
+| 白天打游戏听歌 | 游戏模式 → `...` → MoodWave → Game Radio |
+| 晚上躺床听电台 | 桌面模式浏览器 `http://127.0.0.1:38080/?deck=1` |
+| 换个心情 | Game Radio 选不同氛围，或 AI Radio 选不同心情 |
+| 暂停/继续 | Decky 插件里点 ⏸/▶，或手柄映射快捷键 |
+
+---
+
+## 管理命令速查
+
+在桌面模式终端执行：
+
+```bash
+# 查看服务状态
+systemctl --user status moodwave.service
+
+# 重启服务
+systemctl --user restart moodwave.service
+
+# 停止服务
+systemctl --user stop moodwave.service
+
+# 查看实时日志
+journalctl --user -u moodwave.service -f
+
+# 更新到最新版
+cd ~/moodwave && git pull && npm install --production && npm run build && systemctl --user restart moodwave.service
+```
+
+---
+
+## 卸载
+
+### 只卸载 MoodWave
+
+```bash
+bash ~/moodwave/scripts/uninstall-steamdeck.sh
+```
+
+### 卸载 Decky Loader
+
+在游戏模式 Decky 设置里有个卸载按钮，或者在桌面模式执行安装脚本时的对应卸载命令。
 
 ---
 
@@ -204,14 +274,15 @@ https://github.com/SteamDeckHomebrew/decky-loader
 
 | 问题 | 解决 |
 |------|------|
-| `pacman-key --init` 报错 | 正常现象，等它跑完即可（生成密钥需要时间） |
-| 克隆仓库失败 | 检查是否联网：`ping github.com` |
-| `npm install` 卡住 | 网络问题。试试 `npm install --registry https://registry.npmmirror.com` |
+| 克隆仓库失败 | 检查联网：`ping github.com` |
+| `npm install` 卡住 | 网络问题。换镜像源：`npm config set registry https://registry.npmmirror.com` |
 | 网页打不开 | `systemctl --user restart moodwave.service` |
-| 网页开了但没歌 | 没配 AI Key 会进 Demo 模式。编辑 `~/.config/moodwave/config.env` 填上 Key，重启服务 |
-| 服务启动失败看日志 | `journalctl --user -u moodwave.service -n 50` |
-| 怎么更新 | `cd ~/moodwave && git pull && npm install --production && npm run build && systemctl --user restart moodwave.service` |
-| 怎么卸载 | `bash ~/moodwave/scripts/uninstall-steamdeck.sh` |
+| 网页开了但没歌 | 检查 AI Key 是否正确：`cat ~/.config/moodwave/config.env` |
+| Decky 里找不到 MoodWave | 检查目录是否存在：`ls ~/homebrew/plugins/moodwave-deck-companion/` |
+| Game Radio 没反应 | 确认本地 API 还在跑：`curl http://127.0.0.1:38765/api/health` |
+| 装完显示 Demo 歌单 | 正常现象。配置网易云 API 后可接入真实音乐库 |
+| 怎么换 AI Key | 编辑 `~/.config/moodwave/config.env`，改 `AI_API_KEY=`，然后重启服务 |
+| 忘记 sudo 密码 | 桌面模式 → 系统设置 → 用户 → 改密码 |
 
 ---
 
@@ -220,32 +291,7 @@ https://github.com/SteamDeckHomebrew/decky-loader
 | 东西 | 路径 |
 |------|------|
 | 主程序 | `~/moodwave` |
-| 配置文件 | `~/.config/moodwave/config.env` |
-| 后台服务 | `~/.config/systemd/user/moodwave.service` |
+| 配置（含 AI Key） | `~/.config/moodwave/config.env` |
 | 日志 | `~/.local/state/moodwave/logs/` |
 | 桌面图标 | `~/Desktop/MoodWave.desktop` |
 | Decky 插件 | `~/homebrew/plugins/moodwave-deck-companion` |
-
----
-
-## 管理命令速查
-
-```bash
-# 服务状态
-systemctl --user status moodwave.service
-
-# 重启
-systemctl --user restart moodwave.service
-
-# 停止
-systemctl --user stop moodwave.service
-
-# 实时日志
-journalctl --user -u moodwave.service -f
-
-# 手动启动（调试用）
-cd ~/moodwave && node server/index.js
-
-# 更新到最新版
-cd ~/moodwave && git pull && npm install --production && npm run build && systemctl --user restart moodwave.service
-```
