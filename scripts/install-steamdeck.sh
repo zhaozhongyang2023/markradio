@@ -308,6 +308,8 @@ AI_API_KEY=$AI_KEY
 FISH_AUDIO_API_KEY=$FISH_KEY
 FISH_AUDIO_VOICE_ID=$FISH_VOICE
 FISH_AUDIO_API_BASE=https://api.fish.audio
+# 如果配了 Fish Audio Key，自动启用 Fish Audio 语音
+VOICE_PROVIDER=$([ -n "$FISH_KEY" ] && echo "fish-audio" || echo "local-voice")
 
 # ── 音乐源（可选，不配用 Demo 歌单）──
 NETEASE_API_BASE=$NETEASE_URL
