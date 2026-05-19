@@ -1,5 +1,6 @@
 // ─── 服务端顺序音频播放器 ───
 import { spawn } from 'node:child_process';
+import { config } from './config.js';
 
 let currentProcess = null;
 let activeSequenceId = 0;
@@ -35,9 +36,11 @@ function playOne(urls, index, onEnd, seqId) {
     return;
   }
   const url = urls[index];
+  // ffplay 无法解析相对路径，转成全 HTTP URL
+  const resolvedUrl = url.startsWith('/') ? `http://127.0.0.1:${config.apiPort}${url}` : url;
   const startTime = Date.now();
   const proc = spawn('/usr/bin/ffplay', [
-    '-nodisp', '-autoexit', '-loglevel', 'error', url
+    '-nodisp', '-autoexit', '-loglevel', 'error', resolvedUrl
   ], { stdio: 'ignore' });
 
   proc.on('spawn', () => {

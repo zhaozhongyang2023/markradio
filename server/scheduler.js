@@ -10,6 +10,7 @@ const DEFAULT_QUEUE_LIMIT = 5;
 const TTS_PRELOAD_LIMIT = 2;
 
 export async function createRadioPlan({ store, mood: requestedMood = null, nowPlaying = null, deferTts = false, onTtsReady = null, userRequest = '', currentPlan = null }) {
+  const mode = arguments[0]?.mode || 'radio';
   // 每组刷新时清空跨组去重，确保 AI 选曲不会被跳过
   sessionPlayedIds.clear();
   const now = new Date();
@@ -112,6 +113,7 @@ export async function createRadioPlan({ store, mood: requestedMood = null, nowPl
   const todayPlan = {
     id: planId,
     createdAt: new Date().toISOString(),
+    mode,
     mood,
     weather,
     specialDates,
@@ -121,7 +123,8 @@ export async function createRadioPlan({ store, mood: requestedMood = null, nowPl
     cardTts
   };
   store.set('planToday', todayPlan);
-  if (queue[0]) store.set('now', { track: queue[0], progress: 0, playing: false, speaking: Boolean(tts.ok), mood });
+  store.set('plan-' + mode, todayPlan);
+  if (queue[0]) store.set('now', { mode, track: queue[0], progress: 0, playing: false, speaking: Boolean(tts.ok), mood });
   if (deferTts) {
     // 主导读 TTS 异步生成
     buildTts({ store, text: ttsText, mood, voiceStyle: plan.voiceStyle, nonce: planId })
@@ -190,6 +193,7 @@ function updatePlanTts({ store, planId, tts, onTtsReady }) {
   const updated = { ...current, tts };
   store.set('planToday', updated);
   const now = store.get('now');
+  if (current.mode) store.set('plan-' + current.mode, updated);
   if (now) store.set('now', { ...now, speaking: Boolean(tts.ok) });
   onTtsReady?.(updated);
   return updated;
@@ -203,6 +207,7 @@ function updateCardTts({ store, planId, index, tts, onTtsReady }) {
   const updated = { ...current, cardTts };
   store.set('planToday', updated);
   onTtsReady?.(updated);
+  if (current.mode) store.set('plan-' + current.mode, updated);
   return updated;
 }
 

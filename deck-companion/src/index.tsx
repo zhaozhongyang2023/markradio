@@ -19,6 +19,7 @@ type NowPayload = {
   now?: {
     track?: Track | null;
     playing?: boolean;
+    progressRatio?: number;
     mood?: string;
   };
   plan?: {
@@ -169,6 +170,7 @@ function Content() {
   const currentPlan = (page !== 'settings' ? now.plans?.[page] : null) || now.plan;
   const track = now.now?.track || currentPlan?.queue?.[0] || null;
   const playing = Boolean(now.now?.playing);
+  const progressRatio = Number(now.now?.progressRatio) || 0;
   const currentMood = (currentPlan?.mood || now.now?.mood || '').trim();
   const queue = currentPlan?.queue || [];
   const djLine = currentPlan?.tts?.text || currentPlan?.plan?.say || currentPlan?.plan?.reply || '';
@@ -395,6 +397,19 @@ function Content() {
           font-size: 11px;
           font-weight: 800;
         }
+        .mw-progress-bar {
+          height: 3px;
+          margin: 5px 0 0;
+          border-radius: 2px;
+          background: rgba(255,255,255,.08);
+          overflow: hidden;
+        }
+        .mw-progress-bar-fill {
+          height: 100%;
+          background: #42d8b2;
+          border-radius: 2px;
+          transition: width .5s linear;
+        }
         .mw-mini-state {
           flex: 0 0 auto;
           color: rgba(66,216,178,.86);
@@ -534,6 +549,7 @@ function Content() {
               ›
             </button>
           </div>
+          {playing ? <div className="mw-progress-bar"><div className="mw-progress-bar-fill" style={{width: `${Math.round(progressRatio * 100)}%`}} /></div> : null}
         </div>
       )}
 

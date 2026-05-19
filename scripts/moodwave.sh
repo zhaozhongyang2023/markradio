@@ -10,7 +10,9 @@ set -e
 ##############################################
 is_headless() {
   [[ -z "${DISPLAY:-}" ]] && return 0
-  [[ -n "${SSH_TTY:-}" || -n "${SSH_CONNECTION:-}" || -n "${SSH_CLIENT:-}" ]] && return 0
+  if command -v xdpyinfo >/dev/null 2>&1; then
+    xdpyinfo -display "$DISPLAY" >/dev/null 2>&1 || return 0
+  fi
   return 1
 }
 
@@ -30,6 +32,10 @@ if [ ! -d "$MOODWAVE_DIR_PATH" ] && [ -d "$HOME/.local/share/moodwave" ]; then
   MOODWAVE_DIR_PATH="$HOME/.local/share/moodwave"
 fi
 NETEASE_DIR="${NETEASE_DIR:-$HOME/netease-cloud-music-api}"
+# 兼容旧安装路径
+if [ ! -d "$NETEASE_DIR" ] && [ -d "$HOME/netease-api" ]; then
+  NETEASE_DIR="$HOME/netease-api"
+fi
 API_PORT="${MOODWAVE_API_PORT:-${MOODWAVE_PORT:-8765}}"
 WEB_PORT="${MOODWAVE_WEB_PORT:-8080}"
 NETEASE_PORT="${NETEASE_PORT:-3000}"
@@ -101,7 +107,10 @@ start_netease() {
 
   echo -n "启动 Netease API..."
   cd "$NETEASE_DIR"
-  PORT="$NETEASE_PORT" nohup node index.js > "$NETEASE_LOG" 2>&1 &
+  local entry="index.js"
+  [ -f "run.js" ] && entry="run.js"
+  [ -f "app.js" ] && entry="app.js"
+  PORT="$NETEASE_PORT" nohup node "$entry" > "$NETEASE_LOG" 2>&1 &
   echo $! > "$NETEASE_PID"
 
   for i in $(seq 1 20); do
@@ -268,8 +277,12 @@ stop_netease() {
     fi
     rm -f "$NETEASE_PID"
   fi
-  # 兜底
-  pkill -f "node index.js" 2>/dev/null || true
+  # 兜底：端口占用的进程也一并清理
+  if port_listening "$NETEASE_PORT"; then
+    echo -n "停止 Netease API (端口 $NETEASE_PORT)..."
+    fuser -k "$NETEASE_PORT"/tcp 2>/dev/null || true
+    green " ✓"
+  fi
 }
 
 stop_radio() {
