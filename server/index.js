@@ -422,19 +422,19 @@ function buildPlanMessage(plan) {
   };
 }
 
-async function applyPlaybackAction(action, body = {}) {
+async function applyPlaybackAction(action, body = {}, { skipPlayer = false } = {}) {
   const state = publicNow();
   const now = state.now;
   const planForAction = store.get('plan-' + (now.mode || 'radio')) || state.plan;
   if (action === 'play') {
     now.playing = true;
-    playerStop();
+    if (!skipPlayer) { playerStop(); }
     const urls = buildPlaylist(now.track, planForAction);
     playSequence(urls, { onEnd: () => advanceToNext(store) });
   }
   if (action === 'pause') {
     now.playing = false;
-    playerStop();
+    if (!skipPlayer) { playerStop(); }
   }
   if (action === 'seek') now.progress = Number(body?.progress || 0);
   if (action === 'select' && state.plan?.queue?.length) {
@@ -448,8 +448,7 @@ async function applyPlaybackAction(action, body = {}) {
       now.progress = 0;
       now.playing = true;
       store.addPlay(now.track, now.mood);
-      const urls = buildPlaylist(now.track, planForAction);
-      playSequence(urls, { onEnd: () => advanceToNext(store) });
+      if (!skipPlayer) { const urls = buildPlaylist(now.track, planForAction); playSequence(urls, { onEnd: () => advanceToNext(store) }); }
     }
   }
   if (action === 'prev' && state.plan?.queue?.length) {
@@ -461,8 +460,7 @@ async function applyPlaybackAction(action, body = {}) {
       now.progress = 0;
       now.playing = true;
       store.addPlay(now.track, now.mood);
-      const urls = buildPlaylist(now.track, planForAction);
-      playSequence(urls, { onEnd: () => advanceToNext(store) });
+      if (!skipPlayer) { const urls = buildPlaylist(now.track, planForAction); playSequence(urls, { onEnd: () => advanceToNext(store) }); }
     }
   }
   if (action === 'next' && state.plan?.queue?.length) {
@@ -474,11 +472,10 @@ async function applyPlaybackAction(action, body = {}) {
         now.progress = 0;
         now.playing = true;
         store.addPlay(now.track, now.mood);
-        const urls = buildPlaylist(now.track, planForAction);
-        playSequence(urls, { onEnd: () => advanceToNext(store) });
+        if (!skipPlayer) { const urls = buildPlaylist(now.track, planForAction); playSequence(urls, { onEnd: () => advanceToNext(store) }); }
       } else {
         now.playing = false;
-        playerStop();
+        if (!skipPlayer) { playerStop(); }
       }
     }
   }
@@ -489,7 +486,7 @@ async function applyPlaybackAction(action, body = {}) {
 }
 
 app.post('/api/playback/:action', async (request) => {
-  return applyPlaybackAction(request.params.action, request.body || {});
+  return applyPlaybackAction(request.params.action, request.body || {}, { skipPlayer: true });
 });
 
 app.post('/api/ai/radio', async (request) => {
