@@ -410,17 +410,19 @@ fi
 # ═══════════════════════════════════════════
 if [[ "$SKIP_PLUGIN" = "0" && -d "${APP_PREFIX}/deck-companion" ]]; then
   say "安装 Decky 游戏模式插件..."
-  local plugin_src="${APP_PREFIX}/deck-companion"
-  local plugin_dest="${HOME}/homebrew/plugins/moodwave-deck-companion"
+  plugin_src="${APP_PREFIX}/deck-companion"
+  plugin_dest="${HOME}/homebrew/plugins/moodwave-deck-companion"
 
   if [[ -f "${plugin_src}/package.json" && ! -d "${plugin_src}/node_modules" ]]; then
     (cd "$plugin_src" && npm install --silent && npm run build) 2>&1 | tail -3
   fi
 
   if [[ -d "${HOME}/homebrew/plugins" ]]; then
-    rm -rf "$plugin_dest" 2>/dev/null || true
-    mkdir -p "$plugin_dest"
-    cp -r "${plugin_src}"/dist "${plugin_src}"/main.py "${plugin_src}"/plugin.json "${plugin_src}"/package.json "$plugin_dest/" 2>/dev/null || true
+    # Decky 插件目录通常属于 root，需要 sudo
+    sudo rm -rf "$plugin_dest" 2>/dev/null || true
+    sudo mkdir -p "$plugin_dest"
+    sudo cp -r "${plugin_src}"/dist "${plugin_src}"/main.py "${plugin_src}"/plugin.json "${plugin_src}"/package.json "$plugin_dest/" 2>/dev/null || true
+    sudo chown -R "${USER}:${USER}" "$plugin_dest" 2>/dev/null || true
     done_msg "Decky 插件已安装（重启 Steam 后生效）"
   else
     warn "未检测到 Decky Loader，跳过插件安装。（如需游戏模式使用，请先安装 Decky Loader）"
