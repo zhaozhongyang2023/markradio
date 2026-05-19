@@ -327,6 +327,10 @@ refresh() {
   echo "========== 刷新 $APP_NAME =========="
   stop_chromium
   stop_radio
+  echo -n "清理音频进程..."
+  pkill -9 ffplay 2>/dev/null || true
+  pkill -9 ffmpeg 2>/dev/null || true
+  green " ✓"
   clear_cache
   start_netease
   start_radio
