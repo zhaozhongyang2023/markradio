@@ -523,11 +523,6 @@ app.post('/api/ai/game-radio', async (request) => {
   };
 });
 
-app.post('/api/play', async (request) => applyPlaybackAction('play', request.body || {}));
-app.post('/api/pause', async (request) => applyPlaybackAction('pause', request.body || {}));
-app.post('/api/next', async (request) => applyPlaybackAction('next', request.body || {}));
-app.post('/api/prev', async (request) => applyPlaybackAction('prev', request.body || {}));
-
 app.get('/ws/stream', { websocket: true }, (socket) => {
   clients.add(socket);
   socket.send(JSON.stringify({ event: 'now', payload: publicNow(), at: new Date().toISOString() }));

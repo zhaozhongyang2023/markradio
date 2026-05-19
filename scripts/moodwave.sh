@@ -1,6 +1,6 @@
 #!/bin/bash
-# markradio.sh - MoodWave / Mark Radio 服务管理脚本
-# 用法: ./markradio.sh {start|stop|refresh|status|server}
+# moodwave.sh - MoodWave 服务管理脚本
+# 用法: ./moodwave.sh {start|stop|refresh|status|server}
 
 set -e
 
@@ -23,24 +23,24 @@ has_display() {
 }
 
 APP_NAME="${MOODWAVE_NAME:-MoodWave}"
-MARKRADIO_DIR="${MOODWAVE_DIR:-${MARKRADIO_DIR:-$HOME/markradio}}"
+MOODWAVE_DIR_PATH="${MOODWAVE_DIR:-${MOODWAVE_DIR_PATH:-$HOME/moodwave}}"
 
 # 自动检测 moodwave 安装路径
-if [ ! -d "$MARKRADIO_DIR" ] && [ -d "$HOME/.local/share/moodwave" ]; then
-  MARKRADIO_DIR="$HOME/.local/share/moodwave"
+if [ ! -d "$MOODWAVE_DIR_PATH" ] && [ -d "$HOME/.local/share/moodwave" ]; then
+  MOODWAVE_DIR_PATH="$HOME/.local/share/moodwave"
 fi
 NETEASE_DIR="${NETEASE_DIR:-$HOME/netease-cloud-music-api}"
-API_PORT="${MOODWAVE_API_PORT:-${MOODWAVE_PORT:-${MARKRADIO_API_PORT:-8765}}}"
-WEB_PORT="${MOODWAVE_WEB_PORT:-${MARKRADIO_WEB_PORT:-8080}}"
+API_PORT="${MOODWAVE_API_PORT:-${MOODWAVE_PORT:-8765}}"
+WEB_PORT="${MOODWAVE_WEB_PORT:-8080}"
 NETEASE_PORT="${NETEASE_PORT:-3000}"
 
-MARKRADIO_PID="$MARKRADIO_DIR/markradio.pid"
+MOODWAVE_PID="$MOODWAVE_DIR_PATH/moodwave.pid"
 NETEASE_PID="$NETEASE_DIR/netease-api.pid"
 
-MARKRADIO_LOG="$MARKRADIO_DIR/markradio.log"
+MOODWAVE_LOG="$MOODWAVE_DIR_PATH/moodwave.log"
 NETEASE_LOG="$NETEASE_DIR/netease-api.log"
-FIREFOX_LOG="$MARKRADIO_DIR/firefox-kiosk.log"
-FIREFOX_PROFILE="$MARKRADIO_DIR/firefox-kiosk-profile"
+FIREFOX_LOG="$MOODWAVE_DIR_PATH/firefox-kiosk.log"
+FIREFOX_PROFILE="$MOODWAVE_DIR_PATH/firefox-kiosk-profile"
 
 DISPLAY="${DISPLAY:-:0}"
 KIOSK_URL="${KIOSK_URL:-http://localhost:${WEB_PORT}/?lowPower=1}"
@@ -55,10 +55,10 @@ port_listening() {
 
 clear_cache() {
   echo -n "清理缓存..."
-  rm -rf "$MARKRADIO_DIR/data/cache/tts"/* 2>/dev/null || true
+  rm -rf "$MOODWAVE_DIR_PATH/data/cache/tts"/* 2>/dev/null || true
   # 只清除 TTS/播放记录/当前计划，保留网易云登录、口味、声线等配置
-  if [ -f "$MARKRADIO_DIR/data/markradio.db" ]; then
-    sqlite3 "$MARKRADIO_DIR/data/markradio.db" "
+  if [ -f "$MOODWAVE_DIR_PATH/data/moodwave.db" ]; then
+    sqlite3 "$MOODWAVE_DIR_PATH/data/moodwave.db" "
       DELETE FROM tts_cache;
       DELETE FROM plays;
       DELETE FROM kv WHERE key='planToday';
@@ -121,24 +121,24 @@ start_radio() {
   fi
 
   echo -n "启动 Radio API + Web 前端..."
-  cd "$MARKRADIO_DIR"
+  cd "$MOODWAVE_DIR_PATH"
   NODE_ENV=production \
   MOODWAVE_API_PORT="$API_PORT" \
   MOODWAVE_PORT="$API_PORT" \
   MOODWAVE_WEB_PORT="$WEB_PORT" \
-  MARKRADIO_API_PORT="$API_PORT" \
-  MARKRADIO_WEB_PORT="$WEB_PORT" \
-  nohup node server/index.js > "$MARKRADIO_LOG" 2>&1 &
-  echo $! > "$MARKRADIO_PID"
+  MOODWAVE_API_PORT="$API_PORT" \
+  MOODWAVE_WEB_PORT="$WEB_PORT" \
+  nohup node server/index.js > "$MOODWAVE_LOG" 2>&1 &
+  echo $! > "$MOODWAVE_PID"
 
   for i in $(seq 1 20); do
     sleep 0.5
     if port_listening "$API_PORT"; then
-      green " ✓ (PID $(cat $MARKRADIO_PID))"
+      green " ✓ (PID $(cat $MOODWAVE_PID))"
       return
     fi
   done
-  red " ✗ 启动超时，查看 $MARKRADIO_LOG"
+  red " ✗ 启动超时，查看 $MOODWAVE_LOG"
 }
 
 disable_screen_blank() {
@@ -273,14 +273,14 @@ stop_netease() {
 }
 
 stop_radio() {
-  if command -v systemctl >/dev/null 2>&1 && systemctl list-unit-files markradio.service >/dev/null 2>&1; then
-    sudo -n systemctl stop markradio.service 2>/dev/null || true
+  if command -v systemctl >/dev/null 2>&1 && systemctl list-unit-files moodwave.service >/dev/null 2>&1; then
+    sudo -n systemctl stop moodwave.service 2>/dev/null || true
   fi
   if command -v systemctl >/dev/null 2>&1 && systemctl list-unit-files moodwave.service >/dev/null 2>&1; then
     sudo -n systemctl stop moodwave.service 2>/dev/null || true
   fi
-  if [ -f "$MARKRADIO_PID" ]; then
-    local pid=$(cat "$MARKRADIO_PID")
+  if [ -f "$MOODWAVE_PID" ]; then
+    local pid=$(cat "$MOODWAVE_PID")
     if kill -0 "$pid" 2>/dev/null; then
       echo -n "停止 Radio API (PID $pid)..."
       kill "$pid" 2>/dev/null
@@ -288,7 +288,7 @@ stop_radio() {
       kill -0 "$pid" 2>/dev/null && kill -9 "$pid" 2>/dev/null || true
       green " ✓"
     fi
-    rm -f "$MARKRADIO_PID"
+    rm -f "$MOODWAVE_PID"
   fi
   # 兜底
   pkill -f "node server/index.js" 2>/dev/null || true
