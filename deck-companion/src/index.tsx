@@ -1,6 +1,6 @@
 import { PanelSection, PanelSectionRow, TextField, staticClasses } from '@decky/ui';
 import { definePlugin } from '@decky/api';
-import { ChangeEvent, useEffect, useState } from 'react';
+import { ChangeEvent, useEffect, useRef, useState } from 'react';
 
 const DEFAULT_API_BASE = 'http://127.0.0.1:38765';
 const API_BASE_KEY = 'moodwave.deck.apiBase';
@@ -111,12 +111,21 @@ function Content() {
   const [query, setQuery] = useState(searchExamples[0].id);
   const [gameVibe, setGameVibe] = useState('探索地图');
   const [gameName, setGameName] = useState(() => localStorage.getItem(GAME_NAME_KEY) || '');
+  const gameNameEditedRef = useRef(false);  // 用户手动编辑后不再自动覆盖
 
   async function refresh() {
     try {
       const payload = await apiRequest<NowPayload>(apiBase, '/api/now');
       setNow(payload);
       setStatus('在线');
+      // 自动检测当前运行的游戏名
+      try {
+        const dfl = (window as any).DFL;
+        const runningName = dfl?.Router?.MainRunningApp?.display_name;
+        if (runningName && !gameNameEditedRef.current) {
+          setGameName(String(runningName));
+        }
+      } catch { /* DFL 不可用时静默跳过 */ }
     } catch {
       setStatus('离线');
     }
@@ -178,6 +187,7 @@ function Content() {
 
   function saveGameName(value: string) {
     const v = String(value || "");
+    gameNameEditedRef.current = true;  // 用户手动输入，停止自动覆盖
     setGameName(v);
     localStorage.setItem(GAME_NAME_KEY, v);
   }
