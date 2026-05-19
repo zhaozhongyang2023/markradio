@@ -46,11 +46,10 @@ const searchExamples = [
   { id: '雨天发呆', icon: '⌁' }
 ];
 const gameVibes = [
-  { id: 'Boss战', icon: '⚔', hint: '燃一点，别停。' },
-  { id: '探索地图', icon: '⌖', hint: '适合慢慢跑图。' },
-  { id: '刷素材', icon: '◆', hint: '稳定一点，不打扰。' },
-  { id: '种田放松', icon: '✧', hint: '今晚别太累了。' },
-  { id: '模拟器怀旧', icon: '▣', hint: '像小时候一样。' }
+  { id: 'Boss战', icon: '⚔', hint: '燃一点' },
+  { id: '探索地图', icon: '⌖', hint: '适合慢慢跑图' },
+  { id: '种田放松', icon: '✧', hint: '今天别太累了' },
+  { id: '模拟器怀旧', icon: '▣', hint: '像小时候一样' }
 ];
 
 function normalizeBase(value: string) {
@@ -101,6 +100,7 @@ function Content() {
   const [now, setNow] = useState<NowPayload>({});
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState('连接中');
+  const [progress, setProgress] = useState(0);
   const [query, setQuery] = useState(searchExamples[0].id);
   const [gameVibe, setGameVibe] = useState('探索地图');
   const [gameName, setGameName] = useState(() => localStorage.getItem(GAME_NAME_KEY) || '');
@@ -120,12 +120,25 @@ function Content() {
   async function run(label: string, task: () => Promise<unknown>) {
     setBusy(true);
     setStatus(label);
+    setProgress(0);
+    // 模拟进度增长到 85%
+    const timer = setInterval(() => {
+      setProgress((prev) => {
+        if (prev >= 85) return 85;
+        const step = prev < 30 ? 6 : prev < 60 ? 3 : 1;
+        return Math.min(85, prev + step);
+      });
+    }, 200);
     try {
       await task();
+      setProgress(100);
+      setTimeout(() => setProgress(0), 600);
       await refresh();
     } catch (error) {
+      setProgress(0);
       setStatus(error instanceof Error ? error.message : '请求失败');
     } finally {
+      clearInterval(timer);
       setBusy(false);
     }
   }
@@ -141,7 +154,7 @@ function Content() {
   const currentMood = (now.plan?.mood || now.now?.mood || '').trim();
   const queue = now.plan?.queue || [];
   const djLine = now.plan?.tts?.text || now.plan?.plan?.say || now.plan?.plan?.reply || '';
-  const trackLine = track?.title ? `${track.title}${track.artist ? ` - ${track.artist}` : ''}` : '等待电台开播';
+  const trackLine = track?.title ? `${track.title}${track.artist ? ` - ${track.artist}` : ''}` : "AI DJ 准备中...";
   const audioUrl = track ? `${normalizeBase(apiBase)}/media/audio?id=${track.sourceId || track.id || ''}` : '';
   const ttsUrl = now.plan?.tts?.url ? `${normalizeBase(apiBase)}${now.plan.tts.url}` : '';
 
@@ -201,7 +214,7 @@ function Content() {
     });
   }
 
-  async function startGameRadio(label = '正在生成') {
+  async function startGameRadio(label = 'AI DJ 准备中') {
     const vibe = gameVibes.find((item) => item.id === gameVibe);
     await run(label, async () => {
       await apiRequest(apiBase, '/api/ai/game-radio', {
@@ -219,7 +232,18 @@ function Content() {
     <div className="mw-root">
       <style>{`
         .mw-root {
+          position: relative;
           padding: 6px 10px 54px;
+        }
+        .mw-progress {
+          position: absolute;
+          top: 0;
+          left: 0;
+          height: 2px;
+          background: #42d8b2;
+          transition: width .3s ease;
+          border-radius: 0 1px 1px 0;
+          z-index: 10;
           color: rgba(255,255,255,.86);
           font-size: 12px;
           letter-spacing: 0;
@@ -321,6 +345,31 @@ function Content() {
           background: #42d8b2;
           box-shadow: 0 0 8px rgba(66,216,178,.7);
           vertical-align: 1px;
+          animation: mw-pulse 1.2s ease-in-out infinite;
+        }
+        @keyframes mw-pulse {
+          0%, 100% { opacity: 1; box-shadow: 0 0 8px rgba(66,216,178,.7); }
+          50% { opacity: .4; box-shadow: 0 0 4px rgba(66,216,178,.3); }
+        }
+        .mw-busy-ellipsis {
+          display: inline-flex;
+          gap: 3px;
+          margin-left: 2px;
+        }
+        .mw-busy-ellipsis i {
+          display: inline-block;
+          width: 4px;
+          height: 4px;
+          border-radius: 50%;
+          background: #42d8b2;
+          animation: mw-bounce 1.2s ease-in-out infinite;
+        }
+        .mw-busy-ellipsis i:nth-child(1) { animation-delay: 0s; }
+        .mw-busy-ellipsis i:nth-child(2) { animation-delay: .2s; }
+        .mw-busy-ellipsis i:nth-child(3) { animation-delay: .4s; }
+        @keyframes mw-bounce {
+          0%, 80%, 100% { transform: translateY(0); opacity: .3; }
+          40% { transform: translateY(-4px); opacity: 1; }
         }
         .mw-button:focus-visible {
           outline: 2px solid #42d8b2;
@@ -332,6 +381,10 @@ function Content() {
           border-radius: 7px;
           background: rgba(255,255,255,.04);
           min-width: 0;
+        }
+        .mw-card-accent {
+          border-left: 3px solid #42d8b2;
+          background: rgba(66,216,178,0.06);
         }
         .mw-mini {
           margin-bottom: 7px;
@@ -429,8 +482,8 @@ function Content() {
       <audio ref={djRef} style={{ display: 'none' }} />
 
       <div className="mw-status">
-        <span>{busy ? <><span className="mw-busy-dot" />{status}</> : `${status}${currentMood ? ` · ${currentMood}` : ''}`}</span>
-        <span>{playing ? '播放中' : '待机'}</span>
+        <span>{progress > 0 ? <div className="mw-progress" style={{width: `${progress}%`}} /> : null}{busy ? <><span style={{fontSize:10,opacity:.6,marginRight:6}}>{progress}%</span><span className="mw-busy-dot" /><><span>{status}</span><span className="mw-busy-ellipsis"><i /><i /><i /></span></></> : `${status}${currentMood ? ` · ${currentMood}` : ''}`}</span>
+        <span>{playing ? "📻 正在陪你" : '待机'}</span>
       </div>
 
       <div className="mw-topbar">
@@ -448,7 +501,7 @@ function Content() {
         <div className="mw-card mw-mini">
           <div className="mw-mini-head">
             <div className="mw-mini-title">{trackLine}</div>
-            <div className="mw-mini-state">{playing ? '播放中' : '待机'}</div>
+            <div className="mw-mini-state">{playing ? "📻 正在陪你" : '待机'}</div>
           </div>
           <div className="mw-grid">
             <button
@@ -484,7 +537,7 @@ function Content() {
 
       {page === 'radio' && (
         <div>
-          <div className="mw-section-title"><span>◉</span>AI Radio</div>
+          <div className="mw-section-title"><span>◉</span>今日电台</div>
           <div className="mw-card">
             <div className="mw-grid">
               {moods.map((mood) => (
@@ -504,7 +557,7 @@ function Content() {
 
       {page === 'search' && (
         <div>
-          <div className="mw-section-title"><span>⌕</span>AI 寻歌</div>
+          <div className="mw-section-title"><span>⌕</span>🎮 现在在玩什么？</div>
           <div className="mw-card">
             <div className="mw-grid two">
               {searchExamples.map((example) => (
@@ -522,14 +575,14 @@ function Content() {
           </div>
           <PanelSectionRow>
             <TextField
-              label="一句话描述"
+              label="🎧 想听什么？"
               value={query}
               onChange={(event: ChangeEvent<HTMLInputElement>) => setQuery(event.target.value)}
             />
           </PanelSectionRow>
           <div className="mw-action-row">
-            <AppButton active disabled={busy || !query.trim()} onClick={searchRadio}>开始电台</AppButton>
-            <AppButton disabled={busy} onClick={nextRadio}>换氛围</AppButton>
+            <AppButton active disabled={busy || !query.trim()} onClick={searchRadio}>▶ 开始电台</AppButton>
+            <AppButton disabled={busy} onClick={nextRadio}>↻ 来点别的</AppButton>
           </div>
         </div>
       )}
@@ -553,8 +606,8 @@ function Content() {
             </div>
           </div>
           <div className="mw-action-row">
-            <AppButton active disabled={busy || !gameVibe} onClick={() => startGameRadio('正在生成游戏电台')}>开始</AppButton>
-            <AppButton disabled={busy || !gameVibe} onClick={() => startGameRadio('正在换游戏氛围')}>换氛围</AppButton>
+            <AppButton active disabled={busy || !gameVibe} onClick={() => startGameRadio('电台启动中')}>▶ 开始电台</AppButton>
+            <AppButton disabled={busy || !gameVibe} onClick={() => startGameRadio('换个感觉')}>↻ 来点别的</AppButton>
           </div>
         </div>
       )}
@@ -563,7 +616,7 @@ function Content() {
         <PanelSection title="设置">
           <PanelSectionRow>
             <TextField
-              label="在玩什么"
+              label="🎮 现在在玩什么？"
               value={gameName}
               onChange={(event: ChangeEvent<HTMLInputElement>) => { const v = event.target.value; setGameName(v); localStorage.setItem(GAME_NAME_KEY, v); }}
             />
@@ -584,7 +637,7 @@ function Content() {
       {page !== 'settings' && (djLine || queue.length > 0) && (
         <div>
           <div className="mw-section-title"><span>✦</span>AI DJ</div>
-          <div className="mw-card">
+          <div className="mw-card mw-card-accent">
             {djLine ? <div className="mw-dj">{djLine}</div> : null}
             {queue.slice(0, 2).map((item, index) => (
               <div className="mw-song" key={item.id || index}>
