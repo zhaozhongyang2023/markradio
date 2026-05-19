@@ -570,7 +570,7 @@ function mediaIdFromUrl(url = '') {
   const pathMatch = raw.match(/\/media\/audio\/([^/?#]+?)(?:\.mp3)?(?:[?#]|$)/);
   if (pathMatch) return decodeURIComponent(pathMatch[1]).replace(/\.mp3$/i, '');
   try {
-    const parsed = raw.startsWith('http') ? new URL(raw) : new URL(raw, 'http://markradio.local');
+    const parsed = raw.startsWith('http') ? new URL(raw) : new URL(raw, 'http://localhost');
     const id = parsed.searchParams.get('id') || '';
     if (parsed.pathname === '/media/audio' && id) return id;
   } catch (_) {}
@@ -583,7 +583,7 @@ function ttsHashFromUrl(url = '') {
   const directMatch = raw.match(/\/tts\/([a-f0-9]{24})\.mp3(?:[?#]|$)/i);
   if (directMatch) return directMatch[1];
   try {
-    const parsed = raw.startsWith('http') ? new URL(raw) : new URL(raw, 'http://markradio.local');
+    const parsed = raw.startsWith('http') ? new URL(raw) : new URL(raw, 'http://localhost');
     const match = parsed.pathname.match(/^\/tts\/([a-f0-9]{24})\.mp3$/i);
     return match ? match[1] : '';
   } catch (_) {
