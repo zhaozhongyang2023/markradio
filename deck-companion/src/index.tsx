@@ -30,14 +30,26 @@ type NowPayload = {
 
 type Page = 'radio' | 'search' | 'game' | 'settings';
 
-const moods = ['开心', '平静', '忧郁', '悲伤', '治愈', '愤怒'];
-const searchExamples = ['JRPG夜晚探索', '深夜戴耳机', '小时候网吧', '雨天发呆'];
+const moods = [
+  { id: '开心', icon: '☼' },
+  { id: '平静', icon: '◌' },
+  { id: '忧郁', icon: '☁' },
+  { id: '悲伤', icon: '☂' },
+  { id: '治愈', icon: '✦' },
+  { id: '愤怒', icon: '⚡' }
+];
+const searchExamples = [
+  { id: 'JRPG夜晚探索', icon: '◇' },
+  { id: '深夜戴耳机', icon: '◐' },
+  { id: '小时候网吧', icon: '▣' },
+  { id: '雨天发呆', icon: '⌁' }
+];
 const gameVibes = [
-  { id: 'Boss战', hint: '燃一点，别停。' },
-  { id: '探索地图', hint: '适合慢慢跑图。' },
-  { id: '刷素材', hint: '稳定一点，不打扰。' },
-  { id: '种田放松', hint: '今晚别太累了。' },
-  { id: '模拟器怀旧', hint: '像小时候一样。' }
+  { id: 'Boss战', icon: '⚔', hint: '燃一点，别停。' },
+  { id: '探索地图', icon: '⌖', hint: '适合慢慢跑图。' },
+  { id: '刷素材', icon: '◆', hint: '稳定一点，不打扰。' },
+  { id: '种田放松', icon: '✧', hint: '今晚别太累了。' },
+  { id: '模拟器怀旧', icon: '▣', hint: '像小时候一样。' }
 ];
 
 function normalizeBase(value: string) {
@@ -86,7 +98,7 @@ function Content() {
   const [now, setNow] = useState<NowPayload>({});
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState('连接中');
-  const [query, setQuery] = useState(searchExamples[0]);
+  const [query, setQuery] = useState(searchExamples[0].id);
   const [gameVibe, setGameVibe] = useState('探索地图');
   const [gameName, setGameName] = useState('');
   const audioRef = useRef<HTMLAudioElement>(null);
@@ -221,11 +233,16 @@ function Content() {
           line-height: 14px;
           min-width: 0;
         }
+        .mw-topbar {
+          display: grid;
+          grid-template-columns: minmax(0, 1fr) 30px;
+          gap: 5px;
+          margin-bottom: 6px;
+        }
         .mw-tabs {
           display: grid;
-          grid-template-columns: repeat(4, minmax(0, 1fr));
+          grid-template-columns: repeat(3, minmax(0, 1fr));
           gap: 4px;
-          margin-bottom: 6px;
         }
         .mw-grid {
           display: grid;
@@ -260,6 +277,19 @@ function Content() {
         }
         .mw-button:disabled {
           opacity: .42;
+        }
+        .mw-button.is-icon {
+          padding: 0;
+          font-size: 14px;
+          line-height: 26px;
+        }
+        .mw-button .mw-icon {
+          display: inline-block;
+          min-width: 14px;
+          margin-right: 4px;
+          color: rgba(66,216,178,.92);
+          font-size: 11px;
+          text-align: center;
         }
         .mw-button:focus-visible {
           outline: 2px solid #42d8b2;
@@ -298,11 +328,18 @@ function Content() {
           font-weight: 800;
         }
         .mw-section-title {
+          display: flex;
+          align-items: center;
+          gap: 6px;
           margin: 7px 0 5px;
           color: rgba(255,255,255,.9);
           font-size: 15px;
           font-weight: 800;
           line-height: 18px;
+        }
+        .mw-section-title span {
+          color: #42d8b2;
+          font-size: 13px;
         }
         .mw-action-row {
           display: grid;
@@ -365,40 +402,46 @@ function Content() {
         <span>{playing ? '播放中' : '待机'}</span>
       </div>
 
-      <div className="mw-tabs">
-        <AppButton active={page === 'radio'} onClick={() => setPage('radio')}>电台</AppButton>
-        <AppButton active={page === 'search'} onClick={() => setPage('search')}>寻歌</AppButton>
-        <AppButton active={page === 'game'} onClick={() => setPage('game')}>游戏</AppButton>
-        <AppButton active={page === 'settings'} onClick={() => setPage('settings')}>设置</AppButton>
+      <div className="mw-topbar">
+        <div className="mw-tabs">
+          <AppButton active={page === 'radio'} onClick={() => setPage('radio')}><span className="mw-icon">◉</span>电台</AppButton>
+          <AppButton active={page === 'search'} onClick={() => setPage('search')}><span className="mw-icon">⌕</span>寻歌</AppButton>
+          <AppButton active={page === 'game'} onClick={() => setPage('game')}><span className="mw-icon">▣</span>游戏</AppButton>
+        </div>
+        <AppButton active={page === 'settings'} title="设置" onClick={() => setPage('settings')}>
+          <span className="mw-icon">⚙</span>
+        </AppButton>
       </div>
 
-      <div className="mw-card mw-mini">
-        <div className="mw-mini-head">
-          <div className="mw-mini-title">{trackLine}</div>
-          <div className="mw-mini-state">{playing ? '播放中' : '待机'}</div>
+      {page !== 'settings' && (
+        <div className="mw-card mw-mini">
+          <div className="mw-mini-head">
+            <div className="mw-mini-title">{trackLine}</div>
+            <div className="mw-mini-state">{playing ? '播放中' : '待机'}</div>
+          </div>
+          <div className="mw-grid">
+            <AppButton disabled={busy} title={playing ? '暂停' : '播放'} onClick={() => run(playing ? '暂停' : '播放', () => apiRequest(apiBase, playing ? '/api/pause' : '/api/play', {}))}>
+              {playing ? 'Ⅱ' : '▶'}
+            </AppButton>
+            <AppButton disabled={busy} title="上一首" onClick={() => run('上一首', () => apiRequest(apiBase, '/api/prev', {}))}>‹</AppButton>
+            <AppButton disabled={busy} title="下一首" onClick={() => run('下一首', () => apiRequest(apiBase, '/api/next', {}))}>›</AppButton>
+          </div>
         </div>
-        <div className="mw-grid">
-          <AppButton disabled={busy} onClick={() => run(playing ? '暂停' : '播放', () => apiRequest(apiBase, playing ? '/api/pause' : '/api/play', {}))}>
-            {playing ? '暂停' : '播放'}
-          </AppButton>
-          <AppButton disabled={busy} onClick={() => run('上一首', () => apiRequest(apiBase, '/api/prev', {}))}>上一首</AppButton>
-          <AppButton disabled={busy} onClick={() => run('下一首', () => apiRequest(apiBase, '/api/next', {}))}>下一首</AppButton>
-        </div>
-      </div>
+      )}
 
       {page === 'radio' && (
         <div>
-          <div className="mw-section-title">AI Radio</div>
+          <div className="mw-section-title"><span>◉</span>AI Radio</div>
           <div className="mw-card">
             <div className="mw-grid">
               {moods.map((mood) => (
                 <AppButton
-                  key={mood}
-                  active={currentMood === mood}
+                  key={mood.id}
+                  active={currentMood === mood.id}
                   disabled={busy}
-                  onClick={() => startRadio(mood)}
+                  onClick={() => startRadio(mood.id)}
                 >
-                  {mood}
+                  <span className="mw-icon">{mood.icon}</span>{mood.id}
                 </AppButton>
               ))}
             </div>
@@ -408,18 +451,18 @@ function Content() {
 
       {page === 'search' && (
         <div>
-          <div className="mw-section-title">AI 寻歌</div>
+          <div className="mw-section-title"><span>⌕</span>AI 寻歌</div>
           <div className="mw-card">
             <div className="mw-grid two">
               {searchExamples.map((example) => (
                 <AppButton
-                  key={example}
-                  active={query === example}
+                  key={example.id}
+                  active={query === example.id}
                   disabled={busy}
-                  title={example}
-                  onClick={() => setQuery(example)}
+                  title={example.id}
+                  onClick={() => setQuery(example.id)}
                 >
-                  {example}
+                  <span className="mw-icon">{example.icon}</span>{example.id}
                 </AppButton>
               ))}
             </div>
@@ -440,7 +483,7 @@ function Content() {
 
       {page === 'game' && (
         <div>
-          <div className="mw-section-title">游戏电台</div>
+          <div className="mw-section-title"><span>▣</span>游戏电台</div>
           <div className="mw-card">
             <div className="mw-grid two">
               {gameVibes.map((vibe) => (
@@ -451,7 +494,7 @@ function Content() {
                   title={vibe.hint}
                   onClick={() => setGameVibe(vibe.id)}
                 >
-                  {vibe.id}
+                  <span className="mw-icon">{vibe.icon}</span>{vibe.id}
                 </AppButton>
               ))}
             </div>
@@ -464,7 +507,7 @@ function Content() {
       )}
 
       {page === 'settings' && (
-        <PanelSection title="连接">
+        <PanelSection title="设置">
           <PanelSectionRow>
             <TextField
               label="在玩什么"
@@ -485,9 +528,9 @@ function Content() {
         </PanelSection>
       )}
 
-      {(djLine || queue.length > 0) && (
+      {page !== 'settings' && (djLine || queue.length > 0) && (
         <div>
-          <div className="mw-section-title">AI DJ</div>
+          <div className="mw-section-title"><span>✦</span>AI DJ</div>
           <div className="mw-card">
             {djLine ? <div className="mw-dj">{djLine}</div> : null}
             {queue.slice(0, 2).map((item, index) => (
