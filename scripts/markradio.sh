@@ -24,6 +24,11 @@ has_display() {
 
 APP_NAME="${MOODWAVE_NAME:-MoodWave}"
 MARKRADIO_DIR="${MOODWAVE_DIR:-${MARKRADIO_DIR:-$HOME/markradio}}"
+
+# 自动检测 moodwave 安装路径
+if [ ! -d "$MARKRADIO_DIR" ] && [ -d "$HOME/.local/share/moodwave" ]; then
+  MARKRADIO_DIR="$HOME/.local/share/moodwave"
+fi
 NETEASE_DIR="${NETEASE_DIR:-$HOME/netease-cloud-music-api}"
 API_PORT="${MOODWAVE_API_PORT:-${MOODWAVE_PORT:-${MARKRADIO_API_PORT:-8765}}}"
 WEB_PORT="${MOODWAVE_WEB_PORT:-${MARKRADIO_WEB_PORT:-8080}}"
