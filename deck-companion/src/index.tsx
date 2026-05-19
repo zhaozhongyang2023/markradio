@@ -3,8 +3,7 @@ import {
   PanelSection,
   PanelSectionRow,
   staticClasses,
-  TextField,
-  Tabs
+  TextField
 } from '@decky/ui';
 import { definePlugin } from '@decky/api';
 import { ChangeEvent, useEffect, useMemo, useState } from 'react';
@@ -81,121 +80,88 @@ function useMoodWave(apiBase: string) {
 }
 
 // ═══════════════════════════════════════
-//  SteamOS 深色沉浸风 行内样式
+//  样式常量
 // ═══════════════════════════════════════
 const S = {
-  // 氛围标签
-  vibeWrap: { display: 'flex', gap: 8, marginTop: 6, marginBottom: 14, flexWrap: 'wrap' as const },
-  vibeBtn: (active: boolean) => ({
-    flex: '1 1 calc(33% - 8px)',
-    minWidth: 80,
-    padding: 14,
-    border: active ? '1px solid #42d8b2' : '1px solid rgba(255,255,255,0.08)',
-    borderRadius: 10,
-    background: active ? 'rgba(66,216,178,0.10)' : 'rgba(255,255,255,0.04)',
-    color: active ? '#42d8b2' : 'rgba(255,255,255,0.68)',
-    fontSize: 11,
-    fontWeight: active ? 700 : 500,
-    textAlign: 'center' as const,
-    cursor: 'pointer',
+  // Tab 切换栏
+  tabBar: { display: 'flex', gap: 4, padding: '8px 16px 0', borderBottom: '1px solid rgba(255,255,255,0.06)' },
+  tabBtn: (active: boolean) => ({
+    flex: 1, padding: '10px 0', border: 'none', borderRadius: '8px 8px 0 0',
+    background: active ? 'rgba(66,216,178,0.12)' : 'transparent',
+    color: active ? '#42d8b2' : 'rgba(255,255,255,0.45)',
+    fontSize: 12, fontWeight: active ? 700 : 500, cursor: 'pointer',
+    borderBottom: active ? '2px solid #42d8b2' : '2px solid transparent',
     transition: 'all 140ms ease',
-    lineHeight: 1.4,
   }),
-  vibeIcon: { display: 'block', fontSize: 22, marginBottom: 4 },
-  vibeText: { display: 'block', fontSize: 10, opacity: 0.54, marginTop: 2, fontStyle: 'italic' as const },
 
-  // 大按钮
+  vibeWrap: { display: 'flex', gap: 6, marginTop: 6, marginBottom: 12, flexWrap: 'wrap' as const },
+  vibeBtn: (active: boolean) => ({
+    flex: '1 1 calc(33% - 6px)', minWidth: 72, padding: 12,
+    border: active ? '1px solid #42d8b2' : '1px solid rgba(255,255,255,0.08)',
+    borderRadius: 10, background: active ? 'rgba(66,216,178,0.10)' : 'rgba(255,255,255,0.04)',
+    color: active ? '#42d8b2' : 'rgba(255,255,255,0.68)',
+    fontSize: 11, fontWeight: active ? 700 : 500, textAlign: 'center' as const,
+    cursor: 'pointer', transition: 'all 140ms ease', lineHeight: 1.4,
+  }),
+  vibeIcon: { display: 'block', fontSize: 20, marginBottom: 3 },
+  vibeText: { display: 'block', fontSize: 9, opacity: 0.5, marginTop: 2, fontStyle: 'italic' as const },
+
   bigBtn: (disabled: boolean) => ({
-    width: '100%', padding: '14px 0', marginTop: 10, marginBottom: 8,
+    width: '100%', padding: '12px 0', marginTop: 8, marginBottom: 8,
     fontSize: 14, fontWeight: 700, borderRadius: 10, border: 'none',
-    background: disabled ? 'rgba(66,216,178,0.18)' : '#42d8b2',
-    color: disabled ? 'rgba(66,216,178,0.5)' : '#071510',
-    cursor: disabled ? 'default' : 'pointer',
-    transition: 'all 160ms ease',
+    background: disabled ? 'rgba(66,216,178,0.15)' : '#42d8b2',
+    color: disabled ? 'rgba(66,216,178,0.4)' : '#071510',
+    cursor: disabled ? 'default' : 'pointer', transition: 'all 160ms ease',
   }),
 
-  // 结果区
   resultBox: {
-    marginTop: 16, padding: '14px 16px', borderRadius: 10,
-    background: 'rgba(66,216,178,0.06)', border: '1px solid rgba(66,216,178,0.12)',
+    marginTop: 14, padding: '12px 14px', borderRadius: 10,
+    background: 'rgba(66,216,178,0.05)', border: '1px solid rgba(66,216,178,0.10)',
   },
-  djIntro: { fontSize: 12, fontWeight: 600, color: '#42d8b2', marginBottom: 14, lineHeight: 1.6 },
-  songItem: { padding: '8px 0', borderTop: '1px solid rgba(255,255,255,0.05)' },
-  songTitle: { fontSize: 12, fontWeight: 700, color: 'rgba(255,255,255,0.82)' },
-  songArtist: { fontSize: 11, opacity: 0.56 },
-  songReason: { fontSize: 10, opacity: 0.44, marginTop: 3, fontStyle: 'italic' as const },
+  djIntro: { fontSize: 12, fontWeight: 600, color: '#42d8b2', marginBottom: 12, lineHeight: 1.6 },
+  songItem: { padding: '7px 0', borderTop: '1px solid rgba(255,255,255,0.05)' },
+  songTitle: { fontSize: 12, fontWeight: 700, color: 'rgba(255,255,255,0.8)' },
+  songArtist: { fontSize: 11, opacity: 0.52 },
+  songReason: { fontSize: 10, opacity: 0.42, marginTop: 3, fontStyle: 'italic' as const },
 
-  // 操作按钮行
-  actionRow: { display: 'flex', gap: 10, marginTop: 14 },
+  actionRow: { display: 'flex', gap: 8, marginTop: 12 },
   actionBtn: (primary: boolean) => ({
     flex: 1, padding: '10px 0', borderRadius: 8,
     border: primary ? 'none' : '1px solid rgba(255,255,255,0.10)',
     background: primary ? '#42d8b2' : 'rgba(255,255,255,0.05)',
-    color: primary ? '#071510' : 'rgba(255,255,255,0.68)',
-    fontSize: 12, fontWeight: 700, cursor: 'pointer',
+    color: primary ? '#071510' : 'rgba(255,255,255,0.64)',
+    fontSize: 12, fontWeight: 600, cursor: 'pointer', transition: 'all 140ms ease',
   }),
 
-  // 迷你播放器（带 DJ 文案）
-  miniBar: {
-    marginTop: 16, padding: '10px 14px', borderRadius: 10,
-    background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)',
+  sectionNote: { fontSize: 10, opacity: 0.5, lineHeight: 1.5 },
+  statusStrip: { fontSize: 10, opacity: 0.45, textAlign: 'center' as const, marginTop: 6 },
+
+  miniPlayer: {
+    marginTop: 14, padding: '10px 14px', borderTop: '1px solid rgba(255,255,255,0.06)',
+    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
   },
-  miniDJ: { fontSize: 10, opacity: 0.48, marginBottom: 6 },
-  miniRow: { display: 'flex', alignItems: 'center', gap: 8 },
-  miniTitle: { flex: 1, fontSize: 11, fontWeight: 600, color: 'rgba(255,255,255,0.72)', overflow: 'hidden', whiteSpace: 'nowrap' as const, textOverflow: 'ellipsis' as const },
-  miniBtn: (disabled: boolean) => ({
-    width: 30, height: 30, borderRadius: 6,
-    border: '1px solid rgba(255,255,255,0.12)',
-    background: disabled ? 'rgba(255,255,255,0.03)' : 'rgba(255,255,255,0.08)',
-    color: disabled ? 'rgba(255,255,255,0.28)' : 'rgba(255,255,255,0.70)',
-    fontSize: 14, cursor: disabled ? 'default' : 'pointer',
-  }),
-
-  // 电台模式心情按钮
-  moodGrid: { display: 'flex', flexWrap: 'wrap' as const, gap: 6 },
-  moodBtn: (active: boolean, tone: string) => ({
-    flex: '1 1 calc(33% - 6px)',
-    minWidth: 72,
-    padding: '12px 8px',
-    border: active ? `1px solid ${tone}` : '1px solid rgba(255,255,255,0.08)',
-    borderRadius: 8,
-    background: active ? `${tone}18` : 'rgba(255,255,255,0.04)',
-    color: active ? tone : 'rgba(255,255,255,0.66)',
-    fontSize: 12,
-    fontWeight: active ? 700 : 500,
-    textAlign: 'center' as const,
-    cursor: 'pointer',
-    transition: 'all 140ms ease',
-  }),
-
-  // 通用
-  sectionNote: { fontSize: 11, opacity: 0.48, marginTop: 4, marginBottom: 2 },
-  statusLine: { fontSize: 11, opacity: 0.54, marginTop: 6 },
+  miniTrack: { fontSize: 11, fontWeight: 600, flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' as const },
+  miniBtn: { padding: '6px 10px', fontSize: 11, marginLeft: 8, borderRadius: 6, border: '1px solid rgba(255,255,255,0.12)', background: 'transparent', color: 'rgba(255,255,255,0.7)', cursor: 'pointer' },
 };
 
 // ═══════════════════════════════════════
-//  迷你播放器（跨 Tab，带 DJ 文案）
+//  迷你播放器（跨 Tab 共享）
 // ═══════════════════════════════════════
 function MiniPlayer({ apiBase, now, busy, run, playing }: {
   apiBase: string; now: NowPayload; busy: boolean;
   run: (l: string, t: () => Promise<unknown>) => void; playing: boolean;
 }) {
-  const track = now.now?.track || now.plan?.queue?.[0];
-  const djLine = now.plan?.tts?.text || now.plan?.plan?.say || now.plan?.plan?.reply || '';
-  if (!track?.title) return null;
-  const line = track.artist ? `${track.title} - ${track.artist}` : track.title;
+  const track = now.now?.track || now.plan?.queue?.[0] || {};
+  const line = track.title ? `${track.title} - ${track.artist || ''}` : '等待电台开始';
   return (
-    <div style={S.miniBar}>
-      {djLine ? <div style={S.miniDJ}>📻 {djLine}</div> : null}
-      <div style={S.miniRow}>
-        <span style={S.miniTitle}>{line}</span>
-        <button disabled={busy} style={S.miniBtn(busy)} onClick={() => run(playing ? '暂停' : '播放', () => apiRequest(apiBase, playing ? '/api/pause' : '/api/play', {}))}>
-          {playing ? '⏸' : '▶'}
-        </button>
-        <button disabled={busy} style={S.miniBtn(busy)} onClick={() => run('下一首', () => apiRequest(apiBase, '/api/next', {}))}>
-          ⏭
-        </button>
-      </div>
+    <div style={S.miniPlayer}>
+      <div style={S.miniTrack}>{line}</div>
+      <button style={S.miniBtn} disabled={busy} onClick={() => run(playing ? '暂停' : '播放', () => apiRequest(apiBase, playing ? '/api/pause' : '/api/play', {}))}>
+        {playing ? '⏸' : '▶'}
+      </button>
+      <button style={S.miniBtn} disabled={busy} onClick={() => run('下一首', () => apiRequest(apiBase, '/api/next', {}))}>
+        ⏭
+      </button>
     </div>
   );
 }
@@ -207,38 +173,59 @@ function RadioTab({ apiBase, now, busy, message, run }: {
   apiBase: string; now: NowPayload; busy: boolean; message: string;
   run: (l: string, t: () => Promise<unknown>) => void;
 }) {
-  const playing = Boolean(now.now?.playing);
+  const planMood = (now.plan?.mood || '').trim();
+  const [selectedMood, setSelectedMood] = useState(planMood || moods[0]);
+  const queue = now.plan?.queue || [];
+  const djText = now.plan?.tts?.text || now.plan?.plan?.say || now.plan?.plan?.reply || '今晚适合慢一点。';
+
+  useEffect(() => { if (planMood && planMood !== selectedMood) setSelectedMood(planMood); }, [planMood]);
+
+  async function refreshPlan(mood: string, muteMsg?: boolean) {
+    await apiRequest(apiBase, '/api/ai/radio', { mood, mode: 'steamdeck', deferTts: true });
+    if (!muteMsg) { /* message handled by useMoodWave */ }
+  }
+
   return (
     <div>
-      <PanelSection title="AI Radio">
+      <PanelSection title="AI 电台">
         <PanelSectionRow>
-          <div style={S.statusLine}>
-            {message === '在线' ? '📡 电台已连接' : message}
+          <div style={S.sectionNote}>
+            {busy ? message : (now.plan ? `今日心情：${planMood || '未知'}` : message)}
+          </div>
+        </PanelSectionRow>
+        <PanelSectionRow>
+          <div style={S.vibeWrap}>
+            {moods.map(m => (
+              <button key={m} style={S.vibeBtn(m === selectedMood)} disabled={busy} onClick={() => { setSelectedMood(m); refreshPlan(m, true); }}>
+                {m}
+              </button>
+            ))}
           </div>
         </PanelSectionRow>
       </PanelSection>
 
-      <PanelSection title="今晚心情">
-        <PanelSectionRow>
-          <div style={S.moodGrid}>
-            {moods.map((mood) => {
-              const moodTone = ({ 开心: '#f0c96a', 平静: '#74d8c4', 忧郁: '#9daee8', 悲伤: '#82b5df', 治愈: '#82cf8b', 愤怒: '#ef8d62' } as Record<string,string>)[mood] || '#74d8c4';
-              return (
-                <button
-                  key={mood}
-                  disabled={busy}
-                  style={S.moodBtn(false, moodTone)}
-                  onClick={() => run(`按${mood}开台`, () => apiRequest(apiBase, '/api/ai/radio', { mood, mode: 'steamdeck' }))}
-                >
-                  {mood}
-                </button>
-              );
-            })}
-          </div>
-        </PanelSectionRow>
-      </PanelSection>
-
-      <MiniPlayer apiBase={apiBase} now={now} busy={busy} run={run} playing={playing} />
+      {queue.length > 0 && (
+        <PanelSection title="AI DJ 推荐">
+          <PanelSectionRow>
+            <div style={S.resultBox}>
+              <div style={S.djIntro}>AI DJ：{djText}</div>
+              {queue.slice(0, 3).map((t, i) => (
+                <div key={t.id || i} style={S.songItem}>
+                  <div style={S.songTitle}>{t.title}</div>
+                  <div style={S.songArtist}>{t.artist}</div>
+                  {t.reason && <div style={S.songReason}>{t.reason}</div>}
+                </div>
+              ))}
+            </div>
+          </PanelSectionRow>
+          <PanelSectionRow>
+            <div style={S.actionRow}>
+              <button style={S.actionBtn(true)} disabled={busy} onClick={() => run('▶ 全部播放', () => apiRequest(apiBase, '/api/play', {}))}>▶ 播放</button>
+              <button style={S.actionBtn(false)} disabled={busy} onClick={() => run('换个心情', () => refreshPlan(selectedMood, false))}>↻ 换心情</button>
+            </div>
+          </PanelSectionRow>
+        </PanelSection>
+      )}
     </div>
   );
 }
@@ -252,60 +239,35 @@ function GameRadioTab({ apiBase, now, busy, run }: {
 }) {
   const [gameVibe, setGameVibe] = useState('');
   const [gameName, setGameName] = useState('');
-  const [result, setResult] = useState<{ dj_intro?: string; songs?: Track[] } | null>(null);
+  const queue = now.plan?.queue || [];
+  const djText = now.plan?.tts?.text || now.plan?.plan?.say || '';
+  const showResult = queue.length > 0 && now.plan?.mood;
 
-  async function startGameRadio() {
-    if (!gameVibe) return;
-    await run(`正在为${gameVibe}开台`, async () => {
-      const vibeObj = GAME_VIBES.find(v => v.id === gameVibe);
-      const payload = await apiRequest<{ ok: boolean; dj_intro: string; songs: Track[] }>(apiBase, '/api/ai/game-radio', {
-        gameVibe,
-        gameName: gameName.trim() || undefined,
-        vibeHint: vibeObj?.vibe || ''
-      });
-      setResult(payload);
-      if (payload.songs?.length) await apiRequest(apiBase, '/api/play', {});
+  async function callGameRadio() {
+    await apiRequest(apiBase, '/api/ai/game-radio', {
+      gameVibe: gameVibe || '探索地图',
+      gameName: gameName || undefined,
+      mode: 'steamdeck',
+      deferTts: true
     });
   }
-
   async function refreshGameVibe() {
-    if (!gameVibe) return;
-    setResult(null);
-    await run(`正在为${gameVibe}换氛围`, async () => {
-      const vibeObj = GAME_VIBES.find(v => v.id === gameVibe);
-      const payload = await apiRequest<{ ok: boolean; dj_intro: string; songs: Track[] }>(apiBase, '/api/ai/game-radio', {
-        gameVibe,
-        gameName: gameName.trim() || undefined,
-        vibeHint: vibeObj?.vibe || ''
-      });
-      setResult(payload);
-      if (payload.songs?.length) await apiRequest(apiBase, '/api/play', {});
-    });
+    if (gameVibe) await callGameRadio();
   }
-
-  const playing = Boolean(now.now?.playing);
 
   return (
     <div>
-      <PanelSection title="Tonight's Game Radio">
+      <PanelSection title="🎮 Tonight's Game Radio">
         <PanelSectionRow>
-          <div style={S.sectionNote}>✨ 让 AI 为你的游戏过程自动配乐</div>
+          <div style={S.sectionNote}>选氛围，AI 自动配 BGM</div>
         </PanelSectionRow>
-      </PanelSection>
-
-      <PanelSection title="游戏氛围">
         <PanelSectionRow>
           <div style={S.vibeWrap}>
-            {GAME_VIBES.map((vibe) => (
-              <button
-                key={vibe.id}
-                style={S.vibeBtn(gameVibe === vibe.id)}
-                onClick={() => setGameVibe(vibe.id)}
-                disabled={busy}
-              >
-                <span style={S.vibeIcon}>{vibe.icon}</span>
-                {vibe.id}
-                <span style={S.vibeText}>{vibe.vibe}</span>
+            {GAME_VIBES.map(v => (
+              <button key={v.id} style={S.vibeBtn(gameVibe === v.id)} disabled={busy} onClick={() => setGameVibe(v.id)}>
+                <span style={S.vibeIcon}>{v.icon}</span>
+                {v.id}
+                <span style={S.vibeText}>{v.vibe}</span>
               </button>
             ))}
           </div>
@@ -318,38 +280,34 @@ function GameRadioTab({ apiBase, now, busy, run }: {
           />
         </PanelSectionRow>
         <PanelSectionRow>
-          <button disabled={busy || !gameVibe} style={S.bigBtn(busy || !gameVibe)} onClick={startGameRadio}>
-            {busy ? '…' : `▶  开始电台 · ${gameVibe || '选一个氛围'}`}
+          <button disabled={busy || !gameVibe} style={S.bigBtn(busy || !gameVibe)} onClick={() => run('游戏电台启动中', callGameRadio)}>
+            {busy ? '…' : '▶ 开始游戏电台'}
           </button>
         </PanelSectionRow>
       </PanelSection>
 
-      {result && (
-        <PanelSection title="AI DJ">
+      {showResult && (
+        <PanelSection title="AI DJ 推荐">
           <PanelSectionRow>
             <div style={S.resultBox}>
-              {result.dj_intro ? <div style={S.djIntro}>"{result.dj_intro}"</div> : null}
-              {(result.songs || []).slice(0, 3).map((song, i) => (
-                <div key={song.id || i} style={S.songItem}>
-                  <div style={S.songTitle}>{i + 1}. {song.title || '未知歌曲'}</div>
-                  {song.artist ? <div style={S.songArtist}>{song.artist}</div> : null}
-                  {song.reason ? <div style={S.songReason}>{song.reason}</div> : null}
+              {djText && <div style={S.djIntro}>AI DJ：{djText}</div>}
+              {queue.slice(0, 3).map((t, i) => (
+                <div key={t.id || i} style={S.songItem}>
+                  <div style={S.songTitle}>{t.title}</div>
+                  <div style={S.songArtist}>{t.artist}</div>
+                  {t.reason && <div style={S.songReason}>{t.reason}</div>}
                 </div>
               ))}
             </div>
           </PanelSectionRow>
           <PanelSectionRow>
             <div style={S.actionRow}>
-              <button disabled={busy} style={S.actionBtn(true)} onClick={() => run(playing ? '暂停' : '播放', () => apiRequest(apiBase, playing ? '/api/pause' : '/api/play', {}))}>
-                {playing ? '⏸ 暂停' : '▶ 播放'}
-              </button>
-              <button disabled={busy} style={S.actionBtn(false)} onClick={refreshGameVibe}>↻ 换个氛围</button>
+              <button style={S.actionBtn(true)} disabled={busy} onClick={() => run('▶ 播放', () => apiRequest(apiBase, '/api/play', {}))}>▶ 播放</button>
+              <button style={S.actionBtn(false)} disabled={busy} onClick={refreshGameVibe}>↻ 换个氛围</button>
             </div>
           </PanelSectionRow>
         </PanelSection>
       )}
-
-      <MiniPlayer apiBase={apiBase} now={now} busy={busy} run={run} playing={playing} />
     </div>
   );
 }
@@ -413,17 +371,18 @@ function SearchTab({ apiBase, now, busy, run, playing }: {
           </div>
         </PanelSectionRow>
       </PanelSection>
-
-      <MiniPlayer apiBase={apiBase} now={now} busy={busy} run={run} playing={playing} />
     </div>
   );
 }
 
 // ═══════════════════════════════════════
-//  主入口
+//  主入口（自定义 Tab 栏，不用 Decky Tabs）
 // ═══════════════════════════════════════
 function Content() {
-  const [apiBase, setApiBase] = useState(() => localStorage.getItem(API_BASE_KEY) || DEFAULT_API_BASE);
+  const [apiBase, setApiBase] = useState(() => {
+    try { return localStorage.getItem(API_BASE_KEY) || DEFAULT_API_BASE; }
+    catch { return DEFAULT_API_BASE; }
+  });
   const [activeTab, setActiveTab] = useState('radio');
   const { now, busy, message, run } = useMoodWave(apiBase);
   const playing = Boolean(now.now?.playing);
@@ -431,8 +390,14 @@ function Content() {
   function saveApiBase(v: string) {
     const next = normalizeBase(v);
     setApiBase(next);
-    localStorage.setItem(API_BASE_KEY, next);
+    try { localStorage.setItem(API_BASE_KEY, next); } catch {}
   }
+
+  const tabs = [
+    { id: 'radio', title: '🎧 AI Radio' },
+    { id: 'game', title: '🎮 Game Radio' },
+    { id: 'search', title: '🔍 AI 寻歌' },
+  ];
 
   return (
     <div>
@@ -443,27 +408,28 @@ function Content() {
           onChange={(e: ChangeEvent<HTMLInputElement>) => saveApiBase(e.target.value)}
         />
       </div>
-      <Tabs
-        activeTab={activeTab}
-        onShowTab={(t: string) => setActiveTab(t)}
-        tabs={[
-          {
-            id: 'radio',
-            title: '🎧 AI Radio',
-            content: <RadioTab apiBase={apiBase} now={now} busy={busy} message={message} run={run} />
-          },
-          {
-            id: 'game',
-            title: '🎮 Game Radio',
-            content: <GameRadioTab apiBase={apiBase} now={now} busy={busy} run={run} />
-          },
-          {
-            id: 'search',
-            title: '🔍 AI 寻歌',
-            content: <SearchTab apiBase={apiBase} now={now} busy={busy} run={run} playing={playing} />
-          }
-        ]}
-      />
+
+      {/* 自定义 Tab 栏 */}
+      <div style={S.tabBar}>
+        {tabs.map(t => (
+          <button key={t.id} style={S.tabBtn(activeTab === t.id)} onClick={() => setActiveTab(t.id)}>
+            {t.title}
+          </button>
+        ))}
+      </div>
+
+      {/* Tab 内容 */}
+      <div style={{ display: activeTab === 'radio' ? 'block' : 'none' }}>
+        <RadioTab apiBase={apiBase} now={now} busy={busy} message={message} run={run} />
+      </div>
+      <div style={{ display: activeTab === 'game' ? 'block' : 'none' }}>
+        <GameRadioTab apiBase={apiBase} now={now} busy={busy} run={run} />
+      </div>
+      <div style={{ display: activeTab === 'search' ? 'block' : 'none' }}>
+        <SearchTab apiBase={apiBase} now={now} busy={busy} run={run} playing={playing} />
+      </div>
+
+      <MiniPlayer apiBase={apiBase} now={now} busy={busy} run={run} playing={playing} />
     </div>
   );
 }
