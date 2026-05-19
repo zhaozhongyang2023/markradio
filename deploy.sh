@@ -19,7 +19,7 @@ case "$REMOTE_MODE" in
 esac
 
 SSH_OPTS=()
-RSYNC_SSH="ssh"
+RSYNC_SSH="$RSH_CMD"
 if [ -n "$PI_SSH_KEY" ]; then
   SSH_OPTS=(-i "$PI_SSH_KEY" -o IdentitiesOnly=yes)
   RSYNC_SSH="ssh -i $PI_SSH_KEY -o IdentitiesOnly=yes"
@@ -35,7 +35,7 @@ npm run build --silent
 
 # 2. 停止服务
 echo "[2/4] 停止远端服务..."
-ssh "${SSH_OPTS[@]}" "$PI_USER@$PI_HOST" "cd $PI_DIR && bash scripts/markradio.sh stop" 2>/dev/null || echo "  (服务可能未运行)"
+"$SSH_CMD" "$PI_USER@$PI_HOST" "cd $PI_DIR && bash scripts/markradio.sh stop" 2>/dev/null || echo "  (服务可能未运行)"
 
 # 3. 同步文件
 echo "[3/4] 同步文件..."
@@ -65,7 +65,7 @@ rsync -avz \
 
 # 4. 启动服务
 echo "[4/4] 执行远端模式: $REMOTE_MODE..."
-ssh "${SSH_OPTS[@]}" "$PI_USER@$PI_HOST" "cd $PI_DIR && chmod +x scripts/markradio.sh && bash scripts/markradio.sh $REMOTE_MODE"
+"$SSH_CMD" "$PI_USER@$PI_HOST" "cd $PI_DIR && chmod +x scripts/markradio.sh && bash scripts/markradio.sh $REMOTE_MODE"
 
 echo ""
 echo "========== 部署完成 =========="
