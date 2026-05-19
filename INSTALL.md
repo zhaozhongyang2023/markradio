@@ -58,6 +58,12 @@ git --version
 
 ## 第五步：克隆 + 一键安装
 
+> ⚠️ **如果你之前装过**：安装脚本会检测到旧版本并询问是否清除。
+> 选 Y（默认）会彻底清理旧程序、旧服务、旧桌面图标，保持干净后再安装。
+> 旧配置文件（`~/.config/moodwave/config.env`）不会被删除，重装后仍保留你的 AI Key。
+
+## 第五步：克隆 + 一键安装
+
 ```bash
 # 克隆项目
 git clone --depth 1 https://github.com/zhaozhongyang2023/markradio.git ~/moodwave
