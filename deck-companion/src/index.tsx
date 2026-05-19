@@ -176,7 +176,7 @@ function Content() {
   }
 
   async function startRadio(mood: string) {
-    await run(`开台：${mood}`, async () => {
+    await run(`正在开台 · ${mood}`, async () => {
       await apiRequest(apiBase, '/api/ai/radio', { mood, mode: 'steamdeck', deferTts: true });
       await apiRequest(apiBase, '/api/play', {});
     });
@@ -185,20 +185,20 @@ function Content() {
   async function searchRadio() {
     const prompt = query.trim();
     if (!prompt) return;
-    await run('寻找氛围', async () => {
+    await run('正在找歌单', async () => {
       await apiRequest(apiBase, '/api/ai/search', { query: prompt, mode: 'steamdeck', deferTts: true });
       await apiRequest(apiBase, '/api/play', {});
     });
   }
 
   async function nextRadio() {
-    await run('换个氛围', async () => {
+    await run('正在换氛围', async () => {
       await apiRequest(apiBase, '/api/ai/next-radio', { scene: query, mode: 'steamdeck', deferTts: true });
       await apiRequest(apiBase, '/api/play', {});
     });
   }
 
-  async function startGameRadio(label = '游戏电台') {
+  async function startGameRadio(label = '正在生成') {
     const vibe = gameVibes.find((item) => item.id === gameVibe);
     await run(label, async () => {
       await apiRequest(apiBase, '/api/ai/game-radio', {
@@ -253,6 +253,10 @@ function Content() {
           grid-template-columns: repeat(2, minmax(0, 1fr));
         }
         .mw-button {
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          gap: 0;
           width: 100%;
           min-width: 0;
           height: 28px;
@@ -263,7 +267,7 @@ function Content() {
           color: rgba(255,255,255,.76);
           font-size: 10.5px;
           font-weight: 700;
-          line-height: 26px;
+          line-height: 1;
           letter-spacing: 0;
           text-align: center;
           white-space: nowrap;
@@ -279,9 +283,13 @@ function Content() {
           opacity: .42;
         }
         .mw-button.is-icon {
+          display: flex;
+          align-items: center;
+          justify-content: center;
           padding: 0;
           font-size: 14px;
-          line-height: 26px;
+          line-height: 1;
+          text-overflow: clip;
         }
         .mw-button .mw-icon {
           display: inline-block;
@@ -290,6 +298,22 @@ function Content() {
           color: rgba(66,216,178,.92);
           font-size: 11px;
           text-align: center;
+        }
+        .mw-button.is-transport {
+          padding: 0;
+          font-size: 15px;
+          line-height: 1;
+          text-overflow: clip;
+        }
+        .mw-busy-dot {
+          display: inline-block;
+          width: 6px;
+          height: 6px;
+          margin-right: 5px;
+          border-radius: 999px;
+          background: #42d8b2;
+          box-shadow: 0 0 8px rgba(66,216,178,.7);
+          vertical-align: 1px;
         }
         .mw-button:focus-visible {
           outline: 2px solid #42d8b2;
@@ -398,7 +422,7 @@ function Content() {
       <audio ref={djRef} style={{ display: 'none' }} />
 
       <div className="mw-status">
-        <span>{busy ? status : `${status}${currentMood ? ` · ${currentMood}` : ''}`}</span>
+        <span>{busy ? <><span className="mw-busy-dot" />{status}</> : `${status}${currentMood ? ` · ${currentMood}` : ''}`}</span>
         <span>{playing ? '播放中' : '待机'}</span>
       </div>
 
@@ -420,11 +444,33 @@ function Content() {
             <div className="mw-mini-state">{playing ? '播放中' : '待机'}</div>
           </div>
           <div className="mw-grid">
-            <AppButton disabled={busy} title={playing ? '暂停' : '播放'} onClick={() => run(playing ? '暂停' : '播放', () => apiRequest(apiBase, playing ? '/api/pause' : '/api/play', {}))}>
+            <button
+              type="button"
+              className="mw-button is-transport"
+              disabled={busy}
+              title={playing ? '暂停' : '播放'}
+              onClick={() => run(playing ? '暂停' : '播放', () => apiRequest(apiBase, playing ? '/api/pause' : '/api/play', {}))}
+            >
               {playing ? 'Ⅱ' : '▶'}
-            </AppButton>
-            <AppButton disabled={busy} title="上一首" onClick={() => run('上一首', () => apiRequest(apiBase, '/api/prev', {}))}>‹</AppButton>
-            <AppButton disabled={busy} title="下一首" onClick={() => run('下一首', () => apiRequest(apiBase, '/api/next', {}))}>›</AppButton>
+            </button>
+            <button
+              type="button"
+              className="mw-button is-transport"
+              disabled={busy}
+              title="上一首"
+              onClick={() => run('上一首', () => apiRequest(apiBase, '/api/prev', {}))}
+            >
+              ‹
+            </button>
+            <button
+              type="button"
+              className="mw-button is-transport"
+              disabled={busy}
+              title="下一首"
+              onClick={() => run('下一首', () => apiRequest(apiBase, '/api/next', {}))}
+            >
+              ›
+            </button>
           </div>
         </div>
       )}
@@ -500,8 +546,8 @@ function Content() {
             </div>
           </div>
           <div className="mw-action-row">
-            <AppButton active disabled={busy || !gameVibe} onClick={() => startGameRadio('游戏开台')}>开始</AppButton>
-            <AppButton disabled={busy || !gameVibe} onClick={() => startGameRadio('换个氛围')}>换氛围</AppButton>
+            <AppButton active disabled={busy || !gameVibe} onClick={() => startGameRadio('正在生成游戏电台')}>开始</AppButton>
+            <AppButton disabled={busy || !gameVibe} onClick={() => startGameRadio('正在换游戏氛围')}>换氛围</AppButton>
           </div>
         </div>
       )}
@@ -523,7 +569,7 @@ function Content() {
             />
           </PanelSectionRow>
           <PanelSectionRow>
-            <AppButton disabled={busy} onClick={() => run('检查连接', refresh)}>检查连接</AppButton>
+            <AppButton disabled={busy} onClick={() => run('测试连接', refresh)}>测试连接</AppButton>
           </PanelSectionRow>
         </PanelSection>
       )}
