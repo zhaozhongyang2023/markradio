@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import { existsSync, mkdirSync, renameSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
+import { homedir } from 'node:os';
 import { spawnSync } from 'node:child_process';
 
 const text = process.env.MOODWAVE_TTS_TEXT || process.env.MARKRADIO_TTS_TEXT || '';
@@ -16,7 +17,7 @@ const removeSilence = process.env.LOCAL_TTS_REMOVE_SILENCE === '1';
 const cli = process.env.MOODWAVE_F5_TTS_CLI || process.env.MARKRADIO_F5_TTS_CLI || resolve(process.cwd(), '.venv-tts/bin/f5-tts_infer-cli');
 const commandEnv = {
   ...process.env,
-  PATH: ['/usr/local/bin', '/opt/homebrew/bin', process.env.PATH || ''].filter(Boolean).join(':')
+  PATH: ['/usr/local/bin', '/usr/bin', '/opt/homebrew/bin', path.join(os.homedir(), '.local', 'bin'), process.env.PATH || ''].filter(Boolean).join(':')
 };
 
 if (!text.trim()) fail('MOODWAVE_TTS_TEXT 为空');
@@ -45,7 +46,13 @@ const f5Args = [
 if (removeSilence) f5Args.push('--remove_silence');
 run(cli, f5Args);
 
-const ffmpeg = process.env.FFMPEG_BIN || '/usr/local/bin/ffmpeg';
+const ffmpegCandidates = [
+  process.env.FFMPEG_BIN,
+  '/usr/bin/ffmpeg',
+  '/usr/local/bin/ffmpeg',
+  '/opt/homebrew/bin/ffmpeg',
+].filter(Boolean);
+const ffmpeg = ffmpegCandidates.find((p) => existsSync(p)) || ffmpegCandidates[0];
 if (!existsSync(wavOutput)) fail(`F5-TTS 未生成 wav：${wavOutput}`);
 
 if (existsSync(ffmpeg)) {

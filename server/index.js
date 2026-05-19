@@ -444,6 +444,41 @@ app.post('/api/ai/next-radio', async (request) => {
   };
 });
 
+app.post('/api/ai/game-radio', async (request) => {
+  const gameVibe = String(request.body?.gameVibe || request.body?.vibe || '').trim();
+  const gameName = String(request.body?.gameName || request.body?.name || '').trim();
+  const vibeHint = String(request.body?.vibeHint || '').trim();
+  const mood = request.body?.mood || store.get('mood')?.current;
+  // 游戏电台 DJ 人格提示（通过 userRequest 传递，不修改 Prompt 系统）
+  const djPersona = '你不是 AI 助手。你是一名 Steam Deck 深夜 AI 游戏电台 DJ。语气温柔、简短、有留白、有陪伴感。不要像客服，不要解释算法，不要长篇大论。';
+  const sceneLine = gameName
+    ? `游戏场景——${gameVibe}。正在玩：${gameName}。`
+    : `游戏场景——${gameVibe}。`;
+  const vibeLine = vibeHint ? `感觉：${vibeHint}` : '';
+  const userRequest = [djPersona, sceneLine, vibeLine].filter(Boolean).join(' ');
+  const plan = await createRadioPlan({
+    store,
+    mood,
+    userRequest,
+    deferTts: true,
+    onTtsReady: (updatedPlan) => {
+      broadcast('plan', updatedPlan);
+      broadcast('now', publicNow());
+    }
+  });
+  broadcast('plan', plan);
+  broadcast('now', publicNow());
+  return {
+    ok: true,
+    gameVibe,
+    gameName: gameName || null,
+    dj_intro: plan.tts?.text || plan.plan?.say || '',
+    songs: plan.queue || [],
+    plan,
+    now: publicNow().now
+  };
+});
+
 app.post('/api/play', async (request) => applyPlaybackAction('play', request.body || {}));
 app.post('/api/pause', async (request) => applyPlaybackAction('pause', request.body || {}));
 app.post('/api/next', async (request) => applyPlaybackAction('next', request.body || {}));

@@ -29,7 +29,7 @@ export const config = {
   host: process.env.MOODWAVE_HOST || process.env.MARKRADIO_HOST || '0.0.0.0',
   apiPort: Number(process.env.MOODWAVE_API_PORT || process.env.MOODWAVE_PORT || process.env.MARKRADIO_API_PORT || 8765),
   webPort: Number(process.env.MOODWAVE_WEB_PORT || process.env.MARKRADIO_WEB_PORT || 8080),
-  webOrigin: process.env.MOODWAVE_WEB_ORIGIN || process.env.MARKRADIO_WEB_ORIGIN || 'http://192.168.2.33:8080',
+  webOrigin: process.env.MOODWAVE_WEB_ORIGIN || process.env.MARKRADIO_WEB_ORIGIN || (() => { try { return `http://${os.hostname()}.local:${Number(process.env.MOODWAVE_WEB_PORT || process.env.MOODWAVE_PORT || process.env.MARKRADIO_WEB_PORT || 8080)}`; } catch { return 'http://localhost:8080'; } })(),
   aiProvider: process.env.AI_PROVIDER || (process.env.DEEPSEEK_API_KEY ? 'deepseek' : 'openai'),
   aiBaseUrl: process.env.AI_BASE_URL || process.env.DEEPSEEK_BASE_URL || (process.env.DEEPSEEK_API_KEY ? 'https://api.deepseek.com' : ''),
   aiApiKey: process.env.AI_API_KEY || process.env.DEEPSEEK_API_KEY || process.env.OPENAI_API_KEY || '',
@@ -38,9 +38,9 @@ export const config = {
   openaiModel: process.env.OPENAI_MODEL || 'gpt-5.5',
   voiceProvider: process.env.VOICE_PROVIDER || 'local-voice',
   localVoiceSamplePath: process.env.LOCAL_VOICE_SAMPLE_PATH || firstExistingPath([
-    path.resolve(process.cwd(), 'voice/chuanglaoli.mp3'),
-    path.resolve(process.cwd(), 'vioce/chuangzaoli.mp3'),
-    '/Users/mac/Documents/Dev/Learning/chuanglaoli.mp3'
+    path.resolve(process.cwd(), 'voice', 'chuanglaoli.mp3'),
+    path.resolve(process.cwd(), 'voice', 'reference.wav'),
+    path.join(os.homedir(), 'Music', 'chuanglaoli.mp3'),
   ]),
   localTtsCommand: process.env.LOCAL_TTS_COMMAND || '',
   localTtsTimeoutMs: Number(process.env.LOCAL_TTS_TIMEOUT_MS || 30000),

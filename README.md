@@ -42,16 +42,30 @@ npm start
 
 ## Steam Deck 一键安装
 
-在 Steam Deck 桌面模式运行：
+详细图文指南 → [INSTALL.md](./INSTALL.md)
+
+### 一行命令安装（推荐）
 
 ```bash
-bash scripts/install-steamdeck.sh
+bash scripts/install-steamdeck.sh --repo https://github.com/zhaozhongyang2023/markradio.git
 ```
 
-发布后推荐：
+脚本会问一个简单问题：**你的 AI Key 是什么？**
+
+粘贴进去，回车，等待完成即可。
+
+### SSH 远程安装
 
 ```bash
-curl -fsSL https://你的域名/install-moodwave.sh | bash
+# SSH 进 Steam Deck，同样一行：
+bash scripts/install-steamdeck.sh --repo https://github.com/zhaozhongyang2023/markradio.git --ai-key sk-你的密钥
+```
+
+安装后启用后台服务：
+
+```bash
+loginctl enable-linger $USER
+systemctl --user enable --now moodwave.service
 ```
 
 默认安装路径：
@@ -66,6 +80,16 @@ curl -fsSL https://你的域名/install-moodwave.sh | bash
 
 - API：`http://127.0.0.1:38765`
 - Web/PWA：`http://127.0.0.1:38080/?deck=1`
+
+## 故障排查
+
+| 现象 | 解决方案 |
+|------|----------|
+| SSH 安装时 `read: stdin: not a tty` | 添加 `--non-interactive` 并通过环境变量传参 |
+| `systemctl --user` 报 `Failed to connect to bus` | 执行 `loginctl enable-linger $USER` |
+| `npm run build` 失败 | 检查 Node.js >= 22.5: `node -v` |
+| 服务启动但无法访问 | 检查: `curl http://127.0.0.1:38765/api/health` |
+| 树莓派部署后无 Firefox 全屏 | SSH 模式下自动跳过图形界面 |
 
 诊断和卸载：
 

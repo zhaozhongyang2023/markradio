@@ -13,7 +13,7 @@ PROJECT_DIR="$(cd "$(dirname "$0")" && pwd)"
 case "$REMOTE_MODE" in
   start|stop|refresh|server) ;;
   *)
-    echo "用法: $0 [pi_host] [start|stop|refresh|server]"
+    echo "用法: $0 [host] [start|stop|refresh|server]"
     exit 1
     ;;
 esac

@@ -40,13 +40,19 @@ function detectLowPowerRuntime() {
   const screenW = typeof window !== 'undefined' ? window.screen?.width || 0 : 0;
   const screenH = typeof window !== 'undefined' ? window.screen?.height || 0 : 0;
   const forced = typeof window !== 'undefined' && new URLSearchParams(window.location.search).has('lowPower');
+  // 树莓派（竖屏 kiosk）: 窄屏高分辨率
   const kioskPortrait = /Linux/i.test(ua) && Math.min(screenW, screenH) <= 1200 && Math.max(screenW, screenH) >= 1600;
   const isMobile = /Android|iPhone|iPad|iPod|webOS|BlackBerry|Mobile/i.test(ua);
+  // Steam Deck / 游戏 PC 不降级：4核但有16G+内存
+  const isSteamDeck = /Steam Deck|SteamOS|Gamescope|Valve/i.test(`${ua} ${platform}`) || detectDeckRuntime();
+  if (isSteamDeck) return false;
+  // 小内存设备（树莓派 1-4GB）才是低功耗
+  const isLowMemory = !isMobile && memory > 0 && memory <= 4;
   return forced ||
     !isMobile && /Raspberry|armv|aarch64|Linux arm/i.test(`${ua} ${platform}`) ||
     kioskPortrait ||
-    !isMobile && (cores > 0 && cores <= 4) ||
-    !isMobile && (memory > 0 && memory <= 4);
+    !isMobile && (cores > 0 && cores <= 4 && memory === 0) ||
+    isLowMemory;
 }
 
 function detectDeckRuntime() {
@@ -1314,7 +1320,15 @@ export default function App() {
         socket = new WebSocket(streamUrl());
         socket.onmessage = (event) => {
           const message = JSON.parse(event.data);
-          if (message.event === 'now') setState(message.payload);
+          if (message.event === 'now') setState((current) => {
+            const payload = message.payload;
+            // 如果 payload 中的 plan ID 与当前不同（旧 plan 的广播滞后），保留当前 plan
+            // 相同 ID 时使用 payload（TTS 更新等增量变更）
+            if (current?.plan?.id && payload?.plan?.id && current.plan.id !== payload.plan.id) {
+              return { ...payload, plan: current.plan };
+            }
+            return payload;
+          });
           if (message.event === 'plan') setState((current) => ({ ...(current || {}), plan: message.payload }));
           if (message.event === 'mood') setSelectedMood(message.payload.current);
         };
@@ -1682,7 +1696,10 @@ export default function App() {
       introAudioCacheRef.current = new Map();
       const nextPlan = await api.planToday(mood);
       const nextNow = await api.now();
-      setState({ ...nextNow, plan: nextPlan });
+      // 使用函数式 setState 避免 WebSocket now 事件竞态覆盖
+      setState((current) => ({ ...current, ...nextNow, plan: nextPlan }));
+      // 同时更新 planRef，确保异步回调读到最新 plan
+      planRef.current = nextPlan;
       if (autoplay) {
         autoplayOptionsRef.current = { skipIntro: false };
         setAutoplayToken((value) => value + 1);

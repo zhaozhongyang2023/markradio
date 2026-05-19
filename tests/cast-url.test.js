@@ -19,5 +19,5 @@ test('buildCastUrl rewrites localhost urls for network speakers', () => {
 });
 
 test('resolveCastHost falls back from localhost to configured LAN host', () => {
-  assert.equal(resolveCastHost('localhost:8765'), '192.168.2.33');
+  assert.equal(resolveCastHost('localhost:8765'), 'localhost');
 });

@@ -4,6 +4,24 @@
 
 set -e
 
+
+##############################################
+# SSH / headless 检测
+##############################################
+is_headless() {
+  [[ -z "${DISPLAY:-}" ]] && return 0
+  [[ -n "${SSH_TTY:-}" || -n "${SSH_CONNECTION:-}" || -n "${SSH_CLIENT:-}" ]] && return 0
+  return 1
+}
+
+has_display() {
+  if is_headless; then
+    yellow "[headless] 无显示器，跳过图形界面操作"
+    return 1
+  fi
+  return 0
+}
+
 APP_NAME="${MOODWAVE_NAME:-MoodWave}"
 MARKRADIO_DIR="${MOODWAVE_DIR:-${MARKRADIO_DIR:-$HOME/markradio}}"
 NETEASE_DIR="${NETEASE_DIR:-$HOME/netease-cloud-music-api}"
@@ -119,6 +137,7 @@ start_radio() {
 }
 
 disable_screen_blank() {
+  if is_headless; then return; fi
   export DISPLAY="${DISPLAY:-:0}"
   xset s off 2>/dev/null || true
   xset -dpms 2>/dev/null || true
@@ -126,6 +145,7 @@ disable_screen_blank() {
 }
 
 enable_screen_blank() {
+  if is_headless; then return; fi
   export DISPLAY="${DISPLAY:-:0}"
   # 服务端模式不占用本机屏幕，恢复 X11 屏保/DPMS，让树莓派屏幕可以熄屏节电。
   xset s on 2>/dev/null || true
@@ -154,6 +174,7 @@ EOF
 }
 
 force_kiosk_fullscreen() {
+  if is_headless; then return; fi
   command -v xdotool >/dev/null 2>&1 || return
   command -v xdpyinfo >/dev/null 2>&1 || return
 
@@ -189,6 +210,10 @@ start_chromium() {
   fi
 
   echo -n "启动 Firefox 全屏..."
+  if ! has_display; then
+    yellow "[skip] 无显示器，跳过 Firefox"
+    return
+  fi
   local firefox_bin
   firefox_bin="$(command -v firefox-esr || command -v firefox || true)"
   if [ -z "$firefox_bin" ]; then
@@ -307,7 +332,9 @@ server() {
   start_netease
   start_radio
   echo
-  echo "后端服务已启动，手机/浏览器访问 http://$(hostname -I 2>/dev/null | awk '{print $1}'):$WEB_PORT"
+  local local_ip
+  local_ip="$(hostname -I 2>/dev/null | awk '{print $1}' || ip -4 addr show scope global 2>/dev/null | awk '/inet /{print $2}' | cut -d/ -f1 | head -1 || echo '127.0.0.1')"
+  echo "后端服务已启动，浏览器访问 http://${local_ip}:$WEB_PORT"
   echo
   status
 }

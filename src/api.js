@@ -3,10 +3,14 @@ const WS_BASE = import.meta.env.VITE_WS_BASE || '';
 
 function runtimeApiBase() {
   if (typeof window === 'undefined') return '';
-  if (window.location.port === '8765') return '';
-  if (window.location.port === '38765') return '';
+  // 前端与 API 同源（生产构建）— 无需跨域
+  if (window.location.port === '8765' || window.location.port === '38765') return '';
+  // Steam Deck 模式：Web(38080) → API(38765)
   if (window.location.port === '38080') return `${window.location.protocol}//${window.location.hostname}:38765`;
-  return `${window.location.protocol}//${window.location.hostname}:8765`;
+  // 树莓派 / 通用模式：Web(8080) → API(8765)
+  if (window.location.port === '8080') return `${window.location.protocol}//${window.location.hostname}:8765`;
+  // 兜底：尝试 API 标准端口
+  return `${window.location.protocol}//${window.location.hostname}:${window.location.protocol === 'https:' ? '443' : '8765'}`;
 }
 
 async function request(path, options = {}) {
@@ -102,6 +106,11 @@ export const api = {
     }),
   aiNextRadio: (body = {}) =>
     request('/api/ai/next-radio', {
+      method: 'POST',
+      body: JSON.stringify(body)
+    }),
+  gameRadio: (body = {}) =>
+    request('/api/ai/game-radio', {
       method: 'POST',
       body: JSON.stringify(body)
     }),

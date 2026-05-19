@@ -3,7 +3,7 @@ export const station = {
   subtitle: 'AI DJ Radio',
   legacyTitle: '十三哥的音乐之声',
   legacySubtitle: 'mark radio',
-  apiHost: '192.168.2.33',
+  apiHost: 'localhost',
   webPort: 8080,
   apiPort: 8765
 };
