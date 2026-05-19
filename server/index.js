@@ -8,6 +8,7 @@ import fastifyStatic from '@fastify/static';
 import websocket from '@fastify/websocket';
 import { config } from './config.js';
 import { StateStore } from './state.js';
+import { playSequence, stop as playerStop, getPlayerState } from './player.js';
 import { station } from './defaults.js';
 import { moods, normalizeMood } from './mood.js';
 import { parseLyric } from './music.js';
@@ -19,6 +20,53 @@ import { buildCastUrl, resolveCastHost } from './cast-url.js';
 import { callNetease, checkNeteaseQr, createNeteaseQr, getNeteaseLoginStatus } from './netease-auth.js';
 
 const store = new StateStore();
+
+
+// ─── Plugin helpers ───
+function saveNowPerMode(store, now) {
+  if (now?.mode) store.set('now-' + now.mode, now);
+}
+
+function buildPlaylist(track, plan) {
+  if (!track || !plan) return [];
+  const idx = (plan.queue || []).findIndex(t => t.id === track.id);
+  if (idx < 0) return [track.url].filter(Boolean);
+  const cardTts = plan.cardTts?.[idx];
+  const url = cardTts?.ok && cardTts.url ? cardTts.url : null;
+  return [url, track.url].filter(Boolean);
+}
+
+async function advanceToNext(store) {
+  const now = store.get('now') || {};
+  const mode = now.mode || 'radio';
+  const plan = store.get('plan-' + mode);
+  if (!plan?.queue?.length) return;
+  const ci = plan.queue.findIndex(t => t.id === now.track?.id);
+  if (ci < 0 || ci >= plan.queue.length - 1) {
+    now.playing = false; store.set('now', now);
+    saveNowPerMode(store, now); broadcast('now', publicNow()); return;
+  }
+  const next = plan.queue[ci + 1];
+  now.track = next; now.progress = 0; now.playing = true;
+  const urls = buildPlaylist(next, plan);
+  if (urls.length) playSequence(urls, { onEnd: () => advanceToNext(store) });
+  store.addPlay(next, now.mood);
+  store.set('now', now); saveNowPerMode(store, now);
+  broadcast('now', publicNow());
+}
+
+async function applyPluginAction(action, body = {}) {
+  const now = store.get('now') || {}; const mode = now.mode || 'radio';
+  const plan = store.get('plan-' + mode) || {};
+  if (action === 'play') { now.playing = true; playerStop(); const u = buildPlaylist(now.track, plan); if (u.length) playSequence(u, { onEnd: () => advanceToNext(store) }); }
+  if (action === 'pause') { now.playing = false; playerStop(); }
+  if ((action === 'next' || action === 'prev') && plan?.queue?.length) {
+    const ci = plan.queue.findIndex(t => t.id === now.track?.id);
+    const ni = action === 'prev' ? (ci > 0 ? ci - 1 : 0) : (ci >= 0 && ci < plan.queue.length - 1 ? ci + 1 : -1);
+    if (ni >= 0) { now.track = plan.queue[ni]; now.progress = 0; now.playing = true; store.addPlay(now.track, now.mood); playerStop(); const u = buildPlaylist(now.track, plan); if (u.length) playSequence(u, { onEnd: () => advanceToNext(store) }); }
+  }
+  saveNowPerMode(store, now); store.set('now', now); broadcast('now', publicNow()); return publicNow();
+}
 const app = Fastify({ logger: true });
 const webApp = Fastify({ logger: true });
 const clients = new Set();
@@ -49,21 +97,17 @@ function publicStation() {
 }
 
 function publicNow() {
-  const now = store.get('now');
-  const plan = store.get('planToday');
+  const now = store.get('now') || { mode: 'radio' };
+  const mode = now.mode || 'radio';
+  const plan = store.get('plan-' + mode) || {};
   return {
+    now, plan,
+    plans: { radio: store.get('plan-radio') || null, search: store.get('plan-search') || null, game: store.get('plan-game') || null },
     station: publicStation(),
-    now: now || {
-      track: plan?.queue?.[0] || null,
-      progress: 0,
-      playing: false,
-      speaking: false,
-      mood: store.get('mood')?.current || '平静'
-    },
-    plan,
-    cast: getCastStatus()
+    voice: getVoicePublicConfig(store)
   };
 }
+
 
 function broadcast(event, payload) {
   const data = JSON.stringify({ event, payload, at: new Date().toISOString() });
@@ -824,6 +868,24 @@ await new Promise((resolve) => {
   castMediaServer.listen(castMediaPort, config.host, resolve);
 });
 app.log.info(`Cast media server listening on ${castMediaPort}`);
+
+
+// ─── Steam Deck Plugin Routes ───
+app.post('/api/switch-mode', async (request) => {
+  const { mode } = request.body || {};
+  if (!mode || !['radio','search','game'].includes(mode)) return { ok: false };
+  const now = store.get('now') || {};
+  if (now.mode && now.mode !== mode) saveNowPerMode(store, now);
+  playerStop();
+  const saved = store.get('now-' + mode);
+  now.mode = mode; now.track = saved?.track || null; now.playing = false; now.progress = 0;
+  saveNowPerMode(store, now); store.set('now', now); broadcast('now', publicNow());
+  return { ok: true, now: publicNow().now, plan: publicNow().plan };
+});
+app.post('/api/play', async (r) => applyPluginAction('play', r.body || {}));
+app.post('/api/pause', async (r) => applyPluginAction('pause', r.body || {}));
+app.post('/api/next', async (r) => applyPluginAction('next', r.body || {}));
+app.post('/api/prev', async (r) => applyPluginAction('prev', r.body || {}));
 
 await app.listen({ host: config.host, port: config.apiPort });
 

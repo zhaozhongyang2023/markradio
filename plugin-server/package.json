@@ -1,9 +1,0 @@
-{
-  "name": "moodwave-plugin-server",
-  "version": "6.0.0",
-  "type": "module",
-  "private": true,
-  "scripts": {
-    "start": "node index.js"
-  }
-}
