@@ -483,7 +483,7 @@ function Content() {
 
       <div className="mw-status">
         <span>{progress > 0 ? <div className="mw-progress" style={{width: `${progress}%`}} /> : null}{busy ? <><span style={{fontSize:10,opacity:.6,marginRight:6}}>{progress}%</span><span className="mw-busy-dot" /><><span>{status}</span><span className="mw-busy-ellipsis"><i /><i /><i /></span></></> : `${status}${currentMood ? ` · ${currentMood}` : ''}`}</span>
-        <span>{playing ? "📻 正在陪你" : '待机'}</span>
+        <span>{playing ? "📻 正在陪你" : '我在等你'}</span>
       </div>
 
       <div className="mw-topbar">
@@ -501,7 +501,7 @@ function Content() {
         <div className="mw-card mw-mini">
           <div className="mw-mini-head">
             <div className="mw-mini-title">{trackLine}</div>
-            <div className="mw-mini-state">{playing ? "📻 正在陪你" : '待机'}</div>
+            <div className="mw-mini-state">{playing ? "📻 正在陪你" : '我在等你'}</div>
           </div>
           <div className="mw-grid">
             <button
