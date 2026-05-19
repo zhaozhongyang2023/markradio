@@ -477,7 +477,7 @@ if [[ "$SKIP_PLUGIN" = "0" && -d "${APP_PREFIX}/deck-companion" ]]; then
     sudo rm -rf "$plugin_dest" 2>/dev/null || true
     sudo mkdir -p "$plugin_dest"
     sudo cp -r "${plugin_src}"/dist "${plugin_src}"/main.py "${plugin_src}"/plugin.json "${plugin_src}"/package.json "$plugin_dest/" 2>/dev/null || true
-    sudo chown -R "${USER}:${USER}" "$plugin_dest" 2>/dev/null || true
+    sudo chmod -R a+rX "$plugin_dest" 2>/dev/null || true
     done_msg "Decky 插件已安装（重启 Steam 后生效）"
   else
     warn "未检测到 Decky Loader，跳过插件安装。（如需游戏模式使用，请先安装 Decky Loader）"
