@@ -8,6 +8,7 @@ import fastifyStatic from '@fastify/static';
 import websocket from '@fastify/websocket';
 import { config } from './config.js';
 import { StateStore } from './state.js';
+import { playSequence, stop as playerStop, getPlayerState } from './player.js';
 import { station } from './defaults.js';
 import { moods, normalizeMood } from './mood.js';
 import { parseLyric } from './music.js';
@@ -48,19 +49,31 @@ function publicStation() {
   };
 }
 
+
+function saveNowPerMode(store, now) {
+  if (now?.mode) store.set('now-' + now.mode, now);
+}
+
 function publicNow() {
-  const now = store.get('now');
-  const plan = store.get('planToday');
+  const now = store.get('now') || {};
+  const mode = now.mode || 'radio';
+  const plan = store.get('plan-' + mode) || store.get('plan-radio');
   return {
     station: publicStation(),
-    now: now || {
+    now: now.track ? now : {
       track: plan?.queue?.[0] || null,
       progress: 0,
-      playing: false,
+      playing: getPlayerState().state === 'playing',
       speaking: false,
-      mood: store.get('mood')?.current || '平静'
+      mood: store.get('mood')?.current || '平静',
+      mode
     },
     plan,
+    plans: {
+      radio: store.get('plan-radio') || null,
+      search: store.get('plan-search') || null,
+      game: store.get('plan-game') || null
+    },
     cast: getCastStatus()
   };
 }
@@ -86,9 +99,10 @@ async function hydrateCurrentLyric() {
   const nextTrack = { ...track, lyric };
   store.set('now', { ...now, track: nextTrack });
 
-  const plan = store.get('planToday');
+  const planKey = 'plan-' + (now.mode || 'radio');
+  const plan = store.get(planKey);
   if (plan?.queue?.length) {
-    store.set('planToday', {
+    store.set(planKey, {
       ...plan,
       queue: plan.queue.map((item) => (item.id === nextTrack.id ? { ...item, lyric } : item))
     });
@@ -240,7 +254,7 @@ app.put('/api/special-dates', async (request) => {
 });
 
 app.get('/api/plan/today', async (request, reply) => {
-  const cached = store.get('planToday');
+  const cached = store.get('plan-' + (request.query?.mode || store.get('now')?.mode || 'radio'));
   // Return cached plan if TTS is ready; otherwise regenerate with async TTS
   if (cached && cached.tts?.url && cached.queue?.[0]) return cached;
   const plan = await createRadioPlan({ store, deferTts: true, onTtsReady: (updated) => {
@@ -251,7 +265,7 @@ app.get('/api/plan/today', async (request, reply) => {
 
 app.post('/api/plan/today', async (request) => {
   // 记录当前队列所有歌曲为已播，防止新计划重复推荐
-  const oldPlan = store.get('planToday');
+  const oldPlan = store.get('plan-' + (request.body?.mode || store.get('now')?.mode || 'radio'));
   if (oldPlan?.queue) {
     for (const t of oldPlan.queue) {
       if (t?.id) store.addPlay(t, oldPlan.mood || '平静');
@@ -261,9 +275,23 @@ app.post('/api/plan/today', async (request) => {
     store,
     mood: request.body?.mood || null,
     deferTts: true,
-    onTtsReady: (updatedPlan) => {
+    onTtsReady: (updatedPlan, ttsType) => {
       broadcast('plan', updatedPlan);
       broadcast('now', publicNow());
+      if (ttsType === 'main') {
+        const nowSt = store.get('now');
+        if (nowSt && !nowSt.playing) {
+          nowSt.speaking = true;
+          nowSt.playing = true;
+          store.set('now', nowSt);
+          saveNowPerMode(store, nowSt);
+          const mainTtsUrl = updatedPlan.tts?.url ? `http://127.0.0.1:${config.apiPort}${updatedPlan.tts.url}` : '';
+          const trackUrls = buildPlaylist(nowSt.track, updatedPlan);
+          const playUrls = mainTtsUrl ? [mainTtsUrl, ...trackUrls] : trackUrls;
+          playSequence(playUrls, { onEnd: () => advanceToNext(store) });
+          broadcast('now', publicNow());
+        }
+      }
     }
   });
   return plan;
@@ -272,7 +300,7 @@ app.post('/api/plan/today', async (request) => {
 app.post('/api/chat', async (request) => {
   const text = String(request.body?.message || '');
   const moodMatch = moods.find((item) => text.includes(item));
-  const currentPlan = store.get('planToday');
+  const currentPlan = store.get('plan-' + (store.get('now')?.mode || 'radio'));
   const previousNow = store.get('now');
   const plan = await createRadioPlan({
     store,
@@ -280,9 +308,23 @@ app.post('/api/chat', async (request) => {
     userRequest: text,
     currentPlan,
     deferTts: true,
-    onTtsReady: (updatedPlan) => {
+    onTtsReady: (updatedPlan, ttsType) => {
       broadcast('plan', updatedPlan);
       broadcast('now', publicNow());
+      if (ttsType === 'main') {
+        const nowSt = store.get('now');
+        if (nowSt && !nowSt.playing) {
+          nowSt.speaking = true;
+          nowSt.playing = true;
+          store.set('now', nowSt);
+          saveNowPerMode(store, nowSt);
+          const mainTtsUrl = updatedPlan.tts?.url ? `http://127.0.0.1:${config.apiPort}${updatedPlan.tts.url}` : '';
+          const trackUrls = buildPlaylist(nowSt.track, updatedPlan);
+          const playUrls = mainTtsUrl ? [mainTtsUrl, ...trackUrls] : trackUrls;
+          playSequence(playUrls, { onEnd: () => advanceToNext(store) });
+          broadcast('now', publicNow());
+        }
+      }
     }
   });
   if (!plan.plan?.shouldSwitchNow && previousNow?.track?.id) {
@@ -304,6 +346,71 @@ app.post('/api/chat', async (request) => {
     planMessage
   };
 });
+async function advanceToNext(store) {
+  const state = publicNow();
+  const now = state.now;
+  if (!state.plan?.queue?.length) return;
+  const currentIndex = state.plan.queue.findIndex((t) => t.id === now.track?.id);
+  if (currentIndex < 0 || currentIndex >= state.plan.queue.length - 1) {
+    now.playing = false;
+    store.set('now', now);
+    broadcast('now', publicNow());
+    return;
+  }
+  const nextTrack = state.plan.queue[currentIndex + 1];
+  now.track = nextTrack;
+  now.progress = 0;
+  now.playing = true;
+  store.addPlay(nextTrack, now.mood);
+  store.set('now', now);
+  saveNowPerMode(store, now);
+  await ensureCardTts(store, state.plan, now);
+  if (store.get('now')?.track?.id !== nextTrack.id) return;
+  const updatedPlan = store.get('plan-' + (now.mode || 'radio')) || state.plan;
+  broadcast('now', publicNow());
+  const urls = buildPlaylist(nextTrack, updatedPlan);
+  playSequence(urls, { onEnd: () => advanceToNext(store) });
+}
+
+async function ensureCardTts(store, plan, now) {
+  if (!plan?.queue?.length) return;
+  if (!config.enableTts) return;
+  const index = plan.queue.findIndex((t) => t.id === now.track?.id);
+  if (index < 0) return;
+  const existing = plan.cardTts?.[index];
+  if (existing?.url) return;
+  const track = plan.queue[index];
+  const text = track?.reason || track?.title;
+  if (!text) return;
+  const mood = plan.mood || '平静';
+  const voiceStyle = plan.plan?.voiceStyle || '语速偏慢，温柔。';
+  try {
+    const result = await synthesizeVoice({ store, text, mood, voiceStyle });
+    const cardTts = [...(plan.cardTts || [])];
+    cardTts[index] = { ok: result.ok, pending: false, url: result.url || null, text };
+    const planKey = 'plan-' + (plan.mode || 'radio');
+    store.set(planKey, { ...plan, cardTts });
+  } catch { /* 静默失败 */ }
+}
+
+function buildMediaUrl(track) {
+  if (!track) return '';
+  const sourceId = track.sourceId || String(track.id || '');
+  return `http://127.0.0.1:${config.apiPort}/media/audio?id=${encodeURIComponent(sourceId)}`;
+}
+
+function buildPlaylist(track, plan) {
+  const urls = [];
+  const musicUrl = buildMediaUrl(track);
+  if (!musicUrl) return urls;
+  const idx = plan?.queue?.findIndex((t) => t.id === track?.id);
+  const cardTtsUrl = (idx >= 0 && plan?.cardTts?.[idx]?.url)
+    ? `http://127.0.0.1:${config.apiPort}${plan.cardTts[idx].url}`
+    : '';
+  if (cardTtsUrl) urls.push(cardTtsUrl);
+  urls.push(musicUrl);
+  return urls;
+}
 
 function buildPlanMessage(plan) {
   return {
@@ -318,8 +425,17 @@ function buildPlanMessage(plan) {
 async function applyPlaybackAction(action, body = {}) {
   const state = publicNow();
   const now = state.now;
-  if (action === 'play') now.playing = true;
-  if (action === 'pause') now.playing = false;
+  const planForAction = store.get('plan-' + (now.mode || 'radio')) || state.plan;
+  if (action === 'play') {
+    now.playing = true;
+    playerStop();
+    const urls = buildPlaylist(now.track, planForAction);
+    playSequence(urls, { onEnd: () => advanceToNext(store) });
+  }
+  if (action === 'pause') {
+    now.playing = false;
+    playerStop();
+  }
   if (action === 'seek') now.progress = Number(body?.progress || 0);
   if (action === 'select' && state.plan?.queue?.length) {
     const index = Number.isInteger(body?.index) ? body.index : -1;
@@ -332,6 +448,8 @@ async function applyPlaybackAction(action, body = {}) {
       now.progress = 0;
       now.playing = true;
       store.addPlay(now.track, now.mood);
+      const urls = buildPlaylist(now.track, planForAction);
+      playSequence(urls, { onEnd: () => advanceToNext(store) });
     }
   }
   if (action === 'prev' && state.plan?.queue?.length) {
@@ -343,6 +461,8 @@ async function applyPlaybackAction(action, body = {}) {
       now.progress = 0;
       now.playing = true;
       store.addPlay(now.track, now.mood);
+      const urls = buildPlaylist(now.track, planForAction);
+      playSequence(urls, { onEnd: () => advanceToNext(store) });
     }
   }
   if (action === 'next' && state.plan?.queue?.length) {
@@ -354,9 +474,15 @@ async function applyPlaybackAction(action, body = {}) {
         now.progress = 0;
         now.playing = true;
         store.addPlay(now.track, now.mood);
+        const urls = buildPlaylist(now.track, planForAction);
+        playSequence(urls, { onEnd: () => advanceToNext(store) });
+      } else {
+        now.playing = false;
+        playerStop();
       }
     }
   }
+  saveNowPerMode(store, now);
   store.set('now', now);
   broadcast('now', publicNow());
   return publicNow();
@@ -367,16 +493,36 @@ app.post('/api/playback/:action', async (request) => {
 });
 
 app.post('/api/ai/radio', async (request) => {
+  playerStop();
+  const nsR = store.get('now') || {};
+  nsR.mode = 'radio';
+  saveNowPerMode(store, nsR);
+  store.set('now', nsR);
   const mood = request.body?.mood || request.body?.currentMood || null;
   const userRequest = String(request.body?.scene || request.body?.prompt || '').trim();
   const plan = await createRadioPlan({
     store,
     mood,
     userRequest,
+    mode: 'radio',
     deferTts: true,
-    onTtsReady: (updatedPlan) => {
+    onTtsReady: (updatedPlan, ttsType) => {
       broadcast('plan', updatedPlan);
       broadcast('now', publicNow());
+      if (ttsType === 'main') {
+        const nowSt = store.get('now');
+        if (nowSt && !nowSt.playing) {
+          nowSt.speaking = true;
+          nowSt.playing = true;
+          store.set('now', nowSt);
+          saveNowPerMode(store, nowSt);
+          const mainTtsUrl = updatedPlan.tts?.url ? `http://127.0.0.1:${config.apiPort}${updatedPlan.tts.url}` : '';
+          const trackUrls = buildPlaylist(nowSt.track, updatedPlan);
+          const playUrls = mainTtsUrl ? [mainTtsUrl, ...trackUrls] : trackUrls;
+          playSequence(playUrls, { onEnd: () => advanceToNext(store) });
+          broadcast('now', publicNow());
+        }
+      }
     }
   });
   broadcast('plan', plan);
@@ -391,17 +537,37 @@ app.post('/api/ai/radio', async (request) => {
 });
 
 app.post('/api/ai/search', async (request) => {
+  playerStop();
+  const nsS = store.get('now') || {};
+  nsS.mode = 'search';
+  saveNowPerMode(store, nsS);
+  store.set('now', nsS);
   const query = String(request.body?.query || request.body?.message || request.body?.prompt || '').trim();
-  const currentPlan = store.get('planToday');
+  const currentPlan = store.get('plan-search');
   const plan = await createRadioPlan({
     store,
     mood: request.body?.mood || store.get('mood')?.current,
     userRequest: query,
     currentPlan,
+    mode: 'search',
     deferTts: true,
-    onTtsReady: (updatedPlan) => {
+    onTtsReady: (updatedPlan, ttsType) => {
       broadcast('plan', updatedPlan);
       broadcast('now', publicNow());
+      if (ttsType === 'main') {
+        const nowSt = store.get('now');
+        if (nowSt && !nowSt.playing) {
+          nowSt.speaking = true;
+          nowSt.playing = true;
+          store.set('now', nowSt);
+          saveNowPerMode(store, nowSt);
+          const mainTtsUrl = updatedPlan.tts?.url ? `http://127.0.0.1:${config.apiPort}${updatedPlan.tts.url}` : '';
+          const trackUrls = buildPlaylist(nowSt.track, updatedPlan);
+          const playUrls = mainTtsUrl ? [mainTtsUrl, ...trackUrls] : trackUrls;
+          playSequence(playUrls, { onEnd: () => advanceToNext(store) });
+          broadcast('now', publicNow());
+        }
+      }
     }
   });
   const planMessage = buildPlanMessage(plan);
@@ -419,7 +585,12 @@ app.post('/api/ai/search', async (request) => {
 });
 
 app.post('/api/ai/next-radio', async (request) => {
-  const currentPlan = store.get('planToday');
+  playerStop();
+  const nsN = store.get('now') || {};
+  nsN.mode = 'radio';
+  saveNowPerMode(store, nsN);
+  store.set('now', nsN);
+  const currentPlan = store.get('plan-radio');
   const mood = request.body?.mood || currentPlan?.mood || store.get('mood')?.current;
   const scene = String(request.body?.scene || request.body?.prompt || '换个氛围').trim();
   const plan = await createRadioPlan({
@@ -427,10 +598,25 @@ app.post('/api/ai/next-radio', async (request) => {
     mood,
     userRequest: scene,
     currentPlan,
+    mode: 'radio',
     deferTts: true,
-    onTtsReady: (updatedPlan) => {
+    onTtsReady: (updatedPlan, ttsType) => {
       broadcast('plan', updatedPlan);
       broadcast('now', publicNow());
+      if (ttsType === 'main') {
+        const nowSt = store.get('now');
+        if (nowSt && !nowSt.playing) {
+          nowSt.speaking = true;
+          nowSt.playing = true;
+          store.set('now', nowSt);
+          saveNowPerMode(store, nowSt);
+          const mainTtsUrl = updatedPlan.tts?.url ? `http://127.0.0.1:${config.apiPort}${updatedPlan.tts.url}` : '';
+          const trackUrls = buildPlaylist(nowSt.track, updatedPlan);
+          const playUrls = mainTtsUrl ? [mainTtsUrl, ...trackUrls] : trackUrls;
+          playSequence(playUrls, { onEnd: () => advanceToNext(store) });
+          broadcast('now', publicNow());
+        }
+      }
     }
   });
   broadcast('plan', plan);
@@ -445,6 +631,11 @@ app.post('/api/ai/next-radio', async (request) => {
 });
 
 app.post('/api/ai/game-radio', async (request) => {
+  playerStop();
+  const nsG = store.get('now') || {};
+  nsG.mode = 'game';
+  saveNowPerMode(store, nsG);
+  store.set('now', nsG);
   const gameVibe = String(request.body?.gameVibe || request.body?.vibe || '').trim();
   const gameName = String(request.body?.gameName || request.body?.name || '').trim();
   const vibeHint = String(request.body?.vibeHint || '').trim();
@@ -460,10 +651,25 @@ app.post('/api/ai/game-radio', async (request) => {
     store,
     mood,
     userRequest,
+    mode: 'game',
     deferTts: true,
-    onTtsReady: (updatedPlan) => {
+    onTtsReady: (updatedPlan, ttsType) => {
       broadcast('plan', updatedPlan);
       broadcast('now', publicNow());
+      if (ttsType === 'main') {
+        const nowSt = store.get('now');
+        if (nowSt && !nowSt.playing) {
+          nowSt.speaking = true;
+          nowSt.playing = true;
+          store.set('now', nowSt);
+          saveNowPerMode(store, nowSt);
+          const mainTtsUrl = updatedPlan.tts?.url ? `http://127.0.0.1:${config.apiPort}${updatedPlan.tts.url}` : '';
+          const trackUrls = buildPlaylist(nowSt.track, updatedPlan);
+          const playUrls = mainTtsUrl ? [mainTtsUrl, ...trackUrls] : trackUrls;
+          playSequence(playUrls, { onEnd: () => advanceToNext(store) });
+          broadcast('now', publicNow());
+        }
+      }
     }
   });
   broadcast('plan', plan);
@@ -477,6 +683,39 @@ app.post('/api/ai/game-radio', async (request) => {
     plan,
     now: publicNow().now
   };
+});
+
+
+app.post('/api/switch-mode', async (request) => {
+  const mode = String(request.body?.mode || 'radio');
+  const validModes = ['radio', 'search', 'game'];
+  if (!validModes.includes(mode)) return { ok: false, error: 'invalid mode' };
+
+  // 保存当前模块状态
+  const currentNow = store.get('now');
+  if (currentNow?.mode) {
+    store.set('now-' + currentNow.mode, { ...currentNow, playing: false });
+  }
+
+  // 停止播放
+  playerStop();
+
+  // 加载目标模块状态
+  let targetNow = store.get('now-' + mode);
+  const targetPlan = store.get('plan-' + mode);
+  
+  if (!targetNow && targetPlan?.queue?.length) {
+    targetNow = { track: targetPlan.queue[0], progress: 0, playing: false, mode, mood: targetPlan.mood };
+  }
+  if (!targetNow) {
+    targetNow = { playing: false, mode };
+  }
+  targetNow.playing = false;
+
+  store.set('now', targetNow);
+  saveNowPerMode(store, targetNow);
+  broadcast('now', publicNow());
+  return { ok: true, mode, now: publicNow().now };
 });
 
 app.post('/api/play', async (request) => applyPlaybackAction('play', request.body || {}));
@@ -830,7 +1069,7 @@ await app.listen({ host: config.host, port: config.apiPort });
 // Warmup: generate initial plan in background so first page load is instant
 setTimeout(async () => {
   try {
-    const existingPlan = store.get('planToday');
+    const existingPlan = store.get('plan-radio');
     if (existingPlan) {
       broadcast('plan', existingPlan);
       return;

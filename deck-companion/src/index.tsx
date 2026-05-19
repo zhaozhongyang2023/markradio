@@ -1,6 +1,6 @@
 import { PanelSection, PanelSectionRow, TextField, staticClasses } from '@decky/ui';
 import { definePlugin } from '@decky/api';
-import { ChangeEvent, useEffect, useRef, useState } from 'react';
+import { ChangeEvent, useEffect, useState } from 'react';
 
 const DEFAULT_API_BASE = 'http://127.0.0.1:38765';
 const API_BASE_KEY = 'moodwave.deck.apiBase';
@@ -26,6 +26,12 @@ type NowPayload = {
     tts?: { text?: string; url?: string };
     queue?: Track[];
     plan?: { say?: string; reply?: string };
+    cardTts?: Array<{ ok?: boolean; pending?: boolean; url?: string; text?: string; deferred?: boolean }>;
+  };
+  plans?: {
+    radio?: NowPayload['plan'];
+    search?: NowPayload['plan'];
+    game?: NowPayload['plan'];
   };
 };
 
@@ -104,8 +110,6 @@ function Content() {
   const [query, setQuery] = useState(searchExamples[0].id);
   const [gameVibe, setGameVibe] = useState('探索地图');
   const [gameName, setGameName] = useState(() => localStorage.getItem(GAME_NAME_KEY) || '');
-  const audioRef = useRef<HTMLAudioElement>(null);
-  const djRef = useRef<HTMLAudioElement>(null);
 
   async function refresh() {
     try {
@@ -115,6 +119,14 @@ function Content() {
     } catch {
       setStatus('离线');
     }
+  }
+
+  async function switchMode(mode: Page) {
+    if (mode === 'settings') { setPage('settings'); return; }
+    setPage(mode);
+    try { await apiRequest(apiBase, '/api/switch-mode', { mode }); }
+    catch { /* ignore */ }
+    await refresh();
   }
 
   async function run(label: string, task: () => Promise<unknown>) {
@@ -146,44 +158,27 @@ function Content() {
   useEffect(() => {
     refresh();
     const timer = setInterval(refresh, 5000);
-    return () => clearInterval(timer);
+    const onVisible = () => { if (document.visibilityState === 'visible') refresh(); };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => {
+      clearInterval(timer);
+      document.removeEventListener('visibilitychange', onVisible);
+    };
   }, [apiBase]);
 
-  const track = now.now?.track || now.plan?.queue?.[0] || null;
+  const currentPlan = (page !== 'settings' ? now.plans?.[page] : null) || now.plan;
+  const track = now.now?.track || currentPlan?.queue?.[0] || null;
   const playing = Boolean(now.now?.playing);
-  const currentMood = (now.plan?.mood || now.now?.mood || '').trim();
-  const queue = now.plan?.queue || [];
-  const djLine = now.plan?.tts?.text || now.plan?.plan?.say || now.plan?.plan?.reply || '';
+  const currentMood = (currentPlan?.mood || now.now?.mood || '').trim();
+  const queue = currentPlan?.queue || [];
+  const djLine = currentPlan?.tts?.text || currentPlan?.plan?.say || currentPlan?.plan?.reply || '';
   const trackLine = track?.title ? `${track.title}${track.artist ? ` - ${track.artist}` : ''}` : "AI DJ 准备中...";
-  const audioUrl = track ? `${normalizeBase(apiBase)}/media/audio?id=${track.sourceId || track.id || ''}` : '';
-  const ttsUrl = now.plan?.tts?.url ? `${normalizeBase(apiBase)}${now.plan.tts.url}` : '';
 
-  useEffect(() => {
-    const audio = audioRef.current;
-    if (!audio || !audioUrl) return;
-    if (playing) {
-      if (audio.src !== audioUrl) {
-        audio.src = audioUrl;
-        audio.load();
-      }
-      audio.play().catch(() => {});
-    } else {
-      audio.pause();
-    }
-  }, [audioUrl, playing]);
-
-  useEffect(() => {
-    const djAudio = djRef.current;
-    if (!djAudio || !ttsUrl) return;
-    if (djAudio.src === ttsUrl) return;
-    djAudio.src = ttsUrl;
-    djAudio.load();
-    if (audioRef.current) audioRef.current.volume = 0.22;
-    djAudio.play().catch(() => {});
-    djAudio.onended = () => {
-      if (audioRef.current) audioRef.current.volume = 1;
-    };
-  }, [ttsUrl]);
+  function saveGameName(value: string) {
+    const v = String(value || "");
+    setGameName(v);
+    localStorage.setItem(GAME_NAME_KEY, v);
+  }
 
   function saveApiBase(value: string) {
     const next = normalizeBase(value);
@@ -194,7 +189,6 @@ function Content() {
   async function startRadio(mood: string) {
     await run(`正在开台 · ${mood}`, async () => {
       await apiRequest(apiBase, '/api/ai/radio', { mood, mode: 'steamdeck', deferTts: true });
-      await apiRequest(apiBase, '/api/play', {});
     });
   }
 
@@ -203,14 +197,12 @@ function Content() {
     if (!prompt) return;
     await run('正在找歌单', async () => {
       await apiRequest(apiBase, '/api/ai/search', { query: prompt, mode: 'steamdeck', deferTts: true });
-      await apiRequest(apiBase, '/api/play', {});
     });
   }
 
   async function nextRadio() {
     await run('正在换氛围', async () => {
       await apiRequest(apiBase, '/api/ai/next-radio', { scene: query, mode: 'steamdeck', deferTts: true });
-      await apiRequest(apiBase, '/api/play', {});
     });
   }
 
@@ -224,7 +216,6 @@ function Content() {
         mode: 'steamdeck',
         deferTts: true
       });
-      await apiRequest(apiBase, '/api/play', {});
     });
   }
 
@@ -383,7 +374,6 @@ function Content() {
           min-width: 0;
         }
         .mw-card-accent {
-          border-left: 3px solid #42d8b2;
           background: rgba(66,216,178,0.06);
         }
         .mw-mini {
@@ -447,6 +437,21 @@ function Content() {
           border-top: 0;
           padding-top: 0;
         }
+        .mw-song-active {
+          position: relative;
+          padding-left: 6px;
+          border-left: 3px solid #42d8b2;
+          background: rgba(66,216,178,0.04);
+          border-radius: 2px;
+        }
+        .mw-song-active::before {
+          content: "▶";
+          position: absolute;
+          left: -16px;
+          top: 4px;
+          font-size: 8px;
+          color: #42d8b2;
+        }
         .mw-song-title,
         .mw-track {
           overflow: hidden;
@@ -478,21 +483,18 @@ function Content() {
           margin-bottom: 0 !important;
         }
       `}</style>
-      <audio ref={audioRef} style={{ display: 'none' }} />
-      <audio ref={djRef} style={{ display: 'none' }} />
 
       <div className="mw-status">
         <span>{progress > 0 ? <div className="mw-progress" style={{width: `${progress}%`}} /> : null}{busy ? <><span style={{fontSize:10,opacity:.6,marginRight:6}}>{progress}%</span><span className="mw-busy-dot" /><><span>{status}</span><span className="mw-busy-ellipsis"><i /><i /><i /></span></></> : `${status}${currentMood ? ` · ${currentMood}` : ''}`}</span>
-        <span>{playing ? "📻 正在陪你" : '我在等你'}</span>
       </div>
 
       <div className="mw-topbar">
         <div className="mw-tabs">
-          <AppButton active={page === 'radio'} onClick={() => setPage('radio')}><span className="mw-icon">◉</span>电台</AppButton>
-          <AppButton active={page === 'search'} onClick={() => setPage('search')}><span className="mw-icon">⌕</span>寻歌</AppButton>
-          <AppButton active={page === 'game'} onClick={() => setPage('game')}><span className="mw-icon">▣</span>游戏</AppButton>
+          <AppButton active={page === 'radio'} disabled={busy} onClick={() => switchMode('radio')}><span className="mw-icon">◉</span>电台</AppButton>
+          <AppButton active={page === 'search'} disabled={busy} onClick={() => switchMode('search')}><span className="mw-icon">⌕</span>寻歌</AppButton>
+          <AppButton active={page === 'game'} disabled={busy} onClick={() => switchMode('game')}><span className="mw-icon">▣</span>游戏</AppButton>
         </div>
-        <AppButton active={page === 'settings'} title="设置" onClick={() => setPage('settings')} className="is-icon">
+        <AppButton active={page === 'settings'} title="设置" disabled={busy} onClick={() => switchMode('settings')} className="is-icon">
           <span>⚙</span>
         </AppButton>
       </div>
@@ -537,7 +539,7 @@ function Content() {
 
       {page === 'radio' && (
         <div>
-          <div className="mw-section-title"><span>◉</span>今日电台</div>
+          <div className="mw-section-title"><span>◉</span>现在是什么感觉？</div>
           <div className="mw-card">
             <div className="mw-grid">
               {moods.map((mood) => (
@@ -589,7 +591,7 @@ function Content() {
 
       {page === 'game' && (
         <div>
-          <div className="mw-section-title"><span>▣</span>游戏电台</div>
+          <div className="mw-section-title"><span>▣</span>现在想怎么玩？</div>
           <div className="mw-card">
             <div className="mw-grid two">
               {gameVibes.map((vibe) => (
@@ -618,7 +620,8 @@ function Content() {
             <TextField
               label="🎮 现在在玩什么？"
               value={gameName}
-              onChange={(event: ChangeEvent<HTMLInputElement>) => { const v = event.target.value; setGameName(v); localStorage.setItem(GAME_NAME_KEY, v); }}
+              onChange={(event: ChangeEvent<HTMLInputElement>) => saveGameName(event.target.value)}
+              onBlur={(event: ChangeEvent<HTMLInputElement>) => saveGameName(event.target.value)}
             />
           </PanelSectionRow>
           <PanelSectionRow>
@@ -626,6 +629,7 @@ function Content() {
               label="API Base"
               value={apiBase}
               onChange={(event: ChangeEvent<HTMLInputElement>) => saveApiBase(event.target.value)}
+              onBlur={(event: ChangeEvent<HTMLInputElement>) => saveApiBase(event.target.value)}
             />
           </PanelSectionRow>
           <PanelSectionRow>
@@ -639,12 +643,16 @@ function Content() {
           <div className="mw-section-title"><span>✦</span>AI DJ</div>
           <div className="mw-card mw-card-accent">
             {djLine ? <div className="mw-dj">{djLine}</div> : null}
-            {queue.slice(0, 2).map((item, index) => (
-              <div className="mw-song" key={item.id || index}>
+            {queue.map((item, index) => {
+              const isCurrent = track && (item.id === track.id || item.sourceId === track.sourceId);
+              return (
+              <div className={`mw-song${isCurrent ? ' mw-song-active' : ''}`} key={item.id || index}>
                 <div className="mw-song-title">{item.title || '未知歌曲'}</div>
                 {item.artist ? <div className="mw-song-artist">{item.artist}</div> : null}
+                {item.reason ? <div className="mw-song-reason">{item.reason}</div> : null}
               </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       )}

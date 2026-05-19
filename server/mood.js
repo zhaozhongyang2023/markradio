@@ -58,11 +58,27 @@ export function recommendMood({ currentMood, specialDates = [], weather = null, 
   return '平静';
 }
 
-export function scoreTrackForMood(track, mood) {
+export function atmosphereEnergyBias(timePeriod, weatherCondition) {
+  let bias = 0;
+  // 时间氛围能量偏移（数字越小 = 越偏向低能量）
+  if (['深夜'].includes(timePeriod)) bias -= 0.12;
+  else if (['夜晚'].includes(timePeriod)) bias -= 0.08;
+  else if (['清晨'].includes(timePeriod)) bias -= 0.05;
+  // 天气氛围能量偏移
+  if (weatherCondition?.includes('雨')) bias -= 0.06;
+  else if (weatherCondition?.includes('雪')) bias -= 0.04;
+  else if (weatherCondition?.includes('晴')) bias += 0.02;
+  else if (weatherCondition?.includes('云') || weatherCondition?.includes('阴')) bias -= 0.02;
+  return Math.round(bias * 100) / 100;
+}
+
+export function scoreTrackForMood(track, mood, atmosphereBias = 0) {
   const profile = moodProfiles[normalizeMood(mood)];
   const moodHit = track.mood?.includes(mood) ? 0.45 : 0;
   const energy = typeof track.energy === 'number' ? track.energy : 0.5;
-  const [min, max] = profile.energy;
+  const [rawMin, rawMax] = profile.energy;
+  const min = Math.max(0.05, rawMin + atmosphereBias);
+  const max = Math.max(min + 0.05, rawMax + atmosphereBias);
   const inRange = energy >= min && energy <= max ? 0.35 : 0;
   const distance = energy < min ? min - energy : energy > max ? energy - max : 0;
   return moodHit + inRange - distance * 0.35;

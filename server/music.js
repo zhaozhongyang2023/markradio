@@ -4,7 +4,7 @@ import { scoreTrackForMood } from './mood.js';
 import { assertServiceAvailable, markServiceFailure, markServiceSuccess } from './circuit-breaker.js';
 import { callNetease, getNeteaseLoginStatus } from './netease-auth.js';
 
-export async function getCandidateTracks({ store, mood, userRequest = '' }) {
+export async function getCandidateTracks({ store, mood, userRequest = '', atmosphereBias = 0 }) {
   const languageIntent = detectLanguageIntent(userRequest);
   const requestedSongs = extractRequestedSongs(userRequest);
   const neteaseTracks = await getNeteaseCandidates(store, mood, { languageIntent, requestedSongs }).catch(() => []);
@@ -17,7 +17,7 @@ export async function getCandidateTracks({ store, mood, userRequest = '' }) {
     return tracks
       .map((track) => ({
         ...track,
-        score: scoreTrackForMood(track, mood) + (recent.has(track.id) ? -0.4 : 0)
+        score: scoreTrackForMood(track, mood, atmosphereBias) + (recent.has(track.id) ? -0.4 : 0)
       }))
       .sort((a, b) => b.score - a.score)
       .sort((a, b) => languageScore(b, languageIntent) - languageScore(a, languageIntent));
@@ -25,7 +25,7 @@ export async function getCandidateTracks({ store, mood, userRequest = '' }) {
   return fresh
     .map((track) => ({
       ...track,
-      score: scoreTrackForMood(track, mood)
+      score: scoreTrackForMood(track, mood, atmosphereBias)
     }))
     .sort((a, b) => b.score - a.score)
     .sort((a, b) => languageScore(b, languageIntent) - languageScore(a, languageIntent));
