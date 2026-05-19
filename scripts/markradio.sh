@@ -9,9 +9,21 @@ set -e
 # SSH / headless 检测
 ##############################################
 is_headless() {
-  [[ -z "${DISPLAY:-}" ]] && return 0
-  [[ -n "${SSH_TTY:-}" || -n "${SSH_CONNECTION:-}" || -n "${SSH_CLIENT:-}" ]] && return 0
-  return 1
+  # 检查 X11 是否实际在运行（而非仅靠 DISPLAY 环境变量）
+  if pgrep -x Xorg >/dev/null 2>&1; then
+    # X11 在运行，强制设置 DISPLAY
+    [[ -z "${DISPLAY:-}" ]] && export DISPLAY=:0
+    return 1
+  fi
+  if pgrep -x X >/dev/null 2>&1; then
+    [[ -z "${DISPLAY:-}" ]] && export DISPLAY=:0
+    return 1
+  fi
+  # Wayland 检测
+  if [[ -n "${WAYLAND_DISPLAY:-}" ]] || pgrep -x gamescope >/dev/null 2>&1; then
+    return 1
+  fi
+  return 0
 }
 
 has_display() {
