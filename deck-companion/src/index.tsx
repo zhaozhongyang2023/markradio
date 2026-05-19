@@ -71,20 +71,22 @@ function AppButton({
   active = false,
   disabled = false,
   onClick,
-  title
+  title,
+  className: extraClass = '',
 }: {
   children: React.ReactNode;
   active?: boolean;
   disabled?: boolean;
   onClick?: () => void;
   title?: string;
+  className?: string;
 }) {
   return (
     <button
       type="button"
       title={title}
       disabled={disabled}
-      className={`mw-button${active ? ' is-active' : ''}`}
+      className={`mw-button${active ? ' is-active' : ''}${extraClass ? ' ' + extraClass : ''}`}
       onClick={onClick}
     >
       {children}
@@ -299,6 +301,10 @@ function Content() {
           font-size: 11px;
           text-align: center;
         }
+        .mw-button.is-icon .mw-icon {
+          margin-right: 0;
+        }
+        .mw-button:not(.is-icon) .mw-icon { margin-right: 4px; }
         .mw-button.is-transport {
           padding: 0;
           font-size: 15px;
@@ -432,8 +438,8 @@ function Content() {
           <AppButton active={page === 'search'} onClick={() => setPage('search')}><span className="mw-icon">⌕</span>寻歌</AppButton>
           <AppButton active={page === 'game'} onClick={() => setPage('game')}><span className="mw-icon">▣</span>游戏</AppButton>
         </div>
-        <AppButton active={page === 'settings'} title="设置" onClick={() => setPage('settings')}>
-          <span className="mw-icon">⚙</span>
+        <AppButton active={page === 'settings'} title="设置" onClick={() => setPage('settings')} className="is-icon">
+          <span>⚙</span>
         </AppButton>
       </div>
 
