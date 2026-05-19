@@ -4,6 +4,7 @@ import { ChangeEvent, useEffect, useRef, useState } from 'react';
 
 const DEFAULT_API_BASE = 'http://127.0.0.1:38765';
 const API_BASE_KEY = 'moodwave.deck.apiBase';
+const GAME_NAME_KEY = 'moodwave.deck.gameName';
 
 type Track = {
   id?: string;
@@ -102,7 +103,7 @@ function Content() {
   const [status, setStatus] = useState('连接中');
   const [query, setQuery] = useState(searchExamples[0].id);
   const [gameVibe, setGameVibe] = useState('探索地图');
-  const [gameName, setGameName] = useState('');
+  const [gameName, setGameName] = useState(() => localStorage.getItem(GAME_NAME_KEY) || '');
   const audioRef = useRef<HTMLAudioElement>(null);
   const djRef = useRef<HTMLAudioElement>(null);
 
@@ -564,7 +565,7 @@ function Content() {
             <TextField
               label="在玩什么"
               value={gameName}
-              onChange={(event: ChangeEvent<HTMLInputElement>) => setGameName(event.target.value)}
+              onChange={(event: ChangeEvent<HTMLInputElement>) => { const v = event.target.value; setGameName(v); localStorage.setItem(GAME_NAME_KEY, v); }}
             />
           </PanelSectionRow>
           <PanelSectionRow>
