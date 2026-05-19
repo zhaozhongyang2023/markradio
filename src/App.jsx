@@ -1511,8 +1511,6 @@ export default function App() {
     stopAudioVisuals();
     audioRef.current?.pause();
     djAudioRef.current?.pause();
-    djAudioRef.current?.removeAttribute("src");
-    djAudioRef.current?.load();
     activeDjClipRef.current?.pause();
     activeDjClipRef.current = null;
     try { activeDjSourceRef.current?.stop?.(); } catch {}

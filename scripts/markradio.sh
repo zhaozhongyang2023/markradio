@@ -36,16 +36,24 @@ has_display() {
 
 APP_NAME="${MOODWAVE_NAME:-MoodWave}"
 MARKRADIO_DIR="${MOODWAVE_DIR:-${MARKRADIO_DIR:-$HOME/markradio}}"
+
+# 自动检测 moodwave 安装路径（兼容树莓派 /home/pi/markradio 和 Steam Deck /home/deck/.local/share/moodwave）
+if [ ! -d "$MARKRADIO_DIR" ] && [ -d "$HOME/.local/share/moodwave" ]; then
+  MARKRADIO_DIR="$HOME/.local/share/moodwave"
+fi
 NETEASE_DIR="${NETEASE_DIR:-$HOME/netease-api}"
 API_PORT="${MOODWAVE_API_PORT:-${MOODWAVE_PORT:-${MARKRADIO_API_PORT:-38765}}}"
 WEB_PORT="${MOODWAVE_WEB_PORT:-${MARKRADIO_WEB_PORT:-38080}}"
 NETEASE_PORT="${NETEASE_PORT:-3000}"
+PLUGIN_PORT="${PLUGIN_PORT:-38766}"
 
 MARKRADIO_PID="$MARKRADIO_DIR/markradio.pid"
 NETEASE_PID="$NETEASE_DIR/netease-api.pid"
 
 MARKRADIO_LOG="$MARKRADIO_DIR/markradio.log"
 NETEASE_LOG="$NETEASE_DIR/netease-api.log"
+PLUGIN_PID="$MARKRADIO_DIR/plugin-server.pid"
+PLUGIN_LOG="$MARKRADIO_DIR/plugin-server.log"
 FIREFOX_LOG="$MARKRADIO_DIR/firefox-kiosk.log"
 FIREFOX_PROFILE="$MARKRADIO_DIR/firefox-kiosk-profile"
 
@@ -92,6 +100,12 @@ status() {
     red   "  Netease API ($NETEASE_PORT) ✗ 未启动"
   fi
 
+  if port_listening "$PLUGIN_PORT"; then
+    green "  Plugin API ($PLUGIN_PORT)  ✓ 运行中"
+  else
+    red   "  Plugin API ($PLUGIN_PORT)  ✗ 未启动"
+  fi
+
   if pgrep -f "firefox.*--kiosk" > /dev/null 2>&1; then
     green "  Firefox 全屏        ✓ 运行中"
   else
@@ -120,6 +134,35 @@ start_netease() {
   done
   red " ✗ 启动超时，查看 $NETEASE_LOG"
 }
+
+
+start_plugin_server() {
+  if port_listening "$PLUGIN_PORT"; then
+    yellow "[skip] Plugin API 已在运行 (端口 $PLUGIN_PORT)"
+    return
+  fi
+
+  local plugin_dir="$MARKRADIO_DIR/plugin-server"
+  if [ ! -f "$plugin_dir/index.js" ]; then
+    yellow "[skip] Plugin server 未安装 ($plugin_dir/index.js 不存在)"
+    return
+  fi
+
+  echo -n "启动 Plugin API..."
+  cd "$MARKRADIO_DIR"
+  PLUGIN_API_PORT="$PLUGIN_PORT" nohup node plugin-server/index.js > "$PLUGIN_LOG" 2>&1 &
+  echo $! > "$PLUGIN_PID"
+
+  for i in $(seq 1 20); do
+    sleep 0.5
+    if port_listening "$PLUGIN_PORT"; then
+      green " ✓ (PID $(cat $PLUGIN_PID))"
+      return
+    fi
+  done
+  red " ✗ 启动超时，查看 $PLUGIN_LOG"
+}
+
 
 start_radio() {
   if port_listening "$API_PORT"; then
@@ -256,6 +299,7 @@ start() {
   echo "========== 启动 $APP_NAME =========="
   clear_cache
   start_netease
+  start_plugin_server
   start_radio
   disable_screen_blank
   start_chromium
@@ -278,6 +322,24 @@ stop_netease() {
   # 兜底
   pkill -f "node run.js" 2>/dev/null || true
 }
+
+
+stop_plugin_server() {
+  if [ -f "$PLUGIN_PID" ]; then
+    local pid=$(cat "$PLUGIN_PID")
+    if kill -0 "$pid" 2>/dev/null; then
+      echo -n "停止 Plugin API (PID $pid)..."
+      kill "$pid" 2>/dev/null
+      sleep 1
+      kill -0 "$pid" 2>/dev/null && kill -9 "$pid" 2>/dev/null || true
+      green " ✓"
+    fi
+    rm -f "$PLUGIN_PID"
+  fi
+  # 兜底
+  pkill -f "node plugin-server/index.js" 2>/dev/null || true
+}
+
 
 stop_radio() {
   if command -v systemctl >/dev/null 2>&1 && systemctl list-unit-files markradio.service >/dev/null 2>&1; then
@@ -313,6 +375,7 @@ stop_chromium() {
 stop() {
   echo "========== 停止 $APP_NAME =========="
   stop_chromium
+  stop_plugin_server
   stop_radio
   stop_netease
   echo -n "清理音频进程..."
@@ -326,6 +389,7 @@ stop() {
 refresh() {
   echo "========== 刷新 $APP_NAME =========="
   stop_chromium
+  stop_plugin_server
   stop_radio
   echo -n "清理音频进程..."
   pkill -9 -f ffplay 2>/dev/null || true
@@ -333,6 +397,8 @@ refresh() {
   green " ✓"
   clear_cache
   start_netease
+  start_plugin_server
+  start_plugin_server
   start_radio
   # 等待服务器 warmup 完成，确保计划已就绪
   echo -n "等待服务就绪..."
@@ -350,6 +416,8 @@ server() {
   stop_chromium
   enable_screen_blank
   start_netease
+  start_plugin_server
+  start_plugin_server
   start_radio
   echo
   local local_ip

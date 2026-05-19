@@ -4,12 +4,14 @@ import { MAX_AI_PLAN_TRACKS, demoPlan, generateDjPlan } from './openai.js';
 import { synthesizeVoice } from './voice.js';
 import { getWeather } from './weather.js';
 import { getSpecialDates } from './special-dates.js';
-import { recommendMood } from './mood.js';
+import { recommendMood, atmosphereEnergyBias } from './mood.js';
+import { periodName } from './prompts.js';
+import { deriveNeteaseTaste } from './taste.js';
 
 const DEFAULT_QUEUE_LIMIT = 5;
 const TTS_PRELOAD_LIMIT = 2;
 
-export async function createRadioPlan({ store, mood: requestedMood = null, nowPlaying = null, deferTts = false, onTtsReady = null, userRequest = '', currentPlan = null }) {
+export async function createRadioPlan({ store, mood: requestedMood = null, nowPlaying = null, deferTts = false, onTtsReady = null, userRequest = '', currentPlan = null, mode = 'radio' }) {
   // 每组刷新时清空跨组去重，确保 AI 选曲不会被跳过
   sessionPlayedIds.clear();
   const now = new Date();
@@ -36,10 +38,15 @@ export async function createRadioPlan({ store, mood: requestedMood = null, nowPl
   const currentQueue = languageIntent
     ? (currentPlan?.queue || []).filter((track) => trackMatchesLanguage(track, languageIntent))
     : currentPlan?.queue || [];
-  const freshCandidates = await getCandidateTracks({ store, mood, userRequest });
+  const atmosphereBias = atmosphereEnergyBias(timeContext.period, weather.condition);
+  const freshCandidates = await getCandidateTracks({ store, mood, userRequest, atmosphereBias });
   const candidates = mergeCandidateTracks(currentQueue, freshCandidates);
+  // 获取网易云听歌偏好（带缓存，1 小时刷新）
+  const neteaseTaste = await deriveNeteaseTaste(store).catch(() => null);
   const context = buildDjContext({
     taste,
+    mode,
+    neteaseTaste,
     mood,
     specialDates,
     weather,
@@ -98,7 +105,7 @@ export async function createRadioPlan({ store, mood: requestedMood = null, nowPl
   const cardTts = deferTts
     ? queue.map((track, index) => ({
         ok: false, pending: true, url: null,
-        text: track?.reason || '',
+        text: track?.reason || track?.title || '',
         deferred: index >= TTS_PRELOAD_LIMIT
       }))
     : await (async () => {
@@ -120,12 +127,13 @@ export async function createRadioPlan({ store, mood: requestedMood = null, nowPl
     tts,
     cardTts
   };
-  store.set('planToday', todayPlan);
-  if (queue[0]) store.set('now', { track: queue[0], progress: 0, playing: false, speaking: Boolean(tts.ok), mood });
+  todayPlan.mode = mode;
+  store.set('plan-' + mode, todayPlan);
+  if (queue[0]) store.set('now', { track: queue[0], progress: 0, playing: false, speaking: Boolean(tts.ok), mood, mode });
   if (deferTts) {
     // 主导读 TTS 异步生成
     buildTts({ store, text: ttsText, mood, voiceStyle: plan.voiceStyle, nonce: planId })
-      .then((result) => updatePlanTts({ store, planId: todayPlan.id, tts: result, onTtsReady }))
+      .then((result) => updatePlanTts({ store, planId: todayPlan.id, tts: result, onTtsReady, mode }))
       .catch((error) => updatePlanTts({
         store, planId: todayPlan.id,
         tts: { ok: false, pending: false, url: null, message: error.message, text: ttsText },
@@ -133,10 +141,10 @@ export async function createRadioPlan({ store, mood: requestedMood = null, nowPl
       }));
     // 每首歌导读卡片 TTS
     queue.slice(0, TTS_PRELOAD_LIMIT).forEach((track, i) => {
-      const text = track?.reason;
+      const text = track?.reason || track?.title;
       if (!text) return;
       buildTts({ store, text, mood, voiceStyle: plan.voiceStyle, nonce: planId })
-        .then((card) => updateCardTts({ store, planId: todayPlan.id, index: i, tts: card, onTtsReady }))
+        .then((card) => updateCardTts({ store, planId: todayPlan.id, index: i, tts: card, onTtsReady, mode }))
         .catch((error) => updateCardTts({
           store, planId: todayPlan.id, index: i,
           tts: { ok: false, pending: false, url: null, message: error.message, text },
@@ -184,24 +192,24 @@ async function buildTts({ store, text, mood, voiceStyle, nonce = '' }) {
   }));
 }
 
-function updatePlanTts({ store, planId, tts, onTtsReady }) {
-  const current = store.get('planToday');
+function updatePlanTts({ store, planId, tts, onTtsReady, mode }) {
+  const current = store.get('plan-' + mode);
   if (!current || current.id !== planId) return null;
   const updated = { ...current, tts };
-  store.set('planToday', updated);
+  store.set('plan-' + mode, updated);
   const now = store.get('now');
   if (now) store.set('now', { ...now, speaking: Boolean(tts.ok) });
-  onTtsReady?.(updated);
+  onTtsReady?.(updated, 'main');
   return updated;
 }
 
-function updateCardTts({ store, planId, index, tts, onTtsReady }) {
-  const current = store.get('planToday');
+function updateCardTts({ store, planId, index, tts, onTtsReady, mode }) {
+  const current = store.get('plan-' + mode);
   if (!current || current.id !== planId) return null;
   const cardTts = [...(current.cardTts || [])];
   cardTts[index] = { ...(cardTts[index] || {}), ...tts };
   const updated = { ...current, cardTts };
-  store.set('planToday', updated);
+  store.set('plan-' + (updated.mode || mode), updated);
   onTtsReady?.(updated);
   return updated;
 }
@@ -285,12 +293,3 @@ function buildTimeContext(now) {
   };
 }
 
-function periodName(hour) {
-  if (hour < 5) return '深夜';
-  if (hour < 9) return '清晨';
-  if (hour < 12) return '上午';
-  if (hour < 14) return '午后';
-  if (hour < 18) return '下午';
-  if (hour < 22) return '夜晚';
-  return '夜深';
-}

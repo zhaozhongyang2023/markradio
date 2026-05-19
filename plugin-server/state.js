@@ -40,7 +40,12 @@ export class StateStore {
     if (!this.get('voice')) this.set('voice', { provider: 'local-voice', voiceId: 'chuanglaoli', style: defaultVoiceStyle });
     if (!this.get('specialDates')) this.set('specialDates', getDefaultSpecialDateConfig());
     if (!this.get('tracks')) this.set('tracks', demoTracks);
-    if (!this.get('planToday')) this.set('planToday', null);
+    if (!this.get('plan-radio')) this.set('plan-radio', null);
+    if (!this.get('plan-search')) this.set('plan-search', null);
+    if (!this.get('plan-game')) this.set('plan-game', null);
+    if (!this.get('now-radio')) this.set('now-radio', null);
+    if (!this.get('now-search')) this.set('now-search', null);
+    if (!this.get('now-game')) this.set('now-game', null);
   }
 
   get(key) {
