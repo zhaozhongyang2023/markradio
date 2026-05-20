@@ -21,15 +21,15 @@ function killCurrent() {
 }
 
 // 启动新播放序列：按顺序播放 urls，全部播完后调用 onEnd
-export function playSequence(urls, { onEnd = null } = {}) {
+export function playSequence(urls, { onEnd = null, onTrackStart = null } = {}) {
   killCurrent();
   if (!urls || !urls.length) return getPlayerState();
   const seqId = ++activeSequenceId;
-  playOne(urls, 0, onEnd, seqId);
+  playOne(urls, 0, onEnd, onTrackStart, seqId);
   return getPlayerState();
 }
 
-function playOne(urls, index, onEnd, seqId) {
+function playOne(urls, index, onEnd, onTrackStart, seqId) {
   if (seqId !== activeSequenceId) return; // 序列已过期
   if (index >= urls.length) {
     if (onEnd) pendingTimer = setTimeout(() => { pendingTimer = null; onEnd(); }, 300);
@@ -38,6 +38,8 @@ function playOne(urls, index, onEnd, seqId) {
   const url = urls[index];
   // ffplay 无法解析相对路径，转成全 HTTP URL
   const resolvedUrl = url.startsWith('/') ? `http://127.0.0.1:${config.apiPort}${url}` : url;
+  // 非 TTS URL = 实际歌曲，触发 onTrackStart
+  if (onTrackStart && !resolvedUrl.includes('/tts/')) onTrackStart();
   const startTime = Date.now();
   const proc = spawn('/usr/bin/ffplay', [
     '-nodisp', '-autoexit', '-loglevel', 'error', '-infbuf', resolvedUrl
@@ -52,13 +54,13 @@ function playOne(urls, index, onEnd, seqId) {
     if (currentProcess === proc) currentProcess = null;
     if (seqId !== activeSequenceId) return;
     if (Date.now() - startTime < 2000) { /* 播太快 → 跳过继续下一个 */ }
-    playOne(urls, index + 1, onEnd, seqId);
+    playOne(urls, index + 1, onEnd, onTrackStart, seqId);
   });
 
   proc.on('error', () => {
     if (currentProcess === proc) currentProcess = null;
     if (seqId !== activeSequenceId) return;
-    playOne(urls, index + 1, onEnd, seqId);
+    playOne(urls, index + 1, onEnd, onTrackStart, seqId);
   });
 }
 

@@ -53,7 +53,10 @@ async function advanceToNext(store) {
   const next = plan.queue[ci + 1];
   now.track = next; now.progress = 0; now.playing = true;
   const urls = buildPlaylist(next, plan, now);
-  if (urls.length) playSequence(urls, { onEnd: () => advanceToNext(store) });
+  if (urls.length) playSequence(urls, { onEnd: () => advanceToNext(store), onTrackStart: () => {
+        const n = store.get('now');
+        if (n) { n.startedAt = Date.now(); store.set('now', n); }
+      } });
   store.addPlay(next, now.mood);
   store.set('now', now); saveNowPerMode(store, now);
   broadcast('now', publicNow());
@@ -62,12 +65,18 @@ async function advanceToNext(store) {
 async function applyPluginAction(action, body = {}) {
   const now = store.get('now') || {}; const mode = now.mode || 'radio';
   const plan = store.get('plan-' + mode) || {};
-  if (action === 'play') { now.playing = true; now.startedAt = Date.now(); playerStop(); const u = buildPlaylist(now.track, plan, now); now.introPlayed = true; if (u.length) playSequence(u, { onEnd: () => advanceToNext(store) }); }
+  if (action === 'play') { now.playing = true; playerStop(); const u = buildPlaylist(now.track, plan, now); now.introPlayed = true; if (u.length) playSequence(u, { onEnd: () => advanceToNext(store), onTrackStart: () => {
+        const n = store.get('now');
+        if (n) { n.startedAt = Date.now(); store.set('now', n); }
+      } }); }
   if (action === 'pause') { now.playing = false; playerStop(); }
   if ((action === 'next' || action === 'prev') && plan?.queue?.length) {
     const ci = plan.queue.findIndex(t => t.id === now.track?.id);
     const ni = action === 'prev' ? (ci > 0 ? ci - 1 : 0) : (ci >= 0 && ci < plan.queue.length - 1 ? ci + 1 : -1);
-    if (ni >= 0) { now.track = plan.queue[ni]; now.progress = 0; now.playing = true; store.addPlay(now.track, now.mood); playerStop(); const u = buildPlaylist(now.track, plan, now); if (u.length) playSequence(u, { onEnd: () => advanceToNext(store) }); }
+    if (ni >= 0) { now.track = plan.queue[ni]; now.progress = 0; now.playing = true; store.addPlay(now.track, now.mood); playerStop(); const u = buildPlaylist(now.track, plan, now); if (u.length) playSequence(u, { onEnd: () => advanceToNext(store), onTrackStart: () => {
+        const n = store.get('now');
+        if (n) { n.startedAt = Date.now(); store.set('now', n); }
+      } }); }
   }
   saveNowPerMode(store, now); store.set('now', now); broadcast('now', publicNow()); return publicNow();
 }
