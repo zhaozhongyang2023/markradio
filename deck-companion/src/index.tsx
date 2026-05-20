@@ -15,6 +15,8 @@ type Track = {
   title?: string;
   artist?: string;
   reason?: string;
+  lyric?: Array<{ time: number; text: string }>;
+  duration?: number;
 };
 
 type NowPayload = {
@@ -246,6 +248,18 @@ function Content() {
     }
     if (mode === 'search') return query.trim() ? '寻歌 · ' + query.trim() : '寻歌电台';
     return currentMood ? '心情电台 · ' + currentMood : '心情电台';
+  }
+
+  function getCurrentLyric(track: Track | null, progressRatio: number): string {
+    if (!track?.lyric?.length) return '';
+    const duration = track.duration || 180;
+    const seconds = progressRatio * duration;
+    let idx = -1;
+    for (let i = 0; i < track.lyric.length; i++) {
+      if (track.lyric[i].time <= seconds) idx = i;
+      else break;
+    }
+    return idx >= 0 ? track.lyric[idx].text : '';
   }
 
   async function startRadio(mood: string) {
@@ -506,6 +520,31 @@ function Content() {
           line-height: 1.3;
           letter-spacing: 0.02em;
         }
+        .mw-minimal-loading {
+          display: flex;
+          align-items: center;
+          gap: 6px;
+          margin-bottom: 10px;
+        }
+        .mw-minimal-loading-bar {
+          flex: 1;
+          height: 3px;
+          border-radius: 2px;
+          background: rgba(255,255,255,.08);
+        }
+        .mw-minimal-loading-fill {
+          height: 100%;
+          border-radius: 2px;
+          background: #42d8b2;
+          transition: width .3s linear;
+        }
+        .mw-minimal-loading-pct {
+          color: rgba(66,216,178,.78);
+          font-size: 9px;
+          font-weight: 600;
+          min-width: 24px;
+          text-align: right;
+        }
         .mw-minimal-quote {
           padding: 10px 12px;
           border-left: 4px solid #42d8b2;
@@ -545,6 +584,14 @@ function Content() {
           background: #42d8b2;
           border-radius: 2px;
           transition: width .5s linear;
+        }
+        .mw-minimal-lyric {
+          color: rgba(255,255,255,.48);
+          font-size: 9px;
+          margin-bottom: 5px;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
         }
         .mw-minimal-transport {
           display: grid;
@@ -674,6 +721,14 @@ function Content() {
             {currentMood ? <div className="mw-minimal-tag">{currentMood}</div> : null}
           </div>
           <div className="mw-minimal-scene">{getSceneText()}</div>
+          {busy ? (
+            <div className="mw-minimal-loading">
+              <div className="mw-minimal-loading-bar">
+                <div className="mw-minimal-loading-fill" style={{width: `${progress}%`}} />
+              </div>
+              <span className="mw-minimal-loading-pct">{progress}%</span>
+            </div>
+          ) : null}
           {djForTrack ? (
             <div className="mw-minimal-quote">{djForTrack}</div>
           ) : djLine ? (
@@ -682,6 +737,7 @@ function Content() {
           <div className="mw-minimal-playing">📻 正在陪你</div>
           <div className="mw-minimal-track">{track.title || '未知歌曲'}{track.artist ? ' — ' + track.artist : ''}</div>
           {playing ? <div className="mw-minimal-progress"><div className="mw-minimal-progress-fill" style={{width: `${Math.round(progressRatio * 100)}%`}} /></div> : null}
+          {(() => { const lyric = getCurrentLyric(track, progressRatio); return lyric ? <div className="mw-minimal-lyric">{lyric}</div> : null; })()}
           <div className="mw-minimal-transport">
             <button type="button" className="mw-button is-transport" disabled={busy} title="上一首" onClick={() => run('上一首', () => apiRequest(apiBase, '/api/prev', {}))}>⏮</button>
             <button type="button" className="mw-button is-transport" disabled={busy} title={playing ? '暂停' : '播放'} onClick={() => run(playing ? '暂停' : '播放', () => apiRequest(apiBase, playing ? '/api/pause' : '/api/play', {}))}>{playing ? '⏯' : '▶'}</button>
