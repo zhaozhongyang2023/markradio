@@ -68,6 +68,23 @@ export const api = {
       method: 'POST',
       body: JSON.stringify({ track, like })
     }),
+  neteaseLibrary: () => request('/api/netease/library'),
+  musicDna: () => request('/api/profile/music-dna'),
+  musicDnaGenerate: (preferences) =>
+    request('/api/profile/music-dna/generate', {
+      method: 'POST',
+      body: JSON.stringify({ preferences })
+    }),
+  musicDnaSave: (dna) =>
+    request('/api/profile/music-dna/save', {
+      method: 'POST',
+      body: JSON.stringify({ dna })
+    }),
+  musicDnaReset: () =>
+    request('/api/profile/music-dna/reset', {
+      method: 'POST',
+      body: JSON.stringify({})
+    }),
   castDevices: () => request('/api/cast/devices'),
   castConnect: (host, port) =>
     request('/api/cast/connect', {

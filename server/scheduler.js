@@ -17,6 +17,7 @@ export async function createRadioPlan({ store, mood: requestedMood = null, nowPl
   const timeContext = buildTimeContext(now);
   const taste = store.get('taste');
   const voice = store.get('voice');
+  const musicDna = store.get('musicDna');
   const weather = await getWeather().catch((error) => ({
     source: 'error',
     condition: '未知',
@@ -51,7 +52,8 @@ export async function createRadioPlan({ store, mood: requestedMood = null, nowPl
     voice,
     timeContext,
     userRequest,
-    currentPlan
+    currentPlan,
+    musicDna
   });
   const messages = buildMessages(context);
   const plan = await generateDjPlan({ messages, fallbackTracks: candidates, mood }).catch((error) =>

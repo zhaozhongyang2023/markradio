@@ -923,6 +923,11 @@ export default function App() {
   const [netease, setNetease] = useState({ loggedIn: false, profile: null });
   const [qr, setQr] = useState(null);
   const [qrMessage, setQrMessage] = useState('');
+  const [showDnaPanel, setShowDnaPanel] = useState(false);
+  const [dnaGenerating, setDnaGenerating] = useState(false);
+  const [dnaResult, setDnaResult] = useState(null);
+  const [dnaPreferences, setDnaPreferences] = useState('');
+  const [dnaLibrary, setDnaLibrary] = useState({ likedCount: 0, playlistCount: 0 });
   const [castDevices, setCastDevices] = useState([]);
   const [castDevice, setCastDevice] = useState(null);
   const [castState, setCastState] = useState('idle');
@@ -1172,6 +1177,8 @@ export default function App() {
       setStatus(statusData);
       setState(nowData);
       setNetease(neteaseData);
+      // Load Music DNA on mount
+      api.musicDna().then((res) => { if (res?.dna) setDnaResult(res.dna); }).catch(() => {});
       const initialMood = nowData.now?.mood || '平静';
       setSelectedMood(initialMood);
       if (!nowData.plan?.queue?.length && !nowData.now?.track) {
@@ -3230,6 +3237,78 @@ function seekTo(ratio) {
         </div>
       ) : null}
 
+      {showDnaPanel ? (
+        <div className="qr-backdrop" role="dialog" aria-modal="true" aria-label="AI 音乐人格分析">
+          <div className="qr-card dna-card">
+            <h3>🎧 让 AI 更懂你</h3>
+            {!dnaResult ? (
+              <>
+                {netease.loggedIn ? (
+                  <p className="dna-lib-info">已连接网易云 · 喜欢 {dnaLibrary.likedCount} 首 · 收藏 {dnaLibrary.playlistCount} 个歌单</p>
+                ) : (
+                  <p className="dna-lib-info">登录网易云后 AI 能更了解你的口味</p>
+                )}
+                <textarea
+                  className="dna-input"
+                  placeholder="补充你的音乐偏好（选填）&#10;例如：我喜欢久石让、Nier OST、City Pop、LoFi，适合 JRPG 跑图时听…"
+                  rows={3}
+                  value={dnaPreferences}
+                  onChange={(e) => setDnaPreferences(e.target.value)}
+                />
+                <button
+                  className="dna-btn"
+                  disabled={dnaGenerating}
+                  onClick={async () => {
+                    setDnaGenerating(true);
+                    try {
+                      if (netease.loggedIn) {
+                        const lib = await api.neteaseLibrary();
+                        setDnaLibrary(lib);
+                      }
+                      const res = await api.musicDnaGenerate(dnaPreferences);
+                      if (res?.dna) {
+                        setDnaResult(res.dna);
+                        await api.musicDnaSave(res.dna);
+                      }
+                    } catch (e) {
+                      setQrMessage('生成失败：' + e.message);
+                    }
+                    setDnaGenerating(false);
+                  }}
+                >
+                  {dnaGenerating ? 'AI 正在分析…' : '生成我的音乐人格'}
+                </button>
+              </>
+            ) : (
+              <>
+                <div className="dna-result">
+                  {dnaResult.favorite_styles?.length > 0 && (
+                    <div className="dna-group">
+                      <span className="dna-label">风格</span>
+                      <div className="dna-tags">{dnaResult.favorite_styles.map((s) => <span key={s} className="dna-tag">{s}</span>)}</div>
+                    </div>
+                  )}
+                  {dnaResult.core_feelings?.length > 0 && (
+                    <div className="dna-group">
+                      <span className="dna-label">情绪</span>
+                      <div className="dna-tags">{dnaResult.core_feelings.map((s) => <span key={s} className="dna-tag">{s}</span>)}</div>
+                    </div>
+                  )}
+                  {dnaResult.preferred_scenes?.length > 0 && (
+                    <div className="dna-group">
+                      <span className="dna-label">场景</span>
+                      <div className="dna-tags">{dnaResult.preferred_scenes.map((s) => <span key={s} className="dna-tag">{s}</span>)}</div>
+                    </div>
+                  )}
+                </div>
+                <button className="dna-btn" onClick={async () => { await api.musicDnaReset(); setDnaResult(null); setDnaPreferences(''); }}>重新分析</button>
+              </>
+            )}
+            <button className="dna-close" onClick={() => setShowDnaPanel(false)}>关闭</button>
+          </div>
+        </div>
+      ) : null}
+
       {qr ? (
         <div className="qr-backdrop" role="dialog" aria-modal="true" aria-label="网易云扫码登录">
           <div className="qr-card">
@@ -3324,6 +3403,13 @@ function seekTo(ratio) {
               </div>
               <div className="top-status">
                 <div className="icon-row">
+                  {netease.loggedIn ? (
+                    <button className="icon-btn on" onClick={() => { api.neteaseLibrary().then(setDnaLibrary).catch(()=>{}); setShowDnaPanel(true); }} title="AI 音乐人格分析">
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/>
+                      </svg>
+                    </button>
+                  ) : null}
                   <button
                     className={netease.loggedIn ? 'icon-btn on' : 'icon-btn'}
                     onClick={startNeteaseLogin}

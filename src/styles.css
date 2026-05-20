@@ -3110,3 +3110,91 @@ p {
     flex-wrap: nowrap;
   }
 }
+
+/* ── Music DNA ── */
+.dna-card {
+  max-width: 380px;
+}
+.dna-lib-info {
+  margin: 0 0 10px;
+  color: rgba(255,255,255,0.5);
+  font-size: 12px;
+}
+.dna-input {
+  width: 100%;
+  padding: 10px;
+  border: 1px solid rgba(255,255,255,0.15);
+  border-radius: 8px;
+  background: rgba(255,255,255,0.05);
+  color: #f6f3ec;
+  font-size: 13px;
+  line-height: 1.5;
+  resize: vertical;
+  outline: none;
+}
+.dna-input:focus {
+  border-color: rgba(66,216,178,0.4);
+}
+.dna-input::placeholder {
+  color: rgba(255,255,255,0.25);
+}
+.dna-btn {
+  display: block;
+  width: 100%;
+  margin-top: 10px;
+  padding: 10px;
+  border: none;
+  border-radius: 8px;
+  background: linear-gradient(135deg,#42d8b2,#2ba88a);
+  color: #050606;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity 0.2s;
+}
+.dna-btn:disabled {
+  opacity: 0.5;
+  cursor: wait;
+}
+.dna-close {
+  display: block;
+  width: 100%;
+  margin-top: 8px;
+  padding: 8px;
+  border: 1px solid rgba(255,255,255,0.12);
+  border-radius: 8px;
+  background: transparent;
+  color: rgba(255,255,255,0.6);
+  font-size: 13px;
+  cursor: pointer;
+}
+.dna-result {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+.dna-group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.dna-label {
+  color: rgba(255,255,255,0.4);
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.dna-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.dna-tag {
+  padding: 4px 10px;
+  border-radius: 99px;
+  background: rgba(66,216,178,0.15);
+  color: #42d8b2;
+  font-size: 13px;
+}

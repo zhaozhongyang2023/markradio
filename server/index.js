@@ -19,6 +19,8 @@ import { castManager, getCastStatus } from './cast.js';
 import { buildCastUrl, resolveCastHost } from './cast-url.js';
 import { callNetease, checkNeteaseQr, createNeteaseQr, getNeteaseLoginStatus } from './netease-auth.js';
 import { getWeather } from './weather.js';
+import { loadMusicDNA, saveMusicDNA, generateMusicDNA, getMusicDNASummary } from './profile.js';
+import { collectNeteaseLibrary } from './providers/netease.js';
 
 const store = new StateStore();
 
@@ -207,6 +209,43 @@ app.get('/api/health', async () => ({
 app.get('/api/status', async () => publicStatus());
 
 app.get('/api/netease/status', async () => getNeteaseLoginStatus(store));
+
+app.get('/api/netease/library', async () => {
+  const auth = store.get('neteaseAuth');
+  if (!auth?.cookie) return { likedCount: 0, playlistCount: 0, loggedIn: false };
+  try {
+    const lib = await collectNeteaseLibrary(store);
+    return { ...lib, loggedIn: true };
+  } catch {
+    return { likedCount: 0, playlistCount: 0, loggedIn: true, error: true };
+  }
+});
+
+app.get('/api/profile/music-dna', async () => ({
+  dna: loadMusicDNA(store)
+}));
+
+app.post('/api/profile/music-dna/generate', async (request) => {
+  const { preferences } = request.body || {};
+  try {
+    const dna = await generateMusicDNA(store, preferences || '');
+    return { dna };
+  } catch (error) {
+    return { error: error.message };
+  }
+});
+
+app.post('/api/profile/music-dna/save', async (request) => {
+  const { dna } = request.body || {};
+  if (!dna) return { error: 'missing dna' };
+  saveMusicDNA(store, dna);
+  return { ok: true, dna };
+});
+
+app.post('/api/profile/music-dna/reset', async () => {
+  store.set('musicDna', null);
+  return { ok: true };
+});
 
 app.post('/api/netease/qr/create', async () => createNeteaseQr());
 
