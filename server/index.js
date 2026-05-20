@@ -535,7 +535,13 @@ app.post('/api/ai/game-radio', async (request) => {
 app.get('/ws/stream', { websocket: true }, (socket) => {
   clients.add(socket);
   socket.send(JSON.stringify({ event: 'now', payload: publicNow(), at: new Date().toISOString() }));
-  socket.on('close', () => clients.delete(socket));
+  socket.on('close', () => {
+    clients.delete(socket);
+    if (clients.size === 0 && castManager.getStatus().state !== 'idle') {
+      clearCastLease();
+      castManager.stop();
+    }
+  });
 });
 
 app.get('/tts/:hash.mp3', async (request, reply) => {
