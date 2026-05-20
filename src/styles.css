@@ -1038,18 +1038,34 @@ p {
 .link-bolt:active { display: none; }
 .link-bolt.off::after { display: none; }
 
-.spectrum-canvas {
-  position: absolute;
-  z-index: 1;
-  left: 12px;
-  right: 12px;
-  bottom: 8px;
-  width: calc(100% - 24px) !important;
-  height: 80px !important;
-  min-width: 1px;
-  min-height: 1px;
-  display: block;
+.spectrum-bars {
+  display: flex;
+  align-items: flex-end;
+  gap: 2px;
+  height: 76px;
+  margin: 0 -8px -20px;
+  padding: 0 12px;
   opacity: 0.75;
+  position: relative;
+  z-index: 1;
+  pointer-events: none;
+}
+
+.spectrum-bars span {
+  flex: 1 1 0;
+  min-width: 3px;
+  height: calc(4px + var(--level, 0.18) * 48px);
+  background: #42d8b2;
+  box-shadow: 0 0 10px rgba(66, 216, 178, 0.38);
+  border-radius: 1px;
+  transition: height 100ms ease-out, box-shadow 100ms ease-out;
+  transform-origin: bottom;
+  will-change: height;
+}
+
+.spectrum-bars.is-active span {
+  background: #5ef5ce;
+  box-shadow: 0 0 14px rgba(94, 245, 206, 0.45);
 }
 
 .pixel-pulse-canvas {
@@ -1637,6 +1653,7 @@ p {
   
   transform-origin: center;
   will-change: transform, opacity;
+  transition: transform 100ms ease-out, opacity 100ms ease-out, background 100ms ease-out;
 }
 
 .particle-wave.is-active .particle-bars span {
@@ -1936,14 +1953,16 @@ p {
     height: 36px;
   }
 
-  .spectrum-canvas {
-    position: relative !important;
-    left: auto !important;
-    right: auto !important;
-    bottom: auto !important;
-    width: calc(100% - 20px) !important;
-    height: 70px !important;
-    margin: 4px 10px 0 !important;
+  .spectrum-bars {
+    height: 160px;
+    margin: 0 10px -18px;
+    padding: 0 10px;
+    opacity: 0.75;
+    pointer-events: none;
+  }
+  .spectrum-bars span {
+    height: calc(6px + var(--level, 0.18) * 100px);
+    background: #42d8b2;
   }
 
   .card {
@@ -2483,9 +2502,14 @@ p {
     padding: env(safe-area-inset-top, 8px) 24px 0;
   }
 
-  .spectrum-canvas {
-    bottom: 14px;
-    height: 96px !important;
+  .spectrum-bars {
+    height: 480px;
+    margin: 0 12px -22px;
+    pointer-events: none;
+  }
+  .spectrum-bars span {
+    height: calc(6px + var(--level, 0.18) * 300px);
+    background: #42d8b2;
   }
 
   .brand-lockup h1 {
@@ -2700,15 +2724,15 @@ p {
     margin-top: 13px !important;
   }
 
-  .spectrum-canvas {
-    position: absolute;
-    left: 12px;
-    right: 12px;
-    bottom: 6px;
-    width: calc(100% - 24px) !important;
-    height: 84px !important;
-    margin: 0;
+  .spectrum-bars {
+    height: 160px;
+    margin: 0 -18px -18px;
+    padding: 0 12px;
     opacity: 0.85;
+  }
+  .spectrum-bars span {
+    height: calc(6px + var(--level, 0.18) * 100px);
+    background: #42d8b2;
   }
 
   .card {
@@ -2884,15 +2908,16 @@ p {
     flex-shrink: 0;
   }
 
-  .spectrum-canvas {
-    position: relative !important;
-    left: auto !important;
-    right: auto !important;
-    bottom: auto !important;
-    width: calc(100% - 16px) !important;
-    height: 64px !important;
-    margin: 4px 8px 0 !important;
-    opacity: 0.85 !important;
+  .spectrum-bars {
+    height: 52px;
+    margin: 4px -14px -14px;
+    padding: 0 8px;
+    opacity: 0.85;
+    pointer-events: none;
+  }
+  .spectrum-bars span {
+    height: calc(3px + var(--level, 0.18) * 32px);
+    background: #42d8b2;
   }
 
   .card {

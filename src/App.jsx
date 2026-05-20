@@ -230,60 +230,6 @@ function buildIdleSpectrumLevels(count) {
   });
 }
 
-const SPEC_PEAKS = {};
-
-function paintSpectrumCanvas(canvas, levels) {
-  if (!canvas) return;
-  const ctx = canvas.getContext('2d');
-  const dpr = Math.min(window.devicePixelRatio || 1, 1.5);
-  const rect = canvas.getBoundingClientRect();
-  const w = Math.round(rect.width || canvas.clientWidth || window.innerWidth);
-  const h = Math.round(rect.height || canvas.clientHeight || 70);
-  if (w <= 0 || h <= 0) return;
-
-  const nextWidth = Math.round(w * dpr);
-  const nextHeight = Math.round(h * dpr);
-  if (canvas.width !== nextWidth || canvas.height !== nextHeight) {
-    canvas.width = nextWidth;
-    canvas.height = nextHeight;
-  }
-
-  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-  ctx.imageSmoothingEnabled = false;
-  ctx.clearRect(0, 0, w, h);
-
-  const isMobilePortrait = window.innerWidth < 768 && window.innerHeight > window.innerWidth;
-  const sp = isMobilePortrait
-    ? { size: 10, gap: 6, cell: 16 }
-    : SPEC_PX;
-  const { size, gap, cell } = sp;
-  const numBars = Math.max(1, Math.floor((w - 24) / cell));
-  const maxBlocks = Math.floor(h / cell);
-  const gravity = 0.14;
-
-  const barLevels = levels?.length ? levels : buildIdleSpectrumLevels(numBars);
-  const insetX = Math.max(8, Math.floor((w - numBars * cell) / 2));
-
-  for (let i = 0; i < numBars; i++) {
-    const level = barLevels[i] ?? 0.18;
-    const x = insetX + i * cell;
-    const blockCount = Math.floor(level * maxBlocks);
-
-    const peak = SPEC_PEAKS[i] || 0;
-    if (blockCount > peak) {
-      SPEC_PEAKS[i] = blockCount;
-    } else {
-      SPEC_PEAKS[i] = Math.max(0, peak - gravity);
-    }
-    const peakBlock = Math.round(SPEC_PEAKS[i] || 0);
-
-    ctx.fillStyle = '#74d8c4';
-    for (let b = 0; b < peakBlock; b++) {
-      const y = h - (b + 1) * cell;
-      ctx.fillRect(x + gap, y + gap, size, size);
-    }
-  }
-}
 
 function paintLevels(container, levels) {
   if (!container) return;
@@ -470,19 +416,13 @@ function PixelClockCanvas({ hours, minutes, lowPower = false }) {
 }
 
 
-// ── 频谱像素块常量（匹配点阵时钟 PX 参数）──
-const SPEC_PX = {
-  size: 13,
-  gap: 8,
-  cell: 21,
-};
 function Spectrum({ active, progressRatio, visualRef }) {
   return (
-    <canvas
-      ref={visualRef}
-      className={`spectrum-canvas${active ? ' is-active' : ''}`}
-      aria-hidden="true"
-    />
+    <div className={`spectrum-bars${active ? ' is-active' : ''}`} ref={visualRef} aria-hidden="true">
+      {Array.from({ length: PARTICLE_BARS }, (_, i) => (
+        <span key={i} style={{ '--i': i }} />
+      ))}
+    </div>
   );
 }
 
@@ -1248,20 +1188,10 @@ export default function App() {
           });
       }
     }).catch(() => {});
-    // Draw idle spectrum on mount — retry until canvas has valid dimensions
-    let idleTries = 0;
+    // Draw idle spectrum on mount
     const drawIdle = () => {
       if (!spectrumRef.current || !mounted) return;
-      const rect = spectrumRef.current.getBoundingClientRect();
-      const w = rect.width || spectrumRef.current.clientWidth || window.innerWidth;
-      const h = rect.height || spectrumRef.current.clientHeight;
-      if ((w > 0 && h > 0) || idleTries >= 5) {
-        const n = Math.max(1, Math.floor(w / SPEC_PX.cell));
-        paintSpectrumCanvas(spectrumRef.current, buildIdleSpectrumLevels(n));
-        return;
-      }
-      idleTries++;
-      requestAnimationFrame(drawIdle);
+      paintLevels(spectrumRef.current, buildIdleSpectrumLevels(PARTICLE_BARS));
     };
     const timer = setTimeout(drawIdle, 400);
     return () => {
@@ -2680,7 +2610,7 @@ function seekTo(ratio) {
     stopAudioVisuals();
     if (viewModeRef.current === 'v4') return;
     const startedAt = performance.now();
-    const numBars = Math.max(1, Math.floor((spectrumRef.current?.clientWidth || window.innerWidth) / SPEC_PX.cell));
+    const numBars = PARTICLE_BARS;
     let frameSkip = 0;
     const tick = () => {
       frameSkip = (frameSkip + 1) % 2;
@@ -2690,7 +2620,7 @@ function seekTo(ratio) {
       }
       const elapsed = (performance.now() - startedAt) / 1000;
       const levels = buildFallbackLevels(elapsed, numBars);
-      paintSpectrumCanvas(spectrumRef.current, levels);
+      paintLevels(spectrumRef.current, levels);
       paintLevels(particleRef.current, levels.slice(0, PARTICLE_BARS));
       v4EqLevelsRef.current = levels.slice(0, 5);
       visualFrameRef.current = requestAnimationFrame(tick);
@@ -2713,7 +2643,7 @@ function seekTo(ratio) {
         return;
       }
       let levels = null;
-      const numBars = isV4 ? 6 : Math.max(1, Math.floor((spectrumRef.current?.clientWidth || window.innerWidth) / SPEC_PX.cell));
+      const numBars = isV4 ? 6 : PARTICLE_BARS;
       if (analyser && frequencyData) {
         analyser.getByteFrequencyData(frequencyData);
         levels = buildLevelsFromFrequency(frequencyData, numBars);
@@ -2722,7 +2652,7 @@ function seekTo(ratio) {
         levels = buildFallbackLevels(mediaElement.currentTime || (performance.now() - startedAt) / 1000, numBars);
       }
       if (!isV4) {
-        paintSpectrumCanvas(spectrumRef.current, levels);
+        paintLevels(spectrumRef.current, levels);
         paintLevels(particleRef.current, levels.slice(0, PARTICLE_BARS));
       }
       v4EqLevelsRef.current = levels.slice(0, 5);
@@ -2735,7 +2665,7 @@ function seekTo(ratio) {
 
   function stopAudioVisuals() {
     cancelAnimationFrame(visualFrameRef.current);
-    paintSpectrumCanvas(spectrumRef.current, null);
+    paintLevels(spectrumRef.current, null);
     paintLevels(particleRef.current, null);
   }
 
@@ -3434,9 +3364,9 @@ function seekTo(ratio) {
                 </div>
               );
             })()}
-            <Spectrum active={isPlaying || reading || castState === 'playing'} progressRatio={displayProgressRatio} visualRef={spectrumRef} />
           </header>
 
+          <Spectrum active={isPlaying || reading || castState === 'playing'} progressRatio={displayProgressRatio} visualRef={spectrumRef} />
           <section className="card">
             <div className="song-head">
               <div>
