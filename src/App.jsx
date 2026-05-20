@@ -235,6 +235,8 @@ function buildIdleSpectrumLevels(count) {
 }
 
 const SPEC_PEAKS = {};
+const BEAT_LEVELS = [];
+const PARTICLE_BEAT_LEVELS = new Array(48).fill(0);
 
 function paintSpectrumCanvas(canvas, levels) {
   if (!canvas) return;
@@ -272,24 +274,29 @@ function paintSpectrumCanvas(canvas, levels) {
   const { size, gap, cell } = sp;
   const numBars = Math.max(1, Math.floor((w - 24) / cell));
   const maxBlocks = Math.floor(h / cell);
-  const gravity = 0.09;
+  const gravity = 0.55;
 
   const barLevels = levels?.length ? levels : buildIdleSpectrumLevels(numBars);
 
   const insetX = Math.max(8, Math.floor((w - numBars * cell) / 2));
   for (let i = 0; i < numBars; i++) {
     const level = barLevels[i] ?? 0.18;
+    const prev = BEAT_LEVELS[i] || 0;
+    const isBeat = level > prev * 1.4 && level > 0.3;
+    BEAT_LEVELS[i] = level;
     // Pulse factor: each bar breathes at a slightly different phase
     const x = insetX + i * cell;
-    const blockCount = Math.floor(level * maxBlocks);
+    const beatBoost = isBeat ? 2 : 0;
+    const blockCount = Math.floor(level * maxBlocks) + beatBoost;
 
     const peak = SPEC_PEAKS[i] || 0;
     if (blockCount > peak) {
       SPEC_PEAKS[i] = blockCount;
     } else {
-      SPEC_PEAKS[i] = Math.max(0, peak - gravity);
+      SPEC_PEAKS[i] = Math.max(0, peak * (1 - gravity));
     }
     const peakBlock = Math.round(SPEC_PEAKS[i] || 0);
+    const beatGlow = isBeat ? 3 : 1;
 
     for (let b = 0; b < Math.max(blockCount, peakBlock + 1); b++) {
       const y = h - (b + 1) * cell;
@@ -297,7 +304,7 @@ function paintSpectrumCanvas(canvas, levels) {
       if (b === peakBlock && b > blockCount) {
         ctx.fillStyle = '#d8fff3';
         ctx.shadowColor = 'rgba(0, 245, 212, 0.28)';
-        ctx.shadowBlur = 4;
+        ctx.shadowBlur = 4 * beatGlow;
       } else if (b >= blockCount - 2 && b < blockCount && blockCount > 2) {
         const t = (b - (blockCount - 2)) / 2;
         const cr = Math.round(192 - 65 * t);
@@ -305,11 +312,11 @@ function paintSpectrumCanvas(canvas, levels) {
         const cb = Math.round(225 - 32 * t);
         ctx.fillStyle = `rgb(${cr},${cg},${cb})`;
         ctx.shadowColor = 'rgba(0,245,212,0.16)';
-        ctx.shadowBlur = 3;
+        ctx.shadowBlur = 3 * beatGlow;
       } else {
         ctx.fillStyle = '#8fdcca';
         ctx.shadowColor = 'rgba(143,220,202,0.12)';
-        ctx.shadowBlur = 2;
+        ctx.shadowBlur = 2 * beatGlow;
       }
 
       ctx.fillRect(x + gap, y + gap, size, size);
@@ -324,7 +331,11 @@ function paintLevels(container, levels) {
   const bars = container.querySelectorAll('span');
   bars.forEach((bar, index) => {
     const level = levels?.[index] ?? 0.18;
+    const prev = PARTICLE_BEAT_LEVELS[index] || 0;
+    const beat = level > prev * 1.4 && level > 0.3 ? 1 : 0;
+    PARTICLE_BEAT_LEVELS[index] = level;
     bar.style.setProperty('--level', level.toFixed(3));
+    bar.style.setProperty('--beat', beat);
   });
 }
 
@@ -1292,6 +1303,7 @@ export default function App() {
       if ((w > 0 && h > 0) || idleTries >= 5) {
         const n = Math.max(1, Math.floor(w / SPEC_PX.cell));
         paintSpectrumCanvas(spectrumRef.current, buildIdleSpectrumLevels(n));
+        PARTICLE_BEAT_LEVELS.fill(0);
         return;
       }
       idleTries++;
@@ -2724,8 +2736,8 @@ function seekTo(ratio) {
       }
       const elapsed = (performance.now() - startedAt) / 1000;
       const levels = buildFallbackLevels(elapsed, numBars);
-      paintSpectrumCanvas(spectrumRef.current, levels);
       paintLevels(particleRef.current, levels.slice(0, PARTICLE_BARS));
+      paintSpectrumCanvas(spectrumRef.current, levels);
       v4EqLevelsRef.current = levels.slice(0, 5);
       visualFrameRef.current = requestAnimationFrame(tick);
     };
@@ -2756,8 +2768,8 @@ function seekTo(ratio) {
         levels = buildFallbackLevels(mediaElement.currentTime || (performance.now() - startedAt) / 1000, numBars);
       }
       if (!isV4) {
-        paintSpectrumCanvas(spectrumRef.current, levels);
         paintLevels(particleRef.current, levels.slice(0, PARTICLE_BARS));
+        paintSpectrumCanvas(spectrumRef.current, levels);
       }
       v4EqLevelsRef.current = levels.slice(0, 5);
       if (!mediaElement.paused && !mediaElement.ended) {
@@ -2771,6 +2783,7 @@ function seekTo(ratio) {
     cancelAnimationFrame(visualFrameRef.current);
     paintSpectrumCanvas(spectrumRef.current, null);
     paintLevels(particleRef.current, null);
+    PARTICLE_BEAT_LEVELS.fill(0);
   }
 
   async function resumeSharedAudioContext() {
@@ -2960,7 +2973,7 @@ function seekTo(ratio) {
       const analyser = analyserRef.current || context.createAnalyser();
 
       analyser.fftSize = 128;
-      analyser.smoothingTimeConstant = 0.72;
+      analyser.smoothingTimeConstant = 0.45;
       if (!sourceEntry.destinationConnected) {
         sourceEntry.source.connect(context.destination);
         sourceEntry.destinationConnected = true;
