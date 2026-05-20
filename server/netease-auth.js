@@ -37,6 +37,14 @@ export async function checkNeteaseQr(store, key) {
       loginAt: new Date().toISOString()
     };
     store.set('neteaseAuth', auth);
+    // 拉取用户 profile，保存 userId 供歌单查询
+    try {
+      const status = await callNetease('login/status', { timestamp: Date.now() }, store);
+      if (status?.data?.profile) {
+        const p = status.data.profile;
+        store.set('neteaseAuth', { ...auth, profile: { nickname: p.nickname, userId: p.userId, avatarUrl: p.avatarUrl } });
+      }
+    } catch { /* profile 拉取失败不影响登录 */ }
   }
   return {
     code: result.code,

@@ -3117,26 +3117,28 @@ p {
 }
 .dna-lib-info {
   margin: 0 0 10px;
-  color: rgba(255,255,255,0.5);
+  color: rgba(0,0,0,0.5);
   font-size: 12px;
 }
 .dna-input {
   width: 100%;
   padding: 10px;
-  border: 1px solid rgba(255,255,255,0.15);
+  border: 1px solid #000;
   border-radius: 8px;
-  background: rgba(255,255,255,0.05);
-  color: #f6f3ec;
+  background: rgba(0,0,0,0.03);
+  color: #111;
   font-size: 13px;
   line-height: 1.5;
   resize: vertical;
   outline: none;
 }
 .dna-input:focus {
-  border-color: rgba(66,216,178,0.4);
+  border-color: #000;
+  outline: 2px solid rgba(0,0,0,0.25);
+  outline-offset: 2px;
 }
 .dna-input::placeholder {
-  color: rgba(255,255,255,0.25);
+  color: rgba(0,0,0,0.3);
 }
 .dna-btn {
   display: block;
@@ -3161,10 +3163,10 @@ p {
   width: 100%;
   margin-top: 8px;
   padding: 8px;
-  border: 1px solid rgba(255,255,255,0.12);
+  border: 1px solid rgba(0,0,0,0.12);
   border-radius: 8px;
   background: transparent;
-  color: rgba(255,255,255,0.6);
+  color: rgba(0,0,0,0.55);
   font-size: 13px;
   cursor: pointer;
 }
@@ -3180,7 +3182,7 @@ p {
   gap: 4px;
 }
 .dna-label {
-  color: rgba(255,255,255,0.4);
+  color: rgba(0,0,0,0.45);
   font-size: 11px;
   font-weight: 600;
   text-transform: uppercase;

@@ -44,10 +44,10 @@ export async function generateMusicDNA(store, preferences = '') {
 
   // 构建分析 prompt
   const libraryInfo = neteaseData
-    ? `喜欢歌曲 ${neteaseData.likedCount} 首，收藏歌单 ${neteaseData.playlistCount} 个。
-歌单样本：${neteaseData.playlistSamples.map((p) => `【${p.name}】${p.tracks.slice(0, 5).join('、')}`).join('\n')}`
+    ? `喜欢歌曲 ${neteaseData.likedCount} 首，收藏歌单 ${neteaseData.playlistCount} 个，收藏专辑 ${neteaseData.albumCount || 0} 张。
+歌单样本：${neteaseData.playlistSamples.map((p) => `【${p.name}】${p.tracks.slice(0, 5).join('、')}`).join('\n')}
+${neteaseData.albumCount ? '专辑样本：' + neteaseData.albumSamples.join('、') : ''}`
     : '暂无网易云数据。';
-
   const systemPrompt = `你是 MoodWave 的 AI DJ 音乐人格分析器。
 根据用户的网易云音乐收藏和自述偏好，分析用户的 Music DNA。
 返回纯 JSON，无 Markdown，无解释。
@@ -97,7 +97,8 @@ ${libraryInfo}
       source: 'ai_analysis',
       ...(neteaseData ? {
         analyzed_tracks: neteaseData.likedCount,
-        analyzed_playlists: neteaseData.playlistCount
+        analyzed_playlists: neteaseData.playlistCount,
+        analyzed_albums: neteaseData.albumCount || 0
       } : {})
     };
   } catch (error) {

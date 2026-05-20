@@ -23,9 +23,21 @@ export async function getPlaylistTracks(store, playlistId) {
   }));
 }
 
+
+export async function getUserAlbums(store) {
+  const res = await callNetease('/album/sublist', { limit: 100 }, store).catch(() => ({ data: [] }));
+  return (res?.data || []).map((a) => ({
+    id: String(a.id),
+    name: a.name,
+    artist: (a.artists || []).map((ar) => ar.name).join('/') || a.artist?.name || '',
+    size: a.size || 0
+  }));
+}
+
 export async function collectNeteaseLibrary(store) {
   const liked = await getLikedSongs(store).catch(() => []);
   const playlists = await getUserPlaylists(store).catch(() => []);
+  const albums = await getUserAlbums(store).catch(() => []);
   const playlistSamples = [];
   for (const pl of playlists.slice(0, 5)) {
     const tracks = await getPlaylistTracks(store, pl.id).catch(() => []);
@@ -34,6 +46,8 @@ export async function collectNeteaseLibrary(store) {
   return {
     likedCount: liked.length,
     playlistCount: playlists.length,
-    playlistSamples
+    playlistSamples,
+    albumCount: albums.length,
+    albumSamples: albums.slice(0, 5).map((a) => a.name)
   };
 }

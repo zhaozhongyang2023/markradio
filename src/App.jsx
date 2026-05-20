@@ -3244,7 +3244,7 @@ function seekTo(ratio) {
             {!dnaResult ? (
               <>
                 {netease.loggedIn ? (
-                  <p className="dna-lib-info">已连接网易云 · 喜欢 {dnaLibrary.likedCount} 首 · 收藏 {dnaLibrary.playlistCount} 个歌单</p>
+                  <p className="dna-lib-info">已连接网易云 · 喜欢 {dnaLibrary.likedCount} 首 · {dnaLibrary.playlistCount} 个歌单 · {dnaLibrary.albumCount || 0} 张专辑</p>
                 ) : (
                   <p className="dna-lib-info">登录网易云后 AI 能更了解你的口味</p>
                 )}

@@ -33,7 +33,7 @@ export function buildDjContext({ taste, mood, specialDates, weather, recentPlays
       '从候选歌单里选择歌曲，每首歌必须附带独立的导读文案（reason字段），不许只给id。',
       '严禁推荐 recentPlays 里出现过的歌曲（trackId 匹配即视为已播过）。',
       '只推荐候选歌曲里的歌。'
-    ].join('\n') + (musicDna
+    ].join('\n') + (musicDna && (musicDna.favorite_styles?.length || musicDna.core_feelings?.length || musicDna.preferred_scenes?.length)
       ? '\n[USER_MUSIC_DNA] 用户的音乐人格：' + (musicDna.favorite_styles?.join('、') || '') + ' · 核心情绪：' + (musicDna.core_feelings?.join('、') || '') + ' · 偏好场景：' + (musicDna.preferred_scenes?.join('、') || '') + '。选曲时优先匹配用户长期口味，偶尔适度探索新风格。'
       : ''),
     userTaste: taste,
