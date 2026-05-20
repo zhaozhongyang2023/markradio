@@ -6,6 +6,7 @@ const DEFAULT_API_BASE = 'http://127.0.0.1:38765';
 const API_BASE_KEY = 'moodwave.deck.apiBase';
 const GAME_NAME_KEY = 'moodwave.deck.gameName';
 const MINIMAL_KEY = 'moodwave.deck.minimalMode';
+const PAGE_KEY = 'moodwave.deck.page';
 
 type Track = {
   id?: string;
@@ -107,7 +108,7 @@ function AppButton({
 
 function Content() {
   const [apiBase, setApiBase] = useState(() => normalizeBase(localStorage.getItem(API_BASE_KEY) || DEFAULT_API_BASE));
-  const [page, setPage] = useState<Page>('radio');
+  const [page, setPage] = useState<Page>(() => (localStorage.getItem(PAGE_KEY) as Page) || 'radio');
   const [now, setNow] = useState<NowPayload>({});
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState('连接中');
@@ -139,6 +140,7 @@ function Content() {
   async function switchMode(mode: Page) {
     if (mode === 'settings') { setPage('settings'); return; }
     setPage(mode);
+    localStorage.setItem(PAGE_KEY, mode);
     try { await apiRequest(apiBase, '/api/switch-mode', { mode }); }
     catch { /* ignore */ }
     await refresh();
@@ -181,7 +183,7 @@ function Content() {
     };
   }, [apiBase]);
 
-  const currentPlan = (page !== 'settings' ? now.plans?.[page] : null) || now.plan;
+  const currentPlan = minimalMode ? now.plan : ((page !== 'settings' ? now.plans?.[page] : null) || now.plan);
   const track = now.now?.track || currentPlan?.queue?.[0] || null;
   const playing = Boolean(now.now?.playing);
   const progressRatio = Number(now.now?.progressRatio) || 0;
