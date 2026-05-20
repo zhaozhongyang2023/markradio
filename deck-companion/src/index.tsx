@@ -184,6 +184,11 @@ function Content() {
   const currentMood = (currentPlan?.mood || now.now?.mood || '').trim();
   const queue = currentPlan?.queue || [];
   const djLine = currentPlan?.tts?.text || currentPlan?.plan?.say || currentPlan?.plan?.reply || '';
+  const djForTrack = (() => {
+    const idx = queue.findIndex(t => t.id === track?.id || t.sourceId === track?.sourceId);
+    if (idx >= 0 && currentPlan?.cardTts?.[idx]?.text) return currentPlan.cardTts[idx].text || '';
+    return '';
+  })();
   const trackLine = track?.title ? `${track.title}${track.artist ? ` - ${track.artist}` : ''}` : "AI DJ 准备中...";
 
   function saveGameName(value: string) {
@@ -618,7 +623,7 @@ function Content() {
         }
       `}</style>
 
-      {minimalMode && playing && track ? (
+      {minimalMode && track ? (
         <div className="mw-minimal">
           <div className="mw-minimal-header">
             <div className="mw-minimal-logo">✦ MoodWave</div>
@@ -627,7 +632,7 @@ function Content() {
           <div className="mw-minimal-card">
             <div className="mw-minimal-song">{track.title || '未知歌曲'}</div>
             {track.artist ? <div className="mw-minimal-artist">{track.artist}</div> : null}
-            {djLine ? <div className="mw-minimal-dj">{djLine}</div> : null}
+            {djForTrack ? <div className="mw-minimal-dj">{djForTrack}</div> : null}
             {playing ? <div className="mw-minimal-progress"><div className="mw-minimal-progress-fill" style={{width: `${Math.round(progressRatio * 100)}%`}} /></div> : null}
           </div>
           <div className="mw-minimal-actions">
