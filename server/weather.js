@@ -1,7 +1,16 @@
 import { config } from './config.js';
 import { assertServiceAvailable, markServiceFailure, markServiceSuccess } from './circuit-breaker.js';
 
+const CACHE_TTL_MS = 3 * 60 * 60 * 1000; // 3 小时刷新一次
+let cache = null;
+
 export async function getWeather() {
+  const now = Date.now();
+  if (cache && (now - cache.at) < CACHE_TTL_MS) {
+    return cache.data;
+  }
+
+
   if (!config.openWeatherApiKey || !config.openWeatherCity) {
     return {
       source: 'demo',
@@ -29,11 +38,13 @@ export async function getWeather() {
   }
   if (!response.ok) throw new Error(`OpenWeather ${response.status}`);
   const data = await response.json();
-  return {
+  const result = {
     source: 'openweather',
     city: config.openWeatherCity,
     condition: data.weather?.[0]?.description || '未知',
     temperature: data.main?.temp ?? null,
     summary: `${data.weather?.[0]?.description || '天气'}，${Math.round(data.main?.temp ?? 0)}°C`
   };
+  cache = { at: now, data: result };
+  return result;
 }
