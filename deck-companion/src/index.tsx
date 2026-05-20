@@ -477,46 +477,47 @@ function Content() {
         .mw-minimal-tag {
           display: inline-flex;
           align-items: center;
-          padding: 2px 7px;
+          padding: 1.5px 6px;
           border: 1px solid rgba(255,255,255,.1);
-          border-radius: 5px;
+          border-radius: 4px;
           background: rgba(255,255,255,.04);
-          color: rgba(255,255,255,.72);
-          font-size: 10px;
+          color: rgba(255,255,255,.68);
+          font-size: 9px;
           font-weight: 600;
           line-height: 16px;
         }
         .mw-minimal-scene {
-          color: rgba(255,255,255,.46);
-          font-size: 10.5px;
+          color: rgba(255,255,255,.68);
+          font-size: 10px;
           font-weight: 600;
-          margin-bottom: 8px;
+          margin-bottom: 10px;
           line-height: 1.3;
+          letter-spacing: 0.02em;
         }
         .mw-minimal-quote {
-          padding: 8px 10px;
-          border-left: 3px solid #42d8b2;
-          border-radius: 0 6px 6px 0;
-          background: rgba(66,216,178,.06);
+          padding: 10px 12px;
+          border-left: 4px solid #42d8b2;
+          border-radius: 0 8px 8px 0;
+          background: rgba(66,216,178,.08);
           color: #42d8b2;
-          font-size: 13px;
+          font-size: 14px;
           font-weight: 700;
           line-height: 1.4;
-          margin-bottom: 8px;
+          margin-bottom: 10px;
           min-width: 0;
         }
         .mw-minimal-track {
-          color: rgba(255,255,255,.78);
-          font-size: 11px;
+          color: rgba(255,255,255,.74);
+          font-size: 10px;
           font-weight: 700;
-          margin-bottom: 4px;
+          margin-bottom: 5px;
           overflow: hidden;
           text-overflow: ellipsis;
           white-space: nowrap;
         }
         .mw-minimal-progress {
-          height: 3px;
-          margin-bottom: 8px;
+          height: 2.5px;
+          margin-bottom: 9px;
           border-radius: 2px;
           background: rgba(255,255,255,.08);
           overflow: hidden;
@@ -530,13 +531,21 @@ function Content() {
         .mw-minimal-transport {
           display: grid;
           grid-template-columns: 1fr 1fr 1fr;
-          gap: 5px;
-          margin-bottom: 6px;
+          gap: 4px;
+          margin-bottom: 5px;
+        }
+        .mw-minimal-transport .mw-button {
+          font-size: 13px;
+          height: 26px;
         }
         .mw-minimal-actions {
           display: grid;
           grid-template-columns: 1fr 1fr;
-          gap: 6px;
+          gap: 5px;
+        }
+        .mw-minimal-actions .mw-button {
+          height: 26px;
+          font-size: 10px;
         }
         .mw-minimal-toggle {
           flex: 0 0 auto;
