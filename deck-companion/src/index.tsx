@@ -240,7 +240,10 @@ function Content() {
   function getSceneText() {
     const mode = getActiveMode(now);
     if (mode === 'game' && gameName.trim()) return '🎮 正在陪你玩 ' + gameName.trim();
-    if (mode === 'game') return '🎮 ' + (gameVibe || '游戏电台');
+    if (mode === 'game') {
+      const vibe = gameVibes.find(v => v.id === gameVibe);
+      return vibe ? `${vibe.icon} ${vibe.id} — ${vibe.hint}` : ('🎮 ' + (gameVibe || '游戏电台'));
+    }
     if (mode === 'search') return query.trim() ? '寻歌 · ' + query.trim() : '寻歌电台';
     return currentMood ? '心情电台 · ' + currentMood : '心情电台';
   }
