@@ -2,6 +2,7 @@ import { config } from './config.js';
 import { collectNeteaseLibrary } from './providers/netease.js';
 import { assertServiceAvailable, markServiceFailure, markServiceSuccess } from './circuit-breaker.js';
 
+import OpenAI from 'openai';
 export function loadMusicDNA(store) {
   return store.get('musicDna') || null;
 }
@@ -70,7 +71,6 @@ ${libraryInfo}
 }`;
 
   assertServiceAvailable(config.aiProvider);
-  const { default: OpenAI } = await import('openai');
   const client = new OpenAI({
     apiKey: config.aiApiKey,
     ...(config.aiBaseUrl ? { baseURL: config.aiBaseUrl } : {})

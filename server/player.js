@@ -1,6 +1,20 @@
 // ─── 服务端顺序音频播放器 ───
-import { spawn } from 'node:child_process';
+import { spawn, execSync } from 'node:child_process';
 import { config } from './config.js';
+
+// ffplay 路径：优先环境变量，其次常见路径，最后系统 PATH
+function resolveFfplay() {
+  const paths = [
+    process.env.FFPLAY_PATH,
+    '/usr/bin/ffplay',
+    '/opt/homebrew/bin/ffplay'
+  ].filter(Boolean);
+  for (const p of paths) {
+    try { execSync(`test -x "${p}"`); return p; } catch {}
+  }
+  return 'ffplay'; // fallback to PATH
+}
+const ffplayPath = resolveFfplay();
 
 let currentProcess = null;
 let activeSequenceId = 0;
@@ -41,7 +55,7 @@ function playOne(urls, index, onEnd, onTrackStart, seqId) {
   // 非 TTS URL = 实际歌曲，触发 onTrackStart
   if (onTrackStart && !resolvedUrl.includes('/tts/')) onTrackStart();
   const startTime = Date.now();
-  const proc = spawn('/usr/bin/ffplay', [
+  const proc = spawn(ffplayPath, [
     '-nodisp', '-autoexit', '-loglevel', 'error', '-infbuf', resolvedUrl
   ], { stdio: 'ignore' });
 

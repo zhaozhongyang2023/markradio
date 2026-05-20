@@ -117,5 +117,5 @@ export function getSpecialDates(date = new Date(), customDates = []) {
 }
 
 export function getDefaultSpecialDateConfig() {
-  return fixedDates;
+  return JSON.parse(JSON.stringify(fixedDates));
 }

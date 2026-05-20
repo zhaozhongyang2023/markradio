@@ -928,6 +928,8 @@ export default function App() {
   const [dnaResult, setDnaResult] = useState(null);
   const [dnaPreferences, setDnaPreferences] = useState('');
   const [dnaLibrary, setDnaLibrary] = useState({ likedCount: 0, playlistCount: 0 });
+  const mountedRef = useRef(true);
+  useEffect(() => () => { mountedRef.current = false; }, []);
   const [castDevices, setCastDevices] = useState([]);
   const [castDevice, setCastDevice] = useState(null);
   const [castState, setCastState] = useState('idle');
@@ -3263,16 +3265,20 @@ function seekTo(ratio) {
                     try {
                       if (netease.loggedIn) {
                         const lib = await api.neteaseLibrary();
+                        if (!mountedRef.current) return;
                         setDnaLibrary(lib);
                       }
                       const res = await api.musicDnaGenerate(dnaPreferences);
+                      if (!mountedRef.current) return;
                       if (res?.dna) {
                         setDnaResult(res.dna);
                         await api.musicDnaSave(res.dna);
                       }
                     } catch (e) {
+                      if (!mountedRef.current) return;
                       setQrMessage('生成失败：' + e.message);
                     }
+                    if (!mountedRef.current) return;
                     setDnaGenerating(false);
                   }}
                 >
