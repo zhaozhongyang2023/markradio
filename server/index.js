@@ -110,7 +110,8 @@ function publicNow() {
     now: { ...now, progressRatio }, plan,
     plans: { radio: store.get('plan-radio') || null, search: store.get('plan-search') || null, game: store.get('plan-game') || null },
     station: publicStation(),
-    voice: getVoicePublicConfig(store)
+    voice: getVoicePublicConfig(store),
+    weather: store.get('weather') || null
   };
 }
 

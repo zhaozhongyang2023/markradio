@@ -29,6 +29,7 @@ type NowPayload = {
     plan?: { say?: string; reply?: string };
     cardTts?: Array<{ ok?: boolean; pending?: boolean; url?: string; text?: string; deferred?: boolean }>;
   };
+  weather?: { source?: string; city?: string; condition?: string; temperature?: number | null; summary?: string } | null;
   plans?: {
     radio?: NowPayload['plan'];
     search?: NowPayload['plan'];
@@ -225,6 +226,14 @@ function Content() {
     } else {
       await nextRadio();
     }
+  }
+
+  function getSceneText() {
+    const mode = getActiveMode(now);
+    if (mode === 'game' && gameName.trim()) return '🎮 正在陪你玩 ' + gameName.trim();
+    if (mode === 'game') return '游戏电台';
+    if (mode === 'search') return '寻歌电台';
+    return '心情电台';
   }
 
   async function startRadio(mood: string) {
@@ -457,61 +466,57 @@ function Content() {
         }
         /* 极简播放态 */
         .mw-minimal {
-          padding: 4px 0;
+          padding: 6px 0;
         }
-        .mw-minimal-header {
+        .mw-minimal-tags {
           display: flex;
           align-items: center;
-          justify-content: space-between;
-          gap: 8px;
-          margin-bottom: 10px;
-          padding: 0 2px;
+          gap: 6px;
+          margin-bottom: 4px;
         }
-        .mw-minimal-logo {
-          color: #42d8b2;
-          font-size: 14px;
-          font-weight: 800;
-        }
-        .mw-minimal-badge {
-          color: rgba(66,216,178,.86);
+        .mw-minimal-tag {
+          display: inline-flex;
+          align-items: center;
+          padding: 2px 7px;
+          border: 1px solid rgba(255,255,255,.1);
+          border-radius: 5px;
+          background: rgba(255,255,255,.04);
+          color: rgba(255,255,255,.72);
           font-size: 10px;
-          font-weight: 700;
+          font-weight: 600;
+          line-height: 16px;
         }
-        .mw-minimal-card {
-          padding: 10px 10px 8px;
-          border: 1px solid rgba(255,255,255,.08);
-          border-radius: 9px;
-          background: rgba(255,255,255,.03);
-          margin-bottom: 10px;
-        }
-        .mw-minimal-song {
-          color: rgba(255,255,255,.9);
-          font-size: 15px;
-          font-weight: 800;
-          line-height: 1.25;
-          margin-bottom: 3px;
-          overflow: hidden;
-          text-overflow: ellipsis;
-          white-space: nowrap;
-        }
-        .mw-minimal-artist {
-          color: rgba(255,255,255,.52);
-          font-size: 12px;
+        .mw-minimal-scene {
+          color: rgba(255,255,255,.46);
+          font-size: 10.5px;
+          font-weight: 600;
+          margin-bottom: 8px;
           line-height: 1.3;
-          margin-bottom: 6px;
-          overflow: hidden;
-          text-overflow: ellipsis;
-          white-space: nowrap;
         }
-        .mw-minimal-dj {
+        .mw-minimal-quote {
+          padding: 8px 10px;
+          border-left: 3px solid #42d8b2;
+          border-radius: 0 6px 6px 0;
+          background: rgba(66,216,178,.06);
           color: #42d8b2;
+          font-size: 13px;
+          font-weight: 700;
+          line-height: 1.4;
+          margin-bottom: 8px;
+          min-width: 0;
+        }
+        .mw-minimal-track {
+          color: rgba(255,255,255,.78);
           font-size: 11px;
           font-weight: 700;
-          line-height: 1.35;
           margin-bottom: 4px;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
         }
         .mw-minimal-progress {
           height: 3px;
+          margin-bottom: 8px;
           border-radius: 2px;
           background: rgba(255,255,255,.08);
           overflow: hidden;
@@ -521,6 +526,12 @@ function Content() {
           background: #42d8b2;
           border-radius: 2px;
           transition: width .5s linear;
+        }
+        .mw-minimal-transport {
+          display: grid;
+          grid-template-columns: 1fr 1fr 1fr;
+          gap: 5px;
+          margin-bottom: 6px;
         }
         .mw-minimal-actions {
           display: grid;
@@ -538,6 +549,12 @@ function Content() {
           font-weight: 700;
           cursor: pointer;
           line-height: 16px;
+        }
+        .mw-button.is-transport {
+          padding: 0;
+          font-size: 15px;
+          line-height: 1;
+          text-overflow: clip;
         }
 
         .mw-section-title {
@@ -625,29 +642,26 @@ function Content() {
 
       {minimalMode && track ? (
         <div className="mw-minimal">
-          <div className="mw-minimal-header">
-            <div className="mw-minimal-logo">✦ MoodWave</div>
-            <div className="mw-minimal-badge">📻 正在陪你</div>
+          <div className="mw-minimal-tags">
+            {now.weather ? <div className="mw-minimal-tag">{now.weather.city || '本地'} · {now.weather.condition || '未知'}{now.weather.temperature != null ? ' ' + Math.round(now.weather.temperature) + '°C' : ''}</div> : <div className="mw-minimal-tag">本地 · 未知</div>}
+            {currentMood ? <div className="mw-minimal-tag">{currentMood}</div> : null}
           </div>
-          <div className="mw-minimal-card">
-            <div className="mw-minimal-song">{track.title || '未知歌曲'}</div>
-            {track.artist ? <div className="mw-minimal-artist">{track.artist}</div> : null}
-            {djForTrack ? <div className="mw-minimal-dj">{djForTrack}</div> : null}
-            {playing ? <div className="mw-minimal-progress"><div className="mw-minimal-progress-fill" style={{width: `${Math.round(progressRatio * 100)}%`}} /></div> : null}
+          <div className="mw-minimal-scene">{getSceneText()}</div>
+          {djForTrack ? (
+            <div className="mw-minimal-quote">{djForTrack}</div>
+          ) : djLine ? (
+            <div className="mw-minimal-quote">{djLine}</div>
+          ) : null}
+          <div className="mw-minimal-track">{track.title || '未知歌曲'}{track.artist ? ' — ' + track.artist : ''}</div>
+          {playing ? <div className="mw-minimal-progress"><div className="mw-minimal-progress-fill" style={{width: `${Math.round(progressRatio * 100)}%`}} /></div> : null}
+          <div className="mw-minimal-transport">
+            <button type="button" className="mw-button is-transport" disabled={busy} title="上一首" onClick={() => run('上一首', () => apiRequest(apiBase, '/api/prev', {}))}>⏮</button>
+            <button type="button" className="mw-button is-transport" disabled={busy} title={playing ? '暂停' : '播放'} onClick={() => run(playing ? '暂停' : '播放', () => apiRequest(apiBase, playing ? '/api/pause' : '/api/play', {}))}>{playing ? '⏯' : '▶'}</button>
+            <button type="button" className="mw-button is-transport" disabled={busy} title="下一首" onClick={() => run('下一首', () => apiRequest(apiBase, '/api/next', {}))}>⏭</button>
           </div>
           <div className="mw-minimal-actions">
-            <AppButton disabled={busy} onClick={() => run(playing ? '暂停' : '播放', () => apiRequest(apiBase, playing ? '/api/pause' : '/api/play', {}))}>
-              {playing ? '⏯ 暂停' : '⏯ 播放'}
-            </AppButton>
-            <AppButton disabled={busy} onClick={() => run('下一首', () => apiRequest(apiBase, '/api/next', {}))}>
-              ⏭ 下一首
-            </AppButton>
-            <AppButton disabled={busy} onClick={handleMinimalNextBetter}>
-              ↻ 来点别的
-            </AppButton>
-            <AppButton onClick={() => setMinimalMode(false)}>
-              ⋯ 查看更多
-            </AppButton>
+            <AppButton disabled={busy} onClick={handleMinimalNextBetter}>↻ 来点别的</AppButton>
+            <AppButton onClick={() => setMinimalMode(false)}>✦ 完整模式</AppButton>
           </div>
         </div>
       ) : (

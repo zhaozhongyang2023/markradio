@@ -23,6 +23,7 @@ export async function createRadioPlan({ store, mood: requestedMood = null, nowPl
     temperature: null,
     summary: error.message
   }));
+  store.set('weather', weather);
   const customDates = store.get('specialDates') || [];
   const specialDates = getSpecialDates(now, customDates);
   const mood = recommendMood({
