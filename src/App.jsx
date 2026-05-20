@@ -201,36 +201,32 @@ function buildTrackIntroText({ isPlanIntroTrack, plan, queueIndex, track, ttsTex
 }
 
 function buildLevelsFromFrequency(data, count) {
+  // 纯纵向：每列独立映射频率区间，无跨列正弦波塑形
   return Array.from({ length: count }, (_, index) => {
-    const curveStart = Math.pow(index / count, 1.35);
-    const curveEnd = Math.pow((index + 1) / count, 1.35);
+    const curveStart = Math.pow(index / count, 1.25);
+    const curveEnd = Math.pow((index + 1) / count, 1.25);
     const start = Math.floor(curveStart * data.length);
     const end = Math.max(start + 1, Math.floor(curveEnd * data.length));
     let total = 0;
     for (let i = start; i < end; i += 1) total += data[i] || 0;
     const value = total / (end - start) / 255;
-    const skyline = 0.78 + Math.sin(index * 0.53) * 0.16 + Math.sin(index * 0.21 + 1.4) * 0.1;
-    const accent = index % 11 === 0 || index % 17 === 5 ? 0.1 : 0;
-    const shaped = Math.max(0, value - 0.04) * (index < count * 0.18 ? 0.62 : 1.18);
-    return Math.max(0.12, Math.min(0.98, 0.16 + shaped * 1.65 * skyline + accent));
+    return Math.max(0.08, Math.min(0.98, value * 2.2));
   });
 }
 
 function buildFallbackLevels(seconds, count) {
+  // 纯纵向：每列独立时间动画，无跨列波动
   return Array.from({ length: count }, (_, index) => {
-    const slow = Math.sin(seconds * 2.1 + index * 0.24);
-    const fast = Math.sin(seconds * 5.8 - index * 0.11);
-    const beat = Math.max(0, Math.sin(seconds * 3.2 + index * 0.05));
-    const skyline = 0.8 + Math.sin(index * 0.47) * 0.16 + Math.sin(index * 0.19 + 1.7) * 0.12;
-    return Math.max(0.16, Math.min(0.98, (0.24 + Math.abs(slow) * 0.3 + Math.abs(fast) * 0.14 + beat * 0.2) * skyline));
+    const phase = index * 0.13 + seconds * 2.8;
+    const level = 0.22 + Math.abs(Math.sin(phase)) * 0.55;
+    return Math.max(0.08, Math.min(0.98, level));
   });
 }
 
 function buildIdleSpectrumLevels(count) {
-  return Array.from({ length: count }, (_, index) => {
-    const wave = Math.sin(index * 0.46) * 0.24 + Math.sin(index * 0.18 + 1.6) * 0.18;
-    const cluster = index % 9 === 0 || index % 13 === 4 ? 0.18 : 0;
-    return Math.max(0.2, Math.min(0.92, 0.48 + wave + cluster));
+  // 纯纵向：每列随机静态高度，无正弦波
+  return Array.from({ length: count }, () => {
+    return 0.15 + Math.random() * 0.35;
   });
 }
 
