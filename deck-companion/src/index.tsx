@@ -112,6 +112,7 @@ function Content() {
   const [gameVibe, setGameVibe] = useState('探索地图');
   const [gameName, setGameName] = useState(() => localStorage.getItem(GAME_NAME_KEY) || '');
   const gameNameEditedRef = useRef(false);  // 用户手动编辑后不再自动覆盖
+  const [minimalMode, setMinimalMode] = useState(false);
 
   async function refresh() {
     try {
@@ -196,6 +197,29 @@ function Content() {
     const next = normalizeBase(value);
     setApiBase(next);
     localStorage.setItem(API_BASE_KEY, next);
+  }
+
+  function getActiveMode(now: NowPayload): 'radio' | 'search' | 'game' | null {
+    const plans = now.plans || {};
+    const plan = now.plan;
+    if (plan?.queue?.length) {
+      for (const mode of ['game', 'search', 'radio'] as const) {
+        if (plans[mode]?.queue?.[0]?.id === plan.queue[0]?.id) return mode;
+      }
+    }
+    if (plans.game?.queue?.length) return 'game';
+    if (plans.search?.queue?.length) return 'search';
+    if (plans.radio?.queue?.length) return 'radio';
+    return null;
+  }
+
+  async function handleMinimalNextBetter() {
+    const mode = getActiveMode(now);
+    if (mode === 'game') {
+      await startGameRadio('换个感觉');
+    } else {
+      await nextRadio();
+    }
   }
 
   async function startRadio(mood: string) {
@@ -426,6 +450,91 @@ function Content() {
           font-size: 9.5px;
           font-weight: 800;
         }
+        /* 极简播放态 */
+        .mw-minimal {
+          padding: 4px 0;
+        }
+        .mw-minimal-header {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 8px;
+          margin-bottom: 10px;
+          padding: 0 2px;
+        }
+        .mw-minimal-logo {
+          color: #42d8b2;
+          font-size: 14px;
+          font-weight: 800;
+        }
+        .mw-minimal-badge {
+          color: rgba(66,216,178,.86);
+          font-size: 10px;
+          font-weight: 700;
+        }
+        .mw-minimal-card {
+          padding: 10px 10px 8px;
+          border: 1px solid rgba(255,255,255,.08);
+          border-radius: 9px;
+          background: rgba(255,255,255,.03);
+          margin-bottom: 10px;
+        }
+        .mw-minimal-song {
+          color: rgba(255,255,255,.9);
+          font-size: 15px;
+          font-weight: 800;
+          line-height: 1.25;
+          margin-bottom: 3px;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+        }
+        .mw-minimal-artist {
+          color: rgba(255,255,255,.52);
+          font-size: 12px;
+          line-height: 1.3;
+          margin-bottom: 6px;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+        }
+        .mw-minimal-dj {
+          color: #42d8b2;
+          font-size: 11px;
+          font-weight: 700;
+          line-height: 1.35;
+          margin-bottom: 4px;
+        }
+        .mw-minimal-progress {
+          height: 3px;
+          border-radius: 2px;
+          background: rgba(255,255,255,.08);
+          overflow: hidden;
+        }
+        .mw-minimal-progress-fill {
+          height: 100%;
+          background: #42d8b2;
+          border-radius: 2px;
+          transition: width .5s linear;
+        }
+        .mw-minimal-actions {
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          gap: 6px;
+        }
+        .mw-minimal-toggle {
+          flex: 0 0 auto;
+          padding: 1px 6px;
+          border: 1px solid rgba(66,216,178,.5);
+          border-radius: 4px;
+          background: transparent;
+          color: #42d8b2;
+          font-size: 9.5px;
+          font-weight: 700;
+          cursor: pointer;
+          line-height: 16px;
+        }
+
         .mw-section-title {
           display: flex;
           align-items: center;
@@ -509,9 +618,39 @@ function Content() {
         }
       `}</style>
 
-      <div className="mw-status">
-        <span>{progress > 0 ? <div className="mw-progress" style={{width: `${progress}%`}} /> : null}{busy ? <><span style={{fontSize:10,opacity:.6,marginRight:6}}>{progress}%</span><span className="mw-busy-dot" /><><span>{status}</span><span className="mw-busy-ellipsis"><i /><i /><i /></span></></> : `${status}${currentMood ? ` · ${currentMood}` : ''}`}</span>
-      </div>
+      {minimalMode && playing && track ? (
+        <div className="mw-minimal">
+          <div className="mw-minimal-header">
+            <div className="mw-minimal-logo">✦ MoodWave</div>
+            <div className="mw-minimal-badge">📻 正在陪你</div>
+          </div>
+          <div className="mw-minimal-card">
+            <div className="mw-minimal-song">{track.title || '未知歌曲'}</div>
+            {track.artist ? <div className="mw-minimal-artist">{track.artist}</div> : null}
+            {djLine ? <div className="mw-minimal-dj">{djLine}</div> : null}
+            {playing ? <div className="mw-minimal-progress"><div className="mw-minimal-progress-fill" style={{width: `${Math.round(progressRatio * 100)}%`}} /></div> : null}
+          </div>
+          <div className="mw-minimal-actions">
+            <AppButton disabled={busy} onClick={() => run(playing ? '暂停' : '播放', () => apiRequest(apiBase, playing ? '/api/pause' : '/api/play', {}))}>
+              {playing ? '⏯ 暂停' : '⏯ 播放'}
+            </AppButton>
+            <AppButton disabled={busy} onClick={() => run('下一首', () => apiRequest(apiBase, '/api/next', {}))}>
+              ⏭ 下一首
+            </AppButton>
+            <AppButton disabled={busy} onClick={handleMinimalNextBetter}>
+              ↻ 来点别的
+            </AppButton>
+            <AppButton onClick={() => setMinimalMode(false)}>
+              ⋯ 查看更多
+            </AppButton>
+          </div>
+        </div>
+      ) : (
+        <>
+        <div className="mw-status">
+          <span>{progress > 0 ? <div className="mw-progress" style={{width: `${progress}%`}} /> : null}{busy ? <><span style={{fontSize:10,opacity:.6,marginRight:6}}>{progress}%</span><span className="mw-busy-dot" /><><span>{status}</span><span className="mw-busy-ellipsis"><i /><i /><i /></span></></> : `${status}${currentMood ? ` · ${currentMood}` : ''}`}</span>
+          {playing && track ? <button className="mw-minimal-toggle" onClick={() => setMinimalMode(true)} title="极简模式">◁ 极简</button> : null}
+        </div>
 
       <div className="mw-topbar">
         <div className="mw-tabs">
@@ -681,6 +820,8 @@ function Content() {
             })}
           </div>
         </div>
+      )}
+        </>
       )}
     </div>
   );
