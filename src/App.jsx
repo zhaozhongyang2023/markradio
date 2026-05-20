@@ -254,17 +254,8 @@ function paintSpectrumCanvas(canvas, levels) {
 
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   ctx.imageSmoothingEnabled = false;
-
-  const pulse = levels?.length
-    ? levels.reduce((total, level) => total + level, 0) / levels.length
-    : 0.16;
   ctx.clearRect(0, 0, w, h);
-  // Transparent background — let hero-panel bg show through
-  // Glow baseline
-  ctx.fillStyle = `rgba(0, 245, 212, ${0.06 + pulse * 0.09})`;
-  ctx.fillRect(0, Math.max(0, h - 14 - pulse * 8), w, 2);
 
-  // Smaller blocks on mobile portrait
   const isMobilePortrait = window.innerWidth < 768 && window.innerHeight > window.innerWidth;
   const sp = isMobilePortrait
     ? { size: 10, gap: 6, cell: 16 }
@@ -275,8 +266,8 @@ function paintSpectrumCanvas(canvas, levels) {
   const gravity = 0.14;
 
   const barLevels = levels?.length ? levels : buildIdleSpectrumLevels(numBars);
-
   const insetX = Math.max(8, Math.floor((w - numBars * cell) / 2));
+
   for (let i = 0; i < numBars; i++) {
     const level = barLevels[i] ?? 0.18;
     const x = insetX + i * cell;
@@ -290,32 +281,12 @@ function paintSpectrumCanvas(canvas, levels) {
     }
     const peakBlock = Math.round(SPEC_PEAKS[i] || 0);
 
-    for (let b = 0; b < Math.max(blockCount, peakBlock + 1); b++) {
+    ctx.fillStyle = '#74d8c4';
+    for (let b = 0; b < peakBlock; b++) {
       const y = h - (b + 1) * cell;
-
-      if (b === peakBlock && b > blockCount) {
-        ctx.fillStyle = '#d8fff3';
-        ctx.shadowColor = 'rgba(0, 245, 212, 0.28)';
-        ctx.shadowBlur = 4;
-      } else if (b >= blockCount - 2 && b < blockCount && blockCount > 2) {
-        const t = (b - (blockCount - 2)) / 2;
-        const cr = Math.round(192 - 65 * t);
-        const cg = Math.round(245 - 14 * t);
-        const cb = Math.round(225 - 32 * t);
-        ctx.fillStyle = `rgb(${cr},${cg},${cb})`;
-        ctx.shadowColor = 'rgba(0,245,212,0.16)';
-        ctx.shadowBlur = 3;
-      } else {
-        ctx.fillStyle = '#8fdcca';
-        ctx.shadowColor = 'rgba(143,220,202,0.12)';
-        ctx.shadowBlur = 2;
-      }
-
       ctx.fillRect(x + gap, y + gap, size, size);
     }
   }
-
-  ctx.shadowBlur = 0;
 }
 
 function paintLevels(container, levels) {

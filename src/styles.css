@@ -1077,7 +1077,6 @@ p {
   opacity: 0.97;
 }
 
-
 .spectrum span {
   width: 3px;
   min-height: 9px;
@@ -1635,8 +1634,7 @@ p {
     rgba(17, 17, 17, calc(0.11 + var(--level, 0.18) * 0.2));
   opacity: calc(0.34 + var(--level, 0.18) * 0.48);
   transform: scaleY(calc(0.48 + var(--level, 0.18) * 0.72));
-  animation: particle-pulse 1.7s ease-in-out infinite;
-  animation-play-state: paused;
+  
   transform-origin: center;
   will-change: transform, opacity;
 }
@@ -1645,13 +1643,7 @@ p {
   background:
     linear-gradient(180deg, rgba(246, 255, 250, 0.9), rgba(66, 216, 178, 0.45)),
     rgba(17, 17, 17, calc(0.13 + var(--level, 0.18) * 0.34));
-  animation-play-state: running;
-}
-
-@keyframes particle-pulse {
-  0%, 100% { filter: saturate(0.9); }
-  50%      { filter: saturate(1.25) brightness(1.06); }
-}
+  }
 
 .particle-bars span.played {
   background:
@@ -1700,7 +1692,6 @@ p {
   color: #42d8b2;
   font-size: 11px;
 }
-
 
 /* ── Cast / UPnP ── */
 .cast-card {
@@ -1935,8 +1926,6 @@ p {
     min-height: 184px;
     padding: 8px 24px 0;
   }
-
-
 
   .brand-lockup h1 {
     font-size: 30px;
@@ -2409,7 +2398,6 @@ p {
   }
 }
 
-
 /* ── Pixel Clock Hero ── */
 .hero-clock {
   position: relative;
@@ -2494,8 +2482,6 @@ p {
     min-height: 190px;
     padding: env(safe-area-inset-top, 8px) 24px 0;
   }
-
-
 
   .spectrum-canvas {
     bottom: 14px;
@@ -2698,8 +2684,6 @@ p {
     padding: 4px 28px 0;
   }
 
-
-
   .brand-lockup {
     align-items: flex-start !important;
     gap: 10px !important;
@@ -2715,8 +2699,6 @@ p {
     height: 28px !important;
     margin-top: 13px !important;
   }
-
-
 
   .spectrum-canvas {
     position: absolute;
@@ -2885,8 +2867,6 @@ p {
     padding: 2px 16px 0 !important;
     flex: 0 0 auto !important;
   }
-
-
 
   .topline {
     gap: 6px;
