@@ -1660,16 +1660,6 @@ p {
   box-shadow: 0 0 10px rgba(66, 216, 178, 0.12);
 }
 
-/* 节拍弹跳脉冲 — --beat 由 paintLevels 写入，节拍点弹高后快速回落 */
-.particle-bars span {
-  transition: transform 0.08s ease-out;
-}
-.particle-wave.is-active .particle-bars span[style*="--beat:1"] {
-  transform: scaleY(1.35) !important;
-  box-shadow: 0 0 8px rgba(0, 245, 212, 0.45);
-  transition: transform 0.08s ease-out, box-shadow 0.05s ease-out;
-}
-
 .bottom-player button {
   flex: 0 0 auto;
   width: 38px;
