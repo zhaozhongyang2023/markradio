@@ -18,6 +18,7 @@ import { getVoicePublicConfig, synthesizeVoice, ttsFilePath, updateVoiceConfig }
 import { castManager, getCastStatus } from './cast.js';
 import { buildCastUrl, resolveCastHost } from './cast-url.js';
 import { callNetease, checkNeteaseQr, createNeteaseQr, getNeteaseLoginStatus } from './netease-auth.js';
+import { getWeather } from './weather.js';
 
 const store = new StateStore();
 
@@ -294,6 +295,7 @@ app.get('/api/plan/today', async (request, reply) => {
   const cached = store.get('planToday');
   // Return cached plan if TTS is ready; otherwise regenerate with async TTS
   if (cached && cached.tts?.url && cached.queue?.[0]) return cached;
+  playerStop();
   const plan = await createRadioPlan({ store, deferTts: true, onTtsReady: (updated) => {
     broadcast('plan', updated);
   } });
@@ -308,6 +310,7 @@ app.post('/api/plan/today', async (request) => {
       if (t?.id) store.addPlay(t, oldPlan.mood || '平静');
     }
   }
+  playerStop();
   const plan = await createRadioPlan({
     store,
     mood: request.body?.mood || null,
@@ -325,6 +328,7 @@ app.post('/api/chat', async (request) => {
   const moodMatch = moods.find((item) => text.includes(item));
   const currentPlan = store.get('planToday');
   const previousNow = store.get('now');
+  playerStop();
   const plan = await createRadioPlan({
     store,
     mood: moodMatch || store.get('mood')?.current,
@@ -420,6 +424,7 @@ app.post('/api/playback/:action', async (request) => {
 app.post('/api/ai/radio', async (request) => {
   const mood = request.body?.mood || request.body?.currentMood || null;
   const userRequest = String(request.body?.scene || request.body?.prompt || '').trim();
+  playerStop();
   const plan = await createRadioPlan({
     store,
     mood,
@@ -443,7 +448,8 @@ app.post('/api/ai/radio', async (request) => {
 
 app.post('/api/ai/search', async (request) => {
   const query = String(request.body?.query || request.body?.message || request.body?.prompt || '').trim();
-  const currentPlan = store.get('planToday');
+  const currentPlan = store.get('plan-' + (store.get('now')?.mode || 'radio'));
+  playerStop();
   const plan = await createRadioPlan({
     store,
     mood: request.body?.mood || store.get('mood')?.current,
@@ -471,9 +477,10 @@ app.post('/api/ai/search', async (request) => {
 });
 
 app.post('/api/ai/next-radio', async (request) => {
-  const currentPlan = store.get('planToday');
+  const currentPlan = store.get('plan-' + (store.get('now')?.mode || 'radio'));
   const mood = request.body?.mood || currentPlan?.mood || store.get('mood')?.current;
   const scene = String(request.body?.scene || request.body?.prompt || '换个氛围').trim();
+  playerStop();
   const plan = await createRadioPlan({
     mode: store.get('now')?.mode || 'radio',
     store,
@@ -509,6 +516,7 @@ app.post('/api/ai/game-radio', async (request) => {
     : `游戏场景——${gameVibe}。`;
   const vibeLine = vibeHint ? `感觉：${vibeHint}` : '';
   const userRequest = [djPersona, sceneLine, vibeLine].filter(Boolean).join(' ');
+  playerStop();
   const plan = await createRadioPlan({
     store,
     mode: 'game',
@@ -900,6 +908,9 @@ app.post('/api/prev', async (r) => applyPluginAction('prev', r.body || {}));
 
 await app.listen({ host: config.host, port: config.apiPort });
 
+// 启动时获取一次天气，确保极简视图立即可用
+getWeather().then(w => store.set('weather', w)).catch(() => {});
+
 // Warmup: generate initial plan in background so first page load is instant
 setTimeout(async () => {
   try {
@@ -909,7 +920,8 @@ setTimeout(async () => {
       return;
     }
     // Generate fresh plan with async TTS
-    const plan = await createRadioPlan({ store, deferTts: true, onTtsReady: (updated) => {
+    playerStop();
+  const plan = await createRadioPlan({ store, deferTts: true, onTtsReady: (updated) => {
       broadcast('plan', updated);
     } });
     broadcast('plan', plan);

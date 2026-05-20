@@ -40,7 +40,7 @@ function playOne(urls, index, onEnd, seqId) {
   const resolvedUrl = url.startsWith('/') ? `http://127.0.0.1:${config.apiPort}${url}` : url;
   const startTime = Date.now();
   const proc = spawn('/usr/bin/ffplay', [
-    '-nodisp', '-autoexit', '-loglevel', 'error', resolvedUrl
+    '-nodisp', '-autoexit', '-loglevel', 'error', '-infbuf', resolvedUrl
   ], { stdio: 'ignore' });
 
   proc.on('spawn', () => {

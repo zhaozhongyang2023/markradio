@@ -5,6 +5,7 @@ import { ChangeEvent, useEffect, useRef, useState } from 'react';
 const DEFAULT_API_BASE = 'http://127.0.0.1:38765';
 const API_BASE_KEY = 'moodwave.deck.apiBase';
 const GAME_NAME_KEY = 'moodwave.deck.gameName';
+const MINIMAL_KEY = 'moodwave.deck.minimalMode';
 
 type Track = {
   id?: string;
@@ -21,9 +22,11 @@ type NowPayload = {
     playing?: boolean;
     progressRatio?: number;
     mood?: string;
+  mode?: string;
   };
   plan?: {
     mood?: string;
+  mode?: string;
     tts?: { text?: string; url?: string };
     queue?: Track[];
     plan?: { say?: string; reply?: string };
@@ -113,7 +116,7 @@ function Content() {
   const [gameVibe, setGameVibe] = useState('探索地图');
   const [gameName, setGameName] = useState(() => localStorage.getItem(GAME_NAME_KEY) || '');
   const gameNameEditedRef = useRef(false);  // 用户手动编辑后不再自动覆盖
-  const [minimalMode, setMinimalMode] = useState(false);
+  const [minimalMode, setMinimalMode] = useState(() => localStorage.getItem(MINIMAL_KEY) === '1');
 
   async function refresh() {
     try {
@@ -206,6 +209,8 @@ function Content() {
   }
 
   function getActiveMode(now: NowPayload): 'radio' | 'search' | 'game' | null {
+    const serverMode = now.now?.mode;
+    if (serverMode === 'radio' || serverMode === 'search' || serverMode === 'game') return serverMode;
     const plans = now.plans || {};
     const plan = now.plan;
     if (plan?.queue?.length) {
@@ -223,17 +228,19 @@ function Content() {
     const mode = getActiveMode(now);
     if (mode === 'game') {
       await startGameRadio('换个感觉');
+    } else if (mode === 'radio') {
+      await nextRadio('');
     } else {
-      await nextRadio();
+      await nextRadio(query);
     }
   }
 
   function getSceneText() {
     const mode = getActiveMode(now);
     if (mode === 'game' && gameName.trim()) return '🎮 正在陪你玩 ' + gameName.trim();
-    if (mode === 'game') return '游戏电台';
-    if (mode === 'search') return '寻歌电台';
-    return '心情电台';
+    if (mode === 'game') return '🎮 ' + (gameVibe || '游戏电台');
+    if (mode === 'search') return query.trim() ? '寻歌 · ' + query.trim() : '寻歌电台';
+    return currentMood ? '心情电台 · ' + currentMood : '心情电台';
   }
 
   async function startRadio(mood: string) {
@@ -250,9 +257,9 @@ function Content() {
     });
   }
 
-  async function nextRadio() {
+  async function nextRadio(scene = '') {
     await run('正在换氛围', async () => {
-      await apiRequest(apiBase, '/api/ai/next-radio', { scene: query, mode: 'steamdeck', deferTts: true });
+      await apiRequest(apiBase, '/api/ai/next-radio', { scene: scene || '', mode: 'steamdeck', deferTts: true });
     });
   }
 
@@ -481,13 +488,13 @@ function Content() {
           border: 1px solid rgba(255,255,255,.1);
           border-radius: 4px;
           background: rgba(255,255,255,.04);
-          color: rgba(255,255,255,.68);
+          color: rgba(255,255,255,.78);
           font-size: 9px;
           font-weight: 600;
           line-height: 16px;
         }
         .mw-minimal-scene {
-          color: rgba(255,255,255,.68);
+          color: rgba(255,255,255,.78);
           font-size: 10px;
           font-weight: 600;
           margin-bottom: 10px;
@@ -505,6 +512,12 @@ function Content() {
           line-height: 1.4;
           margin-bottom: 10px;
           min-width: 0;
+        }
+        .mw-minimal-playing {
+          color: rgba(66,216,178,.78);
+          font-size: 9px;
+          font-weight: 600;
+          margin-bottom: 2px;
         }
         .mw-minimal-track {
           color: rgba(255,255,255,.74);
@@ -661,6 +674,7 @@ function Content() {
           ) : djLine ? (
             <div className="mw-minimal-quote">{djLine}</div>
           ) : null}
+          <div className="mw-minimal-playing">📻 正在陪你</div>
           <div className="mw-minimal-track">{track.title || '未知歌曲'}{track.artist ? ' — ' + track.artist : ''}</div>
           {playing ? <div className="mw-minimal-progress"><div className="mw-minimal-progress-fill" style={{width: `${Math.round(progressRatio * 100)}%`}} /></div> : null}
           <div className="mw-minimal-transport">
@@ -670,14 +684,14 @@ function Content() {
           </div>
           <div className="mw-minimal-actions">
             <AppButton disabled={busy} onClick={handleMinimalNextBetter}>↻ 来点别的</AppButton>
-            <AppButton onClick={() => setMinimalMode(false)}>✦ 完整模式</AppButton>
+            <AppButton onClick={() => { setMinimalMode(false); localStorage.removeItem(MINIMAL_KEY); }}>✦ 打开电台</AppButton>
           </div>
         </div>
       ) : (
         <>
         <div className="mw-status">
           <span>{progress > 0 ? <div className="mw-progress" style={{width: `${progress}%`}} /> : null}{busy ? <><span style={{fontSize:10,opacity:.6,marginRight:6}}>{progress}%</span><span className="mw-busy-dot" /><><span>{status}</span><span className="mw-busy-ellipsis"><i /><i /><i /></span></></> : `${status}${currentMood ? ` · ${currentMood}` : ''}`}</span>
-          {playing && track ? <button className="mw-minimal-toggle" onClick={() => setMinimalMode(true)} title="极简模式">◁ 极简</button> : null}
+          {playing && track ? <button className="mw-minimal-toggle" onClick={() => { setMinimalMode(true); localStorage.setItem(MINIMAL_KEY, '1'); }} title="极简模式">◁ 极简</button> : null}
         </div>
 
       <div className="mw-topbar">
