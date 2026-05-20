@@ -1,4 +1,4 @@
-# 🎵 MoodWave V5 — Steam Deck 完整安装手册
+# 🎵 MoodWave V6 — Steam Deck 完整安装手册
 
 > 🆕 **已经装过旧版？** → [升级到最新版](#升级到最新版)
 
@@ -108,7 +108,7 @@ http://127.0.0.1:38080/?deck=1
 浏览器打开：
 
 ```
-http://127.0.0.1:38080/api/health
+http://127.0.0.1:38765/api/health
 ```
 
 应该显示：
@@ -181,9 +181,9 @@ curl -L https://github.com/SteamDeckHomebrew/decky-loader/raw/main/dist/install_
 
 点击进入，能看到三个 Tab：
 
-- 🎧 **AI Radio** — 按心情开电台
-- 🎮 **Game Radio** — 选游戏氛围配 BGM
-- 🔍 **AI 寻歌** — 告诉 AI 想听什么
+- 📻 **电台** — 按心情开电台
+- 🔍 **寻歌** — 告诉 AI 想听什么
+- 🎮 **游戏** — 选游戏氛围配 BGM
 
 ---
 
@@ -196,16 +196,17 @@ curl -L https://github.com/SteamDeckHomebrew/decky-loader/raw/main/dist/install_
 ### 操作流程
 
 1. **选游戏氛围**
-   - 🗡️ Boss战 —— 燃一点
-   - 🗺️ 探索地图 —— 适合慢慢跑图
-   - 🏎️ 赛车竞速 —— 今晚速度别停
-   - 🌾 种田放松 —— 今晚别太累了
-   - 📺 模拟器怀旧 —— 像小时候一样
+   - ⚔️ Boss战 —— 燃一点
+   - ⌖ 探索地图 —— 适合慢慢跑图
+   - ✧ 种田放松 —— 今天别太累了
+   - ▣ 模拟器怀旧 —— 像小时候一样
 
 2. **（可选）输入游戏名**
    - 比如输入「塞尔达」「老头环」「星露谷」
 
 3. **点「▶ 开始游戏电台」**
+
+> 💡 播放中可点「◁ 极简」进入极简模式，显示当前歌曲、天气、心情，适合游戏中快速查看。关闭插件后再打开会自动回到极简模式。
 
 4. AI DJ 会：
    - 生成适合当前游戏场景的 DJ 开场白
@@ -268,9 +269,15 @@ git pull
 npm install --omit=dev
 npm run build
 systemctl --user restart moodwave.service
+
+# 如果插件前端有改动，需额外重建并部署：
+cd ~/moodwave/deck-companion
+npm install --silent
+npm run build
+echo 你的密码 | sudo -S cp dist/index.js main.py plugin.json package.json ~/homebrew/plugins/moodwave-deck-companion/
 ```
 
-> Decky 插件会自动跟随 Steam 重启加载最新版。如果插件没更新，回到游戏模式 → Decky → ⚙ → Reload Plugins。
+> 重启 Steam（或 Decky → ⚙ → Reload Plugins）生效。
 
 
 ## 卸载
@@ -296,10 +303,11 @@ bash ~/moodwave/scripts/uninstall-steamdeck.sh
 | 网页打不开 | `systemctl --user restart moodwave.service` |
 | 网页开了但没歌 | 检查 AI Key 是否正确：`cat ~/.config/moodwave/config.env` |
 | Decky 里找不到 MoodWave | 检查目录是否存在：`ls ~/homebrew/plugins/moodwave-deck-companion/` |
-| Game Radio 没反应 | 确认本地 API 还在跑：`curl http://127.0.0.1:38765/api/health` |
+| 游戏电台没反应 | 确认本地 API 还在跑：`curl http://127.0.0.1:38765/api/health` |
 | 装完显示 Demo 歌单 | 正常现象。配置网易云 API 后可接入真实音乐库 |
 | 怎么换 AI Key | 编辑 `~/.config/moodwave/config.env`，改 `AI_API_KEY=`，然后重启服务 |
 | 忘记 sudo 密码 | 桌面模式 → 系统设置 → 用户 → 改密码 |
+| 极简模式显示"本地·未知" | 检查天气配置：`grep WEATHER ~/.config/moodwave/config.env`，不填则用默认天气 |
 
 ---
 
