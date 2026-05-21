@@ -309,7 +309,7 @@ function Content() {
   }
 
   function getWorldContext() {
-    const city = now.weather?.city || '';
+    const city = cityLabel(now.weather?.city || '');
     const condition = now.weather?.condition || '未知';
     const temp = now.weather?.temperature != null ? ' ' + Math.round(now.weather.temperature) + '°C' : '';
     const hasGame = getActiveMode(now) === 'game' && Boolean(gameName.trim());
