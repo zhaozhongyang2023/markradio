@@ -1,5 +1,5 @@
 import { PanelSection, PanelSectionRow, TextField, staticClasses } from '@decky/ui';
-import { definePlugin } from '@decky/api';
+import { definePlugin, callable } from '@decky/api';
 import { ChangeEvent, useEffect, useRef, useState } from 'react';
 
 const DEFAULT_API_BASE = 'http://127.0.0.1:38765';
@@ -187,6 +187,15 @@ function Content() {
       setBusy(false);
       setProgress(0);
     };
+  }, []);
+
+  // 启动时从 config.json / 环境变量读取 API 地址
+  useEffect(() => {
+    (callable as any)('get_api_base')().then((base: any) => {
+      if (base && typeof base === 'string' && base !== DEFAULT_API_BASE) {
+        setApiBase(normalizeBase(base));
+      }
+    }).catch(() => {});
   }, []);
 
   useEffect(() => {
