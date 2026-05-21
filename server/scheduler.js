@@ -8,7 +8,7 @@ import { recommendMood } from './mood.js';
 import { randomUUID } from 'node:crypto';
 
 const DEFAULT_QUEUE_LIMIT = 5;
-const TTS_PRELOAD_LIMIT = 2;
+const TTS_PRELOAD_LIMIT = 5;
 
 export async function createRadioPlan({ store, mood: requestedMood = null, nowPlaying = null, deferTts = false, onTtsReady = null, userRequest = '', mode = 'radio', currentPlan = null }) {
   const playedSet = new Set(); sessionPlayedIdsByMode.set(mode, playedSet);
