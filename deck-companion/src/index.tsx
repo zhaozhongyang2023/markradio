@@ -55,10 +55,10 @@ const moods = [
   { id: '愤怒', icon: '⚡' }
 ];
 const searchExamples = [
-  { id: '适合下雨天放空的英文老歌', icon: '🌧' },
-  { id: '巫师3原声那种中古民谣', icon: '🎻' },
-  { id: '90 年代港乐', icon: '📼' },
-  { id: '像小时候网吧一样', icon: '🖥' },
+  { id: '雨天英文老歌', icon: '🌧' },
+  { id: '中古世纪民谣', icon: '🎻' },
+  { id: '九零年代港乐', icon: '📼' },
+  { id: '儿时玩的网吧', icon: '🖥' },
 ];
 const gameVibes = [
   { id: 'Boss战', icon: '⚔', hint: '今晚燃一点，法印按到底' },
@@ -536,8 +536,8 @@ function Content() {
         }
         .mw-minimal-scene {
           color: rgba(255,255,255,.78);
-          font-size: 10px;
-          font-weight: 600;
+          font-size: 9px;
+          font-weight: 500;
           margin-bottom: 10px;
           line-height: 1.3;
           letter-spacing: 0.02em;
