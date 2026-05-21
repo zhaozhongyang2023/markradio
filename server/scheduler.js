@@ -11,8 +11,8 @@ const TTS_PRELOAD_LIMIT = 2;
 
 export async function createRadioPlan({ store, mood: requestedMood = null, nowPlaying = null, deferTts = false, onTtsReady = null, userRequest = '', currentPlan = null }) {
   const mode = arguments[0]?.mode || 'radio';
-  // 每组刷新时清空跨组去重，确保 AI 选曲不会被跳过
-  sessionPlayedIds.clear();
+  const playedSet = sessionPlayedIdsByMode.get(mode) || (() => { const s = new Set(); sessionPlayedIdsByMode.set(mode, s); return s; })();
+  playedSet.clear();
   const now = new Date();
   const timeContext = buildTimeContext(now);
   const taste = store.get('taste');
@@ -90,7 +90,7 @@ export async function createRadioPlan({ store, mood: requestedMood = null, nowPl
     }
   }
   const queueLimit = resolveQueueLimit(plan, selected.length);
-  const queueTracks = fillQueueTracks(selected, candidates, queueLimit);
+  const queueTracks = fillQueueTracks(selected, candidates, queueLimit, playedSet);
   const queue = await buildQueue(queueTracks, store, queueLimit);
   const ttsText = buildIntroText({ plan, specialDates, track: queue[0] });
   const planId = `plan-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
@@ -214,17 +214,17 @@ function updateCardTts({ store, planId, index, tts, onTtsReady }) {
   return updated;
 }
 
-// Session-level played track IDs to prevent duplicates across plans
-const sessionPlayedIds = new Set();
+// Session-level played track IDs to prevent duplicates per mode
+const sessionPlayedIdsByMode = new Map();
 
-function fillQueueTracks(selected, candidates, limit) {
-  const seen = new Set(sessionPlayedIds);
+function fillQueueTracks(selected, candidates, limit, playedSet) {
+  const seen = new Set(playedSet);
   const queue = [];
   // AI 选曲优先，不被去重跳过
   for (const track of selected) {
     if (!track?.id) continue;
     seen.add(track.id);
-    sessionPlayedIds.add(track.id);
+    playedSet.add(track.id);
     queue.push(track);
   }
   // 不足时从候选中补齐
@@ -232,7 +232,7 @@ function fillQueueTracks(selected, candidates, limit) {
     if (queue.length >= limit) break;
     if (!track?.id || seen.has(track.id)) continue;
     seen.add(track.id);
-    sessionPlayedIds.add(track.id);
+    playedSet.add(track.id);
     queue.push(track);
   }
   return queue;
@@ -262,9 +262,9 @@ function buildTrackReason(track, index, plan, mood) {
   const segue = plan.segue || '下一首，继续。';
   // Create a cohesive intro: hint at why chosen, how it connects, and what to expect
   if (reason && reason.length > 10) {
-    return `${segue} ${songId}${albumLine}。`.replace(/\s+/g, ' ').trim();
+    return `${segue} ${reason} ${songId}${albumLine}。`.replace(/\s+/g, ' ').trim();
   }
-  return `${segue} ${songId}${albumLine}。`.replace(/\s+/g, ' ').trim();
+  return `${segue} ${reason} ${songId}${albumLine}。`.replace(/\s+/g, ' ').trim();
 }
 
 function buildIntroText({ plan, specialDates, track }) {
