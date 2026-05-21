@@ -77,14 +77,6 @@ function weatherIcon(condition = '') {
   return '✦';
 }
 
-function pixelCafe() {
-  return (
-    <div className="pixel-cup" aria-hidden="true">
-      <span />
-      <i />
-    </div>
-  );
-}
 
 function V4PersonaAvatar({ role }) {
   const id = useId();
@@ -744,7 +736,7 @@ function V4RadioView({
             <button className="v4-avatar" onClick={onBack} title="自动荐歌">
               {netease.loggedIn && netease.profile?.avatarUrl ? (
                 <img alt="网易云头像" src={netease.profile.avatarUrl} />
-              ) : pixelCafe()}
+              ) : <img alt="MoodWave" src="/icon-512.png" />}
             </button>
             <button className="v4-wordmark" onClick={onBack} title="自动荐歌">MoodWave</button>
           </div>
@@ -3393,7 +3385,7 @@ function seekTo(ratio) {
                 <button className="avatar" onClick={() => setViewMode('v4')} title="AI寻歌">
                   {netease.loggedIn && netease.profile?.avatarUrl ? (
                     <img alt="网易云头像" src={netease.profile.avatarUrl} />
-                  ) : pixelCafe()}
+                  ) : <img alt="MoodWave" src="/icon-512.png" />}
                 </button>
                 <div>
                   <button className="brand-title-button" onClick={() => setViewMode('v4')} title="AI寻歌">

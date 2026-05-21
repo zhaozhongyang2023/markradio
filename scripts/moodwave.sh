@@ -36,8 +36,20 @@ NETEASE_DIR="${NETEASE_DIR:-$HOME/netease-cloud-music-api}"
 if [ ! -d "$NETEASE_DIR" ] && [ -d "$HOME/netease-api" ]; then
   NETEASE_DIR="$HOME/netease-api"
 fi
-API_PORT="${MOODWAVE_API_PORT:-${MOODWAVE_PORT:-8765}}"
-WEB_PORT="${MOODWAVE_WEB_PORT:-8080}"
+
+# ── 加载配置文件（与 server/config.js 相同优先级）──
+_load_config() {
+  local f
+  for f in "${MOODWAVE_CONFIG:-}" "$HOME/.config/moodwave/config.env" "$MOODWAVE_DIR_PATH/.env"; do
+    if [ -n "$f" ] && [ -f "$f" ]; then
+      set -a; . "$f"; set +a
+    fi
+  done
+}
+_load_config
+
+API_PORT="${MOODWAVE_API_PORT:-${MOODWAVE_PORT:-${MARKRADIO_API_PORT:-8765}}}"
+WEB_PORT="${MOODWAVE_WEB_PORT:-${MARKRADIO_WEB_PORT:-8080}}"
 NETEASE_PORT="${NETEASE_PORT:-3000}"
 
 MOODWAVE_PID="$MOODWAVE_DIR_PATH/moodwave.pid"
