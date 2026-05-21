@@ -198,7 +198,7 @@ curl -L https://github.com/SteamDeckHomebrew/decky-loader/raw/main/dist/install_
 - 🎮 **Game Radio** — 选游戏氛围配 BGM（注入 DJ 灵魂 + 游戏世界感）
 - 🔍 **AI 寻歌** — 告诉 AI 想听什么（参考 Music DNA）
 
-> V15 新特性：Game Radio 输入游戏名（如「巫师3」），AI 自动感知**游戏世界氛围**。
+> V15 新特性：Game Radio 输入游戏名（如「巫师3」），AI 自动感知**游戏世界氛围**，插件渲染**极简世界卡片**（天气+游戏+心情+vibe）。
 
 ---
 
