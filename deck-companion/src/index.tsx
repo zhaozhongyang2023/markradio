@@ -3,6 +3,7 @@ import { definePlugin } from '@decky/api';
 import { ChangeEvent, useEffect, useRef, useState } from 'react';
 
 const DEFAULT_API_BASE = 'http://192.168.2.33:8765';
+const CONFIG_VERSION = 2;
 const API_BASE_KEY = 'moodwave.deck.apiBase';
 const GAME_NAME_KEY = 'moodwave.deck.gameName';
 const MINIMAL_KEY = 'moodwave.deck.minimalMode';
@@ -116,7 +117,16 @@ function AppButton({
 }
 
 function Content() {
-  const [apiBase, setApiBase] = useState(() => normalizeBase(localStorage.getItem(API_BASE_KEY) || DEFAULT_API_BASE));
+  const [apiBase, setApiBase] = useState(() => {
+    const storedVersion = localStorage.getItem('moodwave.deck.configVersion');
+    const storedBase = localStorage.getItem(API_BASE_KEY);
+    if (storedVersion !== String(CONFIG_VERSION)) {
+      localStorage.removeItem(API_BASE_KEY);
+      localStorage.setItem('moodwave.deck.configVersion', String(CONFIG_VERSION));
+      return normalizeBase(DEFAULT_API_BASE);
+    }
+    return normalizeBase(storedBase || DEFAULT_API_BASE);
+  });
   const [page, setPage] = useState<Page>(() => (localStorage.getItem(PAGE_KEY) as Page) || 'radio');
   const [now, setNow] = useState<NowPayload>({});
   const [busy, setBusy] = useState(false);
