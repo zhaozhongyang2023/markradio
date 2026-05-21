@@ -71,13 +71,20 @@ function normalizeBase(value: string) {
 }
 
 async function apiRequest<T>(apiBase: string, path: string, body?: unknown): Promise<T> {
-  const response = await fetch(`${normalizeBase(apiBase)}${path}`, {
-    method: body ? 'POST' : 'GET',
-    headers: { 'Content-Type': 'application/json' },
-    body: body ? JSON.stringify(body) : undefined
-  });
-  if (!response.ok) throw new Error(`HTTP ${response.status}`);
-  return response.json() as Promise<T>;
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 15000);
+  try {
+    const response = await fetch(`${normalizeBase(apiBase)}${path}`, {
+      method: body ? 'POST' : 'GET',
+      headers: { 'Content-Type': 'application/json' },
+      body: body ? JSON.stringify(body) : undefined,
+      signal: controller.signal
+    });
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    return response.json() as Promise<T>;
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 function AppButton({
@@ -174,6 +181,14 @@ function Content() {
     }
   }
 
+  // 组件卸载时清理运行中的 timer
+  useEffect(() => {
+    return () => {
+      setBusy(false);
+      setProgress(0);
+    };
+  }, []);
+
   useEffect(() => {
     refresh();
     const timer = setInterval(refresh, 5000);
@@ -199,9 +214,9 @@ function Content() {
   })();
   const trackLine = track?.title ? `${track.title}${track.artist ? ` - ${track.artist}` : ''}` : "AI DJ 准备中...";
 
-  function saveGameName(value: string) {
+  function saveGameName(value: string, fromBlur = false) {
     const v = String(value || "");
-    gameNameEditedRef.current = true;  // 用户手动输入，停止自动覆盖
+    if (fromBlur) gameNameEditedRef.current = true;
     setGameName(v);
     localStorage.setItem(GAME_NAME_KEY, v);
   }
@@ -888,8 +903,8 @@ function Content() {
             <TextField
               label="🎮 现在在玩什么？"
               value={gameName}
-              onChange={(event: ChangeEvent<HTMLInputElement>) => saveGameName(event.target.value)}
-              onBlur={(event: ChangeEvent<HTMLInputElement>) => saveGameName(event.target.value)}
+              onChange={(event: ChangeEvent<HTMLInputElement>) => saveGameName(event.target.value, false)}
+              onBlur={(event: ChangeEvent<HTMLInputElement>) => saveGameName(event.target.value, true)}
             />
           </PanelSectionRow>
           <PanelSectionRow>
@@ -897,7 +912,6 @@ function Content() {
               label="API Base"
               value={apiBase}
               onChange={(event: ChangeEvent<HTMLInputElement>) => saveApiBase(event.target.value)}
-              onBlur={(event: ChangeEvent<HTMLInputElement>) => saveApiBase(event.target.value)}
             />
           </PanelSectionRow>
           <PanelSectionRow>

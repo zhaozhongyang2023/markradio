@@ -48,7 +48,17 @@ async function advanceToNext(store) {
   const plan = store.get('plan-' + mode);
   if (!plan?.queue?.length) return;
   const ci = plan.queue.findIndex(t => t.id === now.track?.id);
-  if (ci < 0 || ci >= plan.queue.length - 1) {
+  // 当前 track 不在 queue 中 → 从 queue[0] 重新开始
+  if (ci < 0 && plan.queue.length > 0) {
+    now.track = plan.queue[0]; now.progress = 0; now.playing = true;
+    const urls2 = buildPlaylist(plan.queue[0], plan, now);
+    if (urls2.length) playSequence(urls2, { onEnd: () => advanceToNext(store), onTrackStart: () => {
+      const n2 = store.get('now'); if (n2) { n2.startedAt = Date.now(); store.set('now', n2); }
+    } });
+    store.set('now', now); saveNowPerMode(store, now);
+    broadcast('now', publicNow()); return;
+  }
+  if (ci >= plan.queue.length - 1) {
     now.playing = false; store.set('now', now);
     saveNowPerMode(store, now); broadcast('now', publicNow()); return;
   }
@@ -149,13 +159,17 @@ async function hydrateCurrentLyric() {
   const nextTrack = { ...track, lyric };
   store.set('now', { ...now, track: nextTrack });
 
-  const plan = store.get('planToday');
-  if (plan?.queue?.length) {
-    store.set('planToday', {
-      ...plan,
-      queue: plan.queue.map((item) => (item.id === nextTrack.id ? { ...item, lyric } : item))
-    });
-  }
+  // 同步更新各模块 plan 中的同一首歌
+  ['radio', 'search', 'game'].forEach((m) => {
+    const p = store.get('plan-' + m);
+    if (p?.queue?.length) {
+      store.set('plan-' + m, {
+        ...p,
+        queue: p.queue.map((item) => (item.id === nextTrack.id ? { ...item, lyric } : item))
+      });
+    }
+  });
+  broadcast('now', publicNow());
 }
 
 function publicStatus() {
@@ -277,7 +291,8 @@ app.post('/api/netease/like', async (request, reply) => {
 });
 
 app.get('/api/now', async () => {
-  await hydrateCurrentLyric();
+  // 异步拉取歌词，不阻塞响应
+  hydrateCurrentLyric().catch(() => {});
   return publicNow();
 });
 
