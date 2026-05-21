@@ -3,7 +3,7 @@ import { definePlugin } from '@decky/api';
 import { ChangeEvent, useEffect, useRef, useState } from 'react';
 
 const DEFAULT_API_BASE = 'http://192.168.2.33:8765';
-const CONFIG_VERSION = 2;
+const CONFIG_VERSION = 4;
 const API_BASE_KEY = 'moodwave.deck.apiBase';
 const GAME_NAME_KEY = 'moodwave.deck.gameName';
 const MINIMAL_KEY = 'moodwave.deck.minimalMode';
@@ -77,7 +77,7 @@ async function apiRequest<T>(apiBase: string, path: string, body?: unknown): Pro
   try {
     const response = await fetch(`${normalizeBase(apiBase)}${path}`, {
       method: body ? 'POST' : 'GET',
-      headers: { 'Content-Type': 'application/json' },
+      headers: body ? { 'Content-Type': 'application/json' } : undefined,
       body: body ? JSON.stringify(body) : undefined,
       signal: controller.signal
     });
