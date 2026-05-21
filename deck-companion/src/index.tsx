@@ -639,13 +639,6 @@ function Content() {
           cursor: pointer;
           line-height: 16px;
         }
-        .mw-button.is-transport {
-          padding: 0;
-          font-size: 15px;
-          line-height: 1;
-          text-overflow: clip;
-        }
-
         .mw-section-title {
           display: flex;
           align-items: center;

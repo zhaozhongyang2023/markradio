@@ -10,6 +10,7 @@ fs.mkdirSync(dataDir, { recursive: true });
 export class StateStore {
   constructor(dbPath = path.join(dataDir, 'markradio.db')) {
     this.db = new DatabaseSync(dbPath);
+    this.db.exec('PRAGMA journal_mode=WAL');
     this.db.exec(`
       CREATE TABLE IF NOT EXISTS kv (
         key TEXT PRIMARY KEY,
