@@ -115,6 +115,37 @@ function AppButton({
   );
 }
 
+const cityNameMap: Record<string, string> = {
+  'Rongcheng': '荣成',
+  'Beijing': '北京',
+  'Shanghai': '上海',
+  'Guangzhou': '广州',
+  'Shenzhen': '深圳',
+  'Hangzhou': '杭州',
+  'Chengdu': '成都',
+  'Nanjing': '南京',
+  'Wuhan': '武汉',
+  'Xiamen': '厦门',
+  'Qingdao': '青岛',
+  'Dalian': '大连',
+  'Suzhou': '苏州',
+  'Chongqing': '重庆',
+  'Xian': '西安',
+  'Changsha': '长沙',
+  'Kunming': '昆明',
+  'Fuzhou': '福州',
+  'Zhengzhou': '郑州',
+  'Jinan': '济南',
+  'Harbin': '哈尔滨',
+  'Shenyang': '沈阳',
+  'Tianjin': '天津',
+};
+
+function cityLabel(raw: string): string {
+  const name = (raw || '').split(',')[0].trim();
+  return cityNameMap[name] || name;
+}
+
 function Content() {
   const [apiBase, setApiBase] = useState(() => {
     const storedVersion = localStorage.getItem('moodwave.deck.configVersion');
@@ -465,6 +496,10 @@ function Content() {
           vertical-align: 1px;
           animation: mw-pulse 1.2s ease-in-out infinite;
         }
+        @keyframes mw-spectrum {
+          0%, 100% { height: 3px; opacity: .35; }
+          50% { height: 14px; opacity: 1; }
+        }
         @keyframes mw-pulse {
           0%, 100% { opacity: 1; box-shadow: 0 0 8px rgba(66,216,178,.7); }
           50% { opacity: .4; box-shadow: 0 0 4px rgba(66,216,178,.3); }
@@ -563,6 +598,24 @@ function Content() {
           font-weight: 600;
           line-height: 16px;
         }
+        .mw-minimal-spectrum {
+          display: inline-flex;
+          align-items: flex-end;
+          gap: 2px;
+          margin-left: auto;
+          height: 16px;
+        }
+        .mw-minimal-spectrum-bar {
+          width: 2px;
+          border-radius: 1px;
+          background: #42d8b2;
+          animation: mw-spectrum 0.8s ease-in-out infinite;
+        }
+        .mw-minimal-spectrum-bar:nth-child(1) { animation-delay: 0s; }
+        .mw-minimal-spectrum-bar:nth-child(2) { animation-delay: 0.12s; }
+        .mw-minimal-spectrum-bar:nth-child(3) { animation-delay: 0.24s; }
+        .mw-minimal-spectrum-bar:nth-child(4) { animation-delay: 0.36s; }
+        .mw-minimal-spectrum-bar:nth-child(5) { animation-delay: 0.48s; }
         .mw-minimal-scene {
           color: rgba(255,255,255,.78);
           font-size: 9px;
@@ -607,6 +660,14 @@ function Content() {
           line-height: 1.4;
           margin-bottom: 10px;
           min-width: 0;
+        }
+        .mw-minimal-quote-track {
+          font-size: 11px;
+          font-weight: 500;
+          color: rgba(66,216,178,.6);
+          border-left: none;
+          padding-left: 12px;
+          margin-top: -4px;
         }
         .mw-minimal-playing {
           color: rgba(66,216,178,.78);
@@ -762,8 +823,15 @@ function Content() {
         <div className="mw-minimal" style={{ position: "relative" }}>
           <img className="mw-minimal-logo" src={`data:image/png;base64,${ICON_BASE64}`} alt="MoodWave" />
           <div className="mw-minimal-tags">
-            {now.weather ? <div className="mw-minimal-tag">{now.weather.city || '本地'} · {now.weather.condition || '未知'}{now.weather.temperature != null ? ' ' + Math.round(now.weather.temperature) + '°C' : ''}</div> : <div className="mw-minimal-tag">本地 · 未知</div>}
+            {now.weather ? <div className="mw-minimal-tag">{cityLabel(now.weather.city || '') || '本地'} · {now.weather.condition || '未知'}{now.weather.temperature != null ? ' ' + Math.round(now.weather.temperature) + '°C' : ''}</div> : <div className="mw-minimal-tag">本地 · 未知</div>}
             {currentMood ? <div className="mw-minimal-tag">{currentMood}</div> : null}
+            <div className="mw-minimal-spectrum" style={{ animationPlayState: playing ? "running" : "paused" }}>
+              <div className="mw-minimal-spectrum-bar" />
+              <div className="mw-minimal-spectrum-bar" />
+              <div className="mw-minimal-spectrum-bar" />
+              <div className="mw-minimal-spectrum-bar" />
+              <div className="mw-minimal-spectrum-bar" />
+            </div>
           </div>
           <div className="mw-minimal-scene">{getSceneText()}</div>
           {busy ? (
@@ -778,7 +846,7 @@ function Content() {
             <div className="mw-minimal-quote">{djLine}</div>
           ) : null}
           {djForTrack ? (
-            <div className="mw-minimal-quote">{djForTrack}</div>
+            <div className="mw-minimal-quote mw-minimal-quote-track">{djForTrack}</div>
           ) : null}
           <div className="mw-minimal-playing">📻 正在陪你</div>
           <div className="mw-minimal-track">{track.title || '未知歌曲'}{track.artist ? ' — ' + track.artist : ''}</div>
