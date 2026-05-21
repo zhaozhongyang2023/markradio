@@ -40,7 +40,7 @@ export async function getWeather() {
   const data = await response.json();
   const result = {
     source: 'openweather',
-    city: config.openWeatherCity,
+    city: data.name || config.openWeatherCity,
     condition: data.weather?.[0]?.description || '未知',
     temperature: data.main?.temp ?? null,
     summary: `${data.weather?.[0]?.description || '天气'}，${Math.round(data.main?.temp ?? 0)}°C`

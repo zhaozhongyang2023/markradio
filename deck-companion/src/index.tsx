@@ -115,6 +115,37 @@ function AppButton({
   );
 }
 
+const cityNameMap: Record<string, string> = {
+  'Rongcheng': '荣成',
+  'Beijing': '北京',
+  'Shanghai': '上海',
+  'Guangzhou': '广州',
+  'Shenzhen': '深圳',
+  'Hangzhou': '杭州',
+  'Chengdu': '成都',
+  'Nanjing': '南京',
+  'Wuhan': '武汉',
+  'Xiamen': '厦门',
+  'Qingdao': '青岛',
+  'Dalian': '大连',
+  'Suzhou': '苏州',
+  'Chongqing': '重庆',
+  'Xian': '西安',
+  'Changsha': '长沙',
+  'Kunming': '昆明',
+  'Fuzhou': '福州',
+  'Zhengzhou': '郑州',
+  'Jinan': '济南',
+  'Harbin': '哈尔滨',
+  'Shenyang': '沈阳',
+  'Tianjin': '天津',
+};
+
+function cityLabel(raw: string): string {
+  const name = (raw || '').split(',')[0].trim();
+  return cityNameMap[name] || name;
+}
+
 function Content() {
   const [apiBase, setApiBase] = useState(() => {
     const storedVersion = localStorage.getItem('moodwave.deck.configVersion');
@@ -762,7 +793,7 @@ function Content() {
         <div className="mw-minimal" style={{ position: "relative" }}>
           <img className="mw-minimal-logo" src={`data:image/png;base64,${ICON_BASE64}`} alt="MoodWave" />
           <div className="mw-minimal-tags">
-            {now.weather ? <div className="mw-minimal-tag">{now.weather.city || '本地'} · {now.weather.condition || '未知'}{now.weather.temperature != null ? ' ' + Math.round(now.weather.temperature) + '°C' : ''}</div> : <div className="mw-minimal-tag">本地 · 未知</div>}
+            {now.weather ? <div className="mw-minimal-tag">{cityLabel(now.weather.city || '') || '本地'} · {now.weather.condition || '未知'}{now.weather.temperature != null ? ' ' + Math.round(now.weather.temperature) + '°C' : ''}</div> : <div className="mw-minimal-tag">本地 · 未知</div>}
             {currentMood ? <div className="mw-minimal-tag">{currentMood}</div> : null}
           </div>
           <div className="mw-minimal-scene">{getSceneText()}</div>
