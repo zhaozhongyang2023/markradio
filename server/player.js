@@ -18,6 +18,7 @@ const ffplayPath = resolveFfplay();
 
 let currentProcess = null;
 let activeSequenceId = 0;
+let _consecutiveErrors = 0;
 let pendingTimer = null;
 
 export function getPlayerState() {
@@ -64,10 +65,21 @@ function playOne(urls, index, onEnd, onTrackStart, seqId) {
     currentProcess = proc;
   });
 
-  proc.on('exit', () => {
+  proc.on('exit', (code) => {
     if (currentProcess === proc) currentProcess = null;
     if (seqId !== activeSequenceId) return;
-    if (Date.now() - startTime < 2000) { /* 播太快 → 跳过继续下一个 */ }
+    if (code !== 0) {
+      console.warn('[player] ffplay exited with code %s for %s', code, resolvedUrl.slice(0, 80));
+      _consecutiveErrors = (_consecutiveErrors || 0) + 1;
+      if (_consecutiveErrors >= 3) {
+        console.error('[player] too many consecutive errors (%s), aborting sequence', _consecutiveErrors);
+        if (onEnd) setTimeout(onEnd, 300);
+        return;
+      }
+    } else {
+      _consecutiveErrors = 0;
+    }
+    if (Date.now() - startTime < 2000) { /* 播太快仍继续下一个 */ }
     playOne(urls, index + 1, onEnd, onTrackStart, seqId);
   });
 

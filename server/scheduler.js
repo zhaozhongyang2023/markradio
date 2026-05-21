@@ -5,12 +5,12 @@ import { synthesizeVoice } from './voice.js';
 import { getWeather } from './weather.js';
 import { getSpecialDates } from './special-dates.js';
 import { recommendMood } from './mood.js';
+import { randomUUID } from 'node:crypto';
 
 const DEFAULT_QUEUE_LIMIT = 5;
 const TTS_PRELOAD_LIMIT = 2;
 
-export async function createRadioPlan({ store, mood: requestedMood = null, nowPlaying = null, deferTts = false, onTtsReady = null, userRequest = '', currentPlan = null }) {
-  const mode = arguments[0]?.mode || 'radio';
+export async function createRadioPlan({ store, mood: requestedMood = null, nowPlaying = null, deferTts = false, onTtsReady = null, userRequest = '', mode = 'radio', currentPlan = null }) {
   const playedSet = sessionPlayedIdsByMode.get(mode) || (() => { const s = new Set(); sessionPlayedIdsByMode.set(mode, s); return s; })();
   playedSet.clear();
   const now = new Date();

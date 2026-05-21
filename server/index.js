@@ -23,6 +23,7 @@ import { loadMusicDNA, saveMusicDNA, generateMusicDNA, getMusicDNASummary } from
 import { collectNeteaseLibrary } from './providers/netease.js';
 
 const store = new StateStore();
+const _lyricHydrated = new Set();
 
 
 // ─── Plugin helpers ───
@@ -50,7 +51,7 @@ async function advanceToNext(store) {
   const ci = plan.queue.findIndex(t => t.id === now.track?.id);
   // 当前 track 不在 queue 中 → 从 queue[0] 重新开始
   if (ci < 0 && plan.queue.length > 0) {
-    now.track = plan.queue[0]; now.progress = 0; now.playing = true;
+    now.track = plan.queue[0]; now.progress = 0; now.playing = true; now.introPlayed = false;
     const urls2 = buildPlaylist(plan.queue[0], plan, now);
     if (urls2.length) playSequence(urls2, { onEnd: () => advanceToNext(store), onTrackStart: () => {
       const n2 = store.get('now'); if (n2) { n2.startedAt = Date.now(); store.set('now', n2); }
@@ -149,6 +150,7 @@ async function hydrateCurrentLyric() {
   const now = store.get('now');
   const track = now?.track;
   if (!track?.id || track.lyric?.length || track.source !== 'netease') return;
+  if (_lyricHydrated.has(track.id)) return;
   const sourceId = track.sourceId || String(track.id).replace(/^netease-/, '');
   if (!sourceId) return;
 
@@ -157,6 +159,7 @@ async function hydrateCurrentLyric() {
   if (!lyric.length) return;
 
   const nextTrack = { ...track, lyric };
+  _lyricHydrated.add(track.id);
   store.set('now', { ...now, track: nextTrack });
 
   // 同步更新各模块 plan 中的同一首歌
