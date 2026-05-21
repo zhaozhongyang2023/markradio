@@ -1,6 +1,6 @@
-# 🎵 MoodWave V6 — Steam Deck 完整安装手册
+# 🎵 MoodWave V9 — Steam Deck 完整安装手册
 
-> 装好后，你的 Steam Deck 就多了一个 AI DJ。🎧
+> 装好后，你的 Steam Deck 就多了一个长期陪伴的 AI DJ。🎧
 
 > 🆕 **已经装过旧版？** → [升级到最新版](#升级到最新版)
 
@@ -71,13 +71,13 @@ npm -v
 
 ```bash
 # 克隆项目到本地
-git clone --depth 1 https://github.com/zhaozhongyang2023/markradio.git ~/moodwave
+git clone --depth 1 -b codex/v6-prompt-optimize https://github.com/zhaozhongyang2023/markradio.git ~/moodwave
 
 # 进入目录
 cd ~/moodwave
 
 # 一键安装
-bash scripts/install-steamdeck.sh --repo https://github.com/zhaozhongyang2023/markradio.git
+bash scripts/install-steamdeck.sh --repo https://github.com/zhaozhongyang2023/markradio.git --branch codex/v6-prompt-optimize
 ```
 
 ### 安装过程中会依次问你：
@@ -86,7 +86,7 @@ bash scripts/install-steamdeck.sh --repo https://github.com/zhaozhongyang2023/ma
 |------|------|--------|
 | 1 | **AI Key** ⭐ | 粘贴你的 DeepSeek Key，**必须填** |
 | 2 | Fish Audio Key | 语音朗读 DJ 开场白，**回车跳过** |
-| 3 | 网易云 API 地址 | 真实音乐库，**回车跳过**（用 Demo 歌单） |
+| 3 | 网易云 API 地址 | 真实音乐库 + Music DNA，**回车跳过**（用 Demo 歌单） |
 | 4 | OpenWeather Key | 根据天气调氛围，**回车跳过** |
 
 > 最少只填一个 AI Key，其余全部回车跳过即可正常使用。
@@ -129,7 +129,30 @@ http://127.0.0.1:38080/api/health
 
 ---
 
-## 第七步：安装 Decky Loader（游戏模式插件平台）
+## 第七步：🎧 让 AI DJ 更懂你 — Music DNA（推荐）
+
+这是 MoodWave V9 的核心功能。AI 分析你的网易云听歌记录，生成专属 **Music DNA**，三种模式都会参考。
+
+### 操作流程
+
+1. 网页中点「🎧 AI 正在学习你的音乐口味」
+2. 扫码登录网易云
+3. AI 自动读取你的红心、歌单、专辑
+4. 输入你喜欢的关键词（如：久石让、JRPG OST、City Pop）
+5. 点「生成我的音乐人格」
+6. AI 分析完成 → 展示你的 Music DNA
+
+```
+✦ 你的 Music DNA
+怀旧 / 平静 / 探索
+JRPG OST / LoFi / City Pop
+```
+
+之后 AI Radio、AI Search、Game Radio 都会参考你的 Music DNA。越用越懂你。
+
+---
+
+## 第八步：安装 Decky Loader（游戏模式插件平台）
 
 > Decky Loader 是 Steam Deck 的插件平台，装好它才能装 MoodWave 的游戏模式插件。
 
@@ -159,7 +182,7 @@ curl -L https://github.com/SteamDeckHomebrew/decky-loader/raw/main/dist/install_
 
 ---
 
-## 第八步：验证游戏模式
+## 第九步：验证游戏模式
 
 游戏模式中 → 完全退出 Steam 再重新打开：
 
@@ -169,9 +192,9 @@ curl -L https://github.com/SteamDeckHomebrew/decky-loader/raw/main/dist/install_
 
 点击进入，三个 Tab：
 
-- 🎧 **AI Radio** — 按心情开电台
-- 🎮 **Game Radio** — 选游戏氛围配 BGM
-- 🔍 **AI 寻歌** — 告诉 AI 想听什么
+- 🎧 **AI Radio** — 按心情开电台（参考 Music DNA）
+- 🎮 **Game Radio** — 选游戏氛围配 BGM（注入 DJ 人格 DNA）
+- 🔍 **AI 寻歌** — 告诉 AI 想听什么（参考 Music DNA）
 
 ---
 
@@ -183,6 +206,7 @@ curl -L https://github.com/SteamDeckHomebrew/decky-loader/raw/main/dist/install_
 | 晚上躺床听电台 | 桌面模式浏览器 `http://127.0.0.1:38080/?deck=1` |
 | 换个心情 | Game Radio 选不同氛围，或 AI Radio 选不同心情 |
 | 暂停/继续 | Decky 插件里点 ⏸/▶ |
+| AI 越用越懂你 | 定期更新 Music DNA，AI 口味越来越精准 |
 
 ---
 
@@ -247,11 +271,13 @@ bash ~/moodwave/scripts/uninstall-steamdeck.sh
 | 网页开了但没歌 | 检查 AI Key：`cat ~/.config/moodwave/config.env` |
 | Decky 找不到 MoodWave | 检查目录：`ls ~/homebrew/plugins/moodwave-deck-companion/` |
 | Game Radio 没反应 | 确认本地 API 还在跑：`curl http://127.0.0.1:38765/api/health` |
-| 装完显示 Demo 歌单 | 正常现象。配置网易云 API 后可接入真实音乐库 |
+| 装完显示 Demo 歌单 | 正常现象。配置网易云 API + 生成 Music DNA 后更精准 |
 | 怎么换 AI Key | 编辑 `~/.config/moodwave/config.env`，改 `AI_API_KEY=`，重启服务 |
 | 忘记 sudo 密码 | 桌面模式 → 系统设置 → 用户 → 改密码 |
 | **如何获取最新版？** | `git pull` [更新命令](#升级到最新版)，GitHub Watch 本仓库获取更新通知 |
 | **遇到问题找谁？** | 看下方 [支持与服务](#-支持与服务) |
+| **Music DNA 怎么重新生成？** | 网页设置页 → Music DNA → [重置] → 重新扫码导入 |
+| **AI 推荐不够精准？** | 检查 Music DNA 是否已生成：`curl http://127.0.0.1:38765/api/profile/music-dna` |
 
 ---
 
@@ -261,6 +287,7 @@ bash ~/moodwave/scripts/uninstall-steamdeck.sh
 |------|------|
 | 主程序 | `~/moodwave` |
 | 配置（含 AI Key） | `~/.config/moodwave/config.env` |
+| Music DNA 数据 | `~/.config/moodwave/data/` |
 | 日志 | `~/.local/state/moodwave/logs/` |
 | 桌面图标 | `~/Desktop/MoodWave.desktop` |
 | Decky 插件 | `~/homebrew/plugins/moodwave-deck-companion` |
