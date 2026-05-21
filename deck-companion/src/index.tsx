@@ -28,11 +28,11 @@ type NowPayload = {
     playing?: boolean;
     progressRatio?: number;
     mood?: string;
-  mode?: string;
+    mode?: string;
   };
   plan?: {
     mood?: string;
-  mode?: string;
+    mode?: string;
     tts?: { text?: string; url?: string };
     queue?: Track[];
     plan?: { say?: string; reply?: string };
@@ -167,6 +167,7 @@ function Content() {
   const [gameName, setGameName] = useState(() => localStorage.getItem(GAME_NAME_KEY) || '');
   const gameNameEditedRef = useRef(false);  // 用户手动编辑后不再自动覆盖
   const [minimalMode, setMinimalMode] = useState(() => localStorage.getItem(MINIMAL_KEY) === '1');
+  const [pollVersion, setPollVersion] = useState(0);
 
   async function refresh() {
     try {
@@ -207,6 +208,7 @@ function Content() {
         return Math.min(85, prev + step);
       });
     }, 200);
+    runTimerRef.current = timer;
     try {
       await task();
       setProgress(100);
@@ -217,13 +219,16 @@ function Content() {
       setStatus(error instanceof Error ? error.message : '请求失败');
     } finally {
       clearInterval(timer);
+      runTimerRef.current = null;
       setBusy(false);
     }
   }
 
+  const runTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   // 组件卸载时清理运行中的 timer
   useEffect(() => {
     return () => {
+      if (runTimerRef.current) clearInterval(runTimerRef.current);
       setBusy(false);
       setProgress(0);
     };
@@ -238,7 +243,7 @@ function Content() {
       clearInterval(timer);
       document.removeEventListener('visibilitychange', onVisible);
     };
-  }, [apiBase]);
+  }, [pollVersion]);
 
   const currentPlan = minimalMode ? now.plan : ((page !== 'settings' ? now.plans?.[page] : null) || now.plan);
   const track = now.now?.track || currentPlan?.queue?.[0] || null;
@@ -265,6 +270,7 @@ function Content() {
     const next = normalizeBase(value);
     setApiBase(next);
     localStorage.setItem(API_BASE_KEY, next);
+    setPollVersion(v => v + 1);
   }
 
   function getActiveMode(now: NowPayload): 'radio' | 'search' | 'game' | null {
