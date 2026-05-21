@@ -1,10 +1,11 @@
+<p align="center"><img src="public/icon-512.png" width="128" alt="MoodWave Logo" /></p>
+
 # 🎵 MoodWave V15 — AI DJ 电台
 
 > **不是播放器。是会越来越懂你的 AI DJ。**
 
 | 打 Boss，AI 配燃曲。 | 跑图时，AI 陪你慢慢走。 | 它会越用越懂你。 |
 |:--:|:--:|:--:|
-
 ---
 
 ## 它是什么
