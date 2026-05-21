@@ -7,6 +7,14 @@ import { getDefaultSpecialDateConfig } from './special-dates.js';
 const dataDir = path.resolve(process.cwd(), 'data');
 fs.mkdirSync(dataDir, { recursive: true });
 
+const defaultVoiceStyle = [
+  '声音目标：温柔、简短、低刺激，像 Steam Deck 深夜 AI 电台 DJ。',
+  '句子要短，停顿自然，不要连续解释太多。',
+  '悲伤、忧郁时更慢，开心时可以带轻微笑意，治愈时更柔和。',
+  '不要夸张播音腔，不要营销口吻，不要解释算法。',
+  '称呼电台为"MoodWave"。'
+].join('\n');
+
 export class StateStore {
   constructor(dbPath = path.join(dataDir, 'markradio.db')) {
     this.db = new DatabaseSync(dbPath);
@@ -106,10 +114,3 @@ export class StateStore {
   }
 }
 
-const defaultVoiceStyle = [
-  '声音目标：温柔、简短、低刺激，像 Steam Deck 深夜 AI 电台 DJ。',
-  '句子要短，停顿自然，不要连续解释太多。',
-  '悲伤、忧郁时更慢，开心时可以带轻微笑意，治愈时更柔和。',
-  '不要夸张播音腔，不要营销口吻，不要解释算法。',
-  '称呼电台为"MoodWave"。'
-].join('\n');

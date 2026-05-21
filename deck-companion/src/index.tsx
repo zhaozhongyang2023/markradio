@@ -28,11 +28,11 @@ type NowPayload = {
     playing?: boolean;
     progressRatio?: number;
     mood?: string;
-  mode?: string;
+    mode?: string;
   };
   plan?: {
     mood?: string;
-  mode?: string;
+    mode?: string;
     tts?: { text?: string; url?: string };
     queue?: Track[];
     plan?: { say?: string; reply?: string };
@@ -167,6 +167,7 @@ function Content() {
   const [gameName, setGameName] = useState(() => localStorage.getItem(GAME_NAME_KEY) || '');
   const gameNameEditedRef = useRef(false);  // 用户手动编辑后不再自动覆盖
   const [minimalMode, setMinimalMode] = useState(() => localStorage.getItem(MINIMAL_KEY) === '1');
+  const [pollVersion, setPollVersion] = useState(0);
 
   async function refresh() {
     try {
@@ -207,6 +208,7 @@ function Content() {
         return Math.min(85, prev + step);
       });
     }, 200);
+    runTimerRef.current = timer;
     try {
       await task();
       setProgress(100);
@@ -217,13 +219,16 @@ function Content() {
       setStatus(error instanceof Error ? error.message : '请求失败');
     } finally {
       clearInterval(timer);
+      runTimerRef.current = null;
       setBusy(false);
     }
   }
 
+  const runTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   // 组件卸载时清理运行中的 timer
   useEffect(() => {
     return () => {
+      if (runTimerRef.current) clearInterval(runTimerRef.current);
       setBusy(false);
       setProgress(0);
     };
@@ -238,7 +243,7 @@ function Content() {
       clearInterval(timer);
       document.removeEventListener('visibilitychange', onVisible);
     };
-  }, [apiBase]);
+  }, [pollVersion]);
 
   const currentPlan = minimalMode ? now.plan : ((page !== 'settings' ? now.plans?.[page] : null) || now.plan);
   const track = now.now?.track || currentPlan?.queue?.[0] || null;
@@ -265,6 +270,7 @@ function Content() {
     const next = normalizeBase(value);
     setApiBase(next);
     localStorage.setItem(API_BASE_KEY, next);
+    setPollVersion(v => v + 1);
   }
 
   function getActiveMode(now: NowPayload): 'radio' | 'search' | 'game' | null {
@@ -496,10 +502,6 @@ function Content() {
           vertical-align: 1px;
           animation: mw-pulse 1.2s ease-in-out infinite;
         }
-        @keyframes mw-spectrum {
-          0%, 100% { height: 3px; opacity: .35; }
-          50% { height: 14px; opacity: 1; }
-        }
         @keyframes mw-pulse {
           0%, 100% { opacity: 1; box-shadow: 0 0 8px rgba(66,216,178,.7); }
           50% { opacity: .4; box-shadow: 0 0 4px rgba(66,216,178,.3); }
@@ -598,24 +600,6 @@ function Content() {
           font-weight: 600;
           line-height: 16px;
         }
-        .mw-minimal-spectrum {
-          display: inline-flex;
-          align-items: flex-end;
-          gap: 2px;
-          margin-left: auto;
-          height: 16px;
-        }
-        .mw-minimal-spectrum-bar {
-          width: 2px;
-          border-radius: 1px;
-          background: #42d8b2;
-          animation: mw-spectrum 0.8s ease-in-out infinite;
-        }
-        .mw-minimal-spectrum-bar:nth-child(1) { animation-delay: 0s; }
-        .mw-minimal-spectrum-bar:nth-child(2) { animation-delay: 0.12s; }
-        .mw-minimal-spectrum-bar:nth-child(3) { animation-delay: 0.24s; }
-        .mw-minimal-spectrum-bar:nth-child(4) { animation-delay: 0.36s; }
-        .mw-minimal-spectrum-bar:nth-child(5) { animation-delay: 0.48s; }
         .mw-minimal-scene {
           color: rgba(255,255,255,.78);
           font-size: 9px;
@@ -825,13 +809,6 @@ function Content() {
           <div className="mw-minimal-tags">
             {now.weather ? <div className="mw-minimal-tag">{cityLabel(now.weather.city || '') || '本地'} · {now.weather.condition || '未知'}{now.weather.temperature != null ? ' ' + Math.round(now.weather.temperature) + '°C' : ''}</div> : <div className="mw-minimal-tag">本地 · 未知</div>}
             {currentMood ? <div className="mw-minimal-tag">{currentMood}</div> : null}
-            <div className="mw-minimal-spectrum" style={{ animationPlayState: playing ? "running" : "paused" }}>
-              <div className="mw-minimal-spectrum-bar" />
-              <div className="mw-minimal-spectrum-bar" />
-              <div className="mw-minimal-spectrum-bar" />
-              <div className="mw-minimal-spectrum-bar" />
-              <div className="mw-minimal-spectrum-bar" />
-            </div>
           </div>
           <div className="mw-minimal-scene">{getSceneText()}</div>
           {busy ? (

@@ -19,16 +19,22 @@ export async function getCandidateTracks({ store, mood, userRequest = '' }) {
         ...track,
         score: scoreTrackForMood(track, mood) + (recent.has(track.id) ? -0.4 : 0)
       }))
-      .sort((a, b) => b.score - a.score)
-      .sort((a, b) => languageScore(b, languageIntent) - languageScore(a, languageIntent));
+      .sort((a, b) => {
+        const langDiff = languageScore(b, languageIntent) - languageScore(a, languageIntent);
+        if (langDiff !== 0) return langDiff;
+        return b.score - a.score;
+      });
   }
   return fresh
     .map((track) => ({
       ...track,
       score: scoreTrackForMood(track, mood)
     }))
-    .sort((a, b) => b.score - a.score)
-    .sort((a, b) => languageScore(b, languageIntent) - languageScore(a, languageIntent));
+    .sort((a, b) => {
+        const langDiff = languageScore(b, languageIntent) - languageScore(a, languageIntent);
+        if (langDiff !== 0) return langDiff;
+        return b.score - a.score;
+      });
 }
 
 export async function buildQueue(tracks, store, limit = 4) {

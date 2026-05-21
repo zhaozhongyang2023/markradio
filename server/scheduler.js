@@ -8,6 +8,9 @@ import { recommendMood } from './mood.js';
 import { buildGameContext } from './game-understanding.js';
 import { randomUUID } from 'node:crypto';
 
+const sessionPlayedIdsByMode = new Map();
+let _lastSessionCleanup = 0;
+
 const DEFAULT_QUEUE_LIMIT = 5;
 const TTS_PRELOAD_LIMIT = 5;
 
@@ -233,8 +236,6 @@ function updateCardTts({ store, planId, index, tts, onTtsReady }) {
 }
 
 // Session-level played track IDs to prevent duplicates per mode
-const sessionPlayedIdsByMode = new Map();
-let _lastSessionCleanup = 0;
 
 function fillQueueTracks(selected, candidates, limit, playedSet) {
   const seen = new Set(playedSet);
