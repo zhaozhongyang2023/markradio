@@ -11,8 +11,7 @@ const DEFAULT_QUEUE_LIMIT = 5;
 const TTS_PRELOAD_LIMIT = 2;
 
 export async function createRadioPlan({ store, mood: requestedMood = null, nowPlaying = null, deferTts = false, onTtsReady = null, userRequest = '', mode = 'radio', currentPlan = null }) {
-  const playedSet = sessionPlayedIdsByMode.get(mode) || (() => { const s = new Set(); sessionPlayedIdsByMode.set(mode, s); return s; })();
-  playedSet.clear();
+  const playedSet = new Set(); sessionPlayedIdsByMode.set(mode, playedSet);
   const now = new Date();
   const timeContext = buildTimeContext(now);
   const taste = store.get('taste');
