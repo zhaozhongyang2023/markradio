@@ -639,6 +639,14 @@ function Content() {
           margin-bottom: 10px;
           min-width: 0;
         }
+        .mw-minimal-quote-track {
+          font-size: 11px;
+          font-weight: 500;
+          color: rgba(66,216,178,.6);
+          border-left: none;
+          padding-left: 12px;
+          margin-top: -4px;
+        }
         .mw-minimal-playing {
           color: rgba(66,216,178,.78);
           font-size: 9px;
@@ -809,7 +817,7 @@ function Content() {
             <div className="mw-minimal-quote">{djLine}</div>
           ) : null}
           {djForTrack ? (
-            <div className="mw-minimal-quote">{djForTrack}</div>
+            <div className="mw-minimal-quote mw-minimal-quote-track">{djForTrack}</div>
           ) : null}
           <div className="mw-minimal-playing">📻 正在陪你</div>
           <div className="mw-minimal-track">{track.title || '未知歌曲'}{track.artist ? ' — ' + track.artist : ''}</div>
