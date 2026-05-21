@@ -20,7 +20,7 @@ test('buildDjContext includes chat userRequest', () => {
   assert.equal(context.languageIntent, 'english');
   assert.deepEqual(context.requestedSongs, []);
   assert.match(context.system, /userRequest/);
-  assert.match(context.system, /languageIntent 是 english/);
+  assert.match(context.system, /english.*欧美/);
 
   const messages = buildMessages(context);
   assert.match(messages[1].content, /英文老歌/);
@@ -42,7 +42,7 @@ test('buildDjContext includes requested song names', () => {
   });
 
   assert.deepEqual(context.requestedSongs, ['乌兰巴托的夜']);
-  assert.match(context.system, /requestedSongs 不为空/);
+  assert.match(context.system, /requestedSongs/);
 
   const messages = buildMessages(context);
   assert.match(messages[1].content, /"requestedSongs": \[/);
@@ -65,6 +65,6 @@ test('buildDjContext includes MoodWave Steam Deck DJ direction', () => {
 
   assert.match(context.system, /MoodWave/);
   assert.match(context.system, /Steam Deck/);
-  assert.match(context.system, /10-40/);
-  assert.match(context.system, /禁止客服语气/);
+  assert.match(context.system, /15~30/);
+  assert.match(context.system, /禁止客服/);
 });

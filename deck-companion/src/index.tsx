@@ -211,7 +211,7 @@ function Content() {
   const track = now.now?.track || currentPlan?.queue?.[0] || null;
   const playing = Boolean(now.now?.playing);
   const progressRatio = Number(now.now?.progressRatio) || 0;
-  const currentMood = (currentPlan?.mood || now.now?.mood || '').trim();
+  const currentMood = (now.now?.mood || currentPlan?.mood || '').trim();
   const queue = currentPlan?.queue || [];
   const djLine = currentPlan?.tts?.text || currentPlan?.plan?.say || currentPlan?.plan?.reply || '';
   const djForTrack = (() => {

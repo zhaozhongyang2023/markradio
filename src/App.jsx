@@ -572,7 +572,7 @@ function MoodStrip({ busy, chooseMood, selectedMood }) {
   const [hoverKey, setHoverKey] = useState(null);
 
   return (
-    <div className="mood-strip" aria-label="选择心情">
+    <div className="mood-strip" aria-label="现在是什么感觉？">
       {moodLabels.map((mood) => {
         const isActive = mood.name === selectedMood;
         const isHover = hoverKey === mood.iconKey;
@@ -608,7 +608,7 @@ function QueuePreview({ queue, currentId, onRefresh, busy }) {
     <div className={busy ? 'queue-preview is-refreshing' : 'queue-preview'}>
       <div className="queue-title">
         <span>Next Signal</span>
-        <button aria-label="刷新推荐" disabled={busy} onClick={onRefresh}>{busy ? '…' : '↻'}</button>
+        <button aria-label="换一组" disabled={busy} onClick={onRefresh}>{busy ? '…' : '↻'}</button>
       </div>
       {queue.slice(0, 2).map((item) => (
         <div className={item.id === currentId ? 'queue-item current' : 'queue-item'} key={item.id}>
@@ -671,8 +671,8 @@ function V4RadioView({
   const queueCount = queue?.length || 0;
   const lastMessages = chatMessages.slice(-10);
   const planTitle = plan?.plan?.planTitle
-    ? `自动推荐歌曲 · ${plan.plan.planTitle}`
-    : '自动推荐歌曲模块';
+    ? `AI DJ 为你准备 · ${plan.plan.planTitle}`
+    : 'AI DJ 为你准备';
   const planSummary = plan?.plan?.planSummary || plan?.plan?.reason || '';
 
   const eqRef = useRef(null);
@@ -700,7 +700,7 @@ function V4RadioView({
     return (
       <div className="v4-plan-card">
         <div className="v4-plan-title">
-          <span>{messagePlan.title ? `自动推荐歌曲 · ${messagePlan.title}` : '自动推荐歌曲模块'}</span>
+          <span>{messagePlan.title ? `AI DJ 为你准备 · ${messagePlan.title}` : 'AI DJ 为你准备'}</span>
           <small>{planQueue.length} TRACKS</small>
         </div>
         {messagePlan.summary ? <p>{messagePlan.summary}</p> : null}
@@ -838,7 +838,7 @@ function V4RadioView({
         </section>
 
         {queue?.length ? (
-          <section className="v4-plan-panel" aria-label="自动推荐歌曲模块">
+          <section className="v4-plan-panel" aria-label="AI DJ 为你准备">
             <div className="v4-plan-title">
               <span>{planTitle}</span>
               <button onClick={onRefresh} type="button">ADJUST</button>
@@ -3240,7 +3240,7 @@ function seekTo(ratio) {
       ) : null}
 
       {showDnaPanel ? (
-        <div className="qr-backdrop" role="dialog" aria-modal="true" aria-label="AI 音乐人格分析">
+        <div className="qr-backdrop" role="dialog" aria-modal="true" aria-label="让 AI DJ 更懂你的音乐世界">
           <div className="qr-card dna-card">
             <h3>🎧 让 AI 更懂你</h3>
             {!dnaResult ? (
@@ -3282,7 +3282,7 @@ function seekTo(ratio) {
                     setDnaGenerating(false);
                   }}
                 >
-                  {dnaGenerating ? 'AI 正在分析…' : '生成我的音乐人格'}
+                  {dnaGenerating ? 'AI 正在分析…' : '让 AI DJ 更懂我'}
                 </button>
               </>
             ) : (
@@ -3307,7 +3307,7 @@ function seekTo(ratio) {
                     </div>
                   )}
                 </div>
-                <button className="dna-btn" onClick={async () => { await api.musicDnaReset(); setDnaResult(null); setDnaPreferences(''); }}>重新分析</button>
+                <button className="dna-btn" onClick={async () => { await api.musicDnaReset(); setDnaResult(null); setDnaPreferences(''); }}>再了解我一些</button>
               </>
             )}
             <button className="dna-close" onClick={() => setShowDnaPanel(false)}>关闭</button>
