@@ -55,16 +55,18 @@ const moods = [
   { id: '愤怒', icon: '⚡' }
 ];
 const searchExamples = [
-  { id: 'JRPG夜晚探索', icon: '◇' },
-  { id: '深夜戴耳机', icon: '◐' },
-  { id: '小时候网吧', icon: '▣' },
-  { id: '雨天发呆', icon: '⌁' }
+  { id: '适合下雨天放空的英文老歌', icon: '🌧' },
+  { id: '巫师3原声那种中古民谣', icon: '🎻' },
+  { id: '90 年代港乐', icon: '📼' },
+  { id: '像小时候网吧一样', icon: '🖥' },
 ];
 const gameVibes = [
-  { id: 'Boss战', icon: '⚔', hint: '燃一点' },
-  { id: '探索地图', icon: '⌖', hint: '适合慢慢跑图' },
-  { id: '种田放松', icon: '✧', hint: '今天别太累了' },
-  { id: '模拟器怀旧', icon: '▣', hint: '像小时候一样' }
+  { id: 'Boss战', icon: '⚔', hint: '今晚燃一点，法印按到底' },
+  { id: '探索地图', icon: '⌖', hint: '慢慢走，不急着赶路' },
+  { id: '雨夜跑图', icon: '🌙', hint: '外面下雨，适合慢慢走' },
+  { id: '赛车竞速', icon: '🏎️', hint: '今晚速度别停' },
+  { id: '种田放松', icon: '✧', hint: '今晚别太累了' },
+  { id: '模拟器怀旧', icon: '▣', hint: '像小时候一样' },
 ];
 
 function normalizeBase(value: string) {
