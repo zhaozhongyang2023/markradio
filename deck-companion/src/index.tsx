@@ -2,8 +2,8 @@ import { PanelSection, PanelSectionRow, TextField, staticClasses } from '@decky/
 import { definePlugin } from '@decky/api';
 import { ChangeEvent, useEffect, useRef, useState } from 'react';
 
-const DEFAULT_API_BASE = 'http://192.168.2.33:8765';
-const CONFIG_VERSION = 6;
+const DEFAULT_API_BASE = 'http://127.0.0.1:38765';
+const CONFIG_VERSION = 7;
 const API_BASE_KEY = 'moodwave.deck.apiBase';
 const GAME_NAME_KEY = 'moodwave.deck.gameName';
 const MINIMAL_KEY = 'moodwave.deck.minimalMode';
