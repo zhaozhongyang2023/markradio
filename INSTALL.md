@@ -1,4 +1,4 @@
-# 🎵 MoodWave V9 — Steam Deck 完整安装手册
+# 🎵 MoodWave V15 — Steam Deck 完整安装手册
 
 > 装好后，你的 Steam Deck 就多了一个长期陪伴的 AI DJ。🎧
 
@@ -71,13 +71,13 @@ npm -v
 
 ```bash
 # 克隆项目到本地
-git clone --depth 1 -b codex/v6-prompt-optimize https://github.com/zhaozhongyang2023/markradio.git ~/moodwave
+git clone https://github.com/zhaozhongyang2023/markradio.git ~/moodwave
 
 # 进入目录
 cd ~/moodwave
 
 # 一键安装
-bash scripts/install-steamdeck.sh --repo https://github.com/zhaozhongyang2023/markradio.git --branch codex/v6-prompt-optimize
+bash scripts/install-steamdeck.sh --repo https://github.com/zhaozhongyang2023/markradio.git
 ```
 
 ### 安装过程中会依次问你：
@@ -131,7 +131,9 @@ http://127.0.0.1:38080/api/health
 
 ## 第七步：🎧 让 AI DJ 更懂你 — Music DNA（推荐）
 
-这是 MoodWave V9 的核心功能。AI 分析你的网易云听歌记录，生成专属 **Music DNA**，三种模式都会参考。
+这是 MoodWave 的核心功能。AI 分析你的网易云听歌记录，生成专属 **Music DNA**，三种模式都会参考。
+
+V15 升级：Music DNA 变成三维结构——**核心情绪 / 聆听状态 / 音乐性格**，比简单的风格标签更深入。
 
 ### 操作流程
 
@@ -192,9 +194,11 @@ curl -L https://github.com/SteamDeckHomebrew/decky-loader/raw/main/dist/install_
 
 点击进入，三个 Tab：
 
-- 🎧 **AI Radio** — 按心情开电台（参考 Music DNA）
-- 🎮 **Game Radio** — 选游戏氛围配 BGM（注入 DJ 人格 DNA）
+- 🎧 **AI Radio** — 按心情开电台（参考 Music DNA + 情绪势能）
+- 🎮 **Game Radio** — 选游戏氛围配 BGM（注入 DJ 灵魂 + 游戏世界感）
 - 🔍 **AI 寻歌** — 告诉 AI 想听什么（参考 Music DNA）
+
+> V15 新特性：Game Radio 输入游戏名（如「巫师3」），AI 自动感知**游戏世界氛围**。
 
 ---
 
@@ -202,7 +206,7 @@ curl -L https://github.com/SteamDeckHomebrew/decky-loader/raw/main/dist/install_
 
 | 场景 | 怎么做 |
 |------|--------|
-| 白天打游戏听歌 | 游戏模式 → `...` → MoodWave → Game Radio |
+| 白天打游戏听歌 | 游戏模式 → `...` → MoodWave → Game Radio → 输入游戏名 |
 | 晚上躺床听电台 | 桌面模式浏览器 `http://127.0.0.1:38080/?deck=1` |
 | 换个心情 | Game Radio 选不同氛围，或 AI Radio 选不同心情 |
 | 暂停/继续 | Decky 插件里点 ⏸/▶ |
