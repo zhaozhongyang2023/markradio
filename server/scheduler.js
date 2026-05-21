@@ -11,7 +11,10 @@ import { randomUUID } from 'node:crypto';
 const DEFAULT_QUEUE_LIMIT = 5;
 const TTS_PRELOAD_LIMIT = 5;
 
-export async function createRadioPlan({ store, mood: requestedMood = null, nowPlaying = null, deferTts = false, onTtsReady = null, userRequest = '', mode = 'radio', currentPlan = null }) {
+export async function createRadioPlan({ store, mood: requestedMood = null, nowPlaying = null, deferTts = false, onTtsReady = null, userRequest = '', mode = 'radio', currentPlan = null, gameName = '', gameVibe = '' }) {
+  // 每 30 分钟清理一次 session 级别的已播放记录，防止长期泄漏
+  const nowMs = Date.now();
+  if (nowMs - _lastSessionCleanup > 1800000) { sessionPlayedIdsByMode.clear(); _lastSessionCleanup = nowMs; }
   const playedSet = new Set(); sessionPlayedIdsByMode.set(mode, playedSet);
   const now = new Date();
   const timeContext = buildTimeContext(now);
@@ -19,7 +22,7 @@ export async function createRadioPlan({ store, mood: requestedMood = null, nowPl
   const voice = store.get('voice');
   const musicDna = store.get('musicDna');
   const recentTendency = store.getTendency();
-  const gameContext = userRequest ? buildGameContext(userRequest, userRequest) : null;
+  const gameContext = (gameName || gameVibe) ? buildGameContext(gameName, gameVibe) : null;
   const emotionMomentum = calcEmotionMomentum(store);
   const weather = await getWeather().catch((error) => ({
     source: 'error',
@@ -231,6 +234,7 @@ function updateCardTts({ store, planId, index, tts, onTtsReady }) {
 
 // Session-level played track IDs to prevent duplicates per mode
 const sessionPlayedIdsByMode = new Map();
+let _lastSessionCleanup = 0;
 
 function fillQueueTracks(selected, candidates, limit, playedSet) {
   const seen = new Set(playedSet);
@@ -276,9 +280,6 @@ function buildTrackReason(track, index, plan, mood) {
   const reason = plan.reason || '';
   const segue = plan.segue || '下一首，继续。';
   // Create a cohesive intro: hint at why chosen, how it connects, and what to expect
-  if (reason && reason.length > 10) {
-    return `${segue} ${reason} ${songId}${albumLine}。`.replace(/\s+/g, ' ').trim();
-  }
   return `${segue} ${reason} ${songId}${albumLine}。`.replace(/\s+/g, ' ').trim();
 }
 
@@ -333,12 +334,12 @@ function calcEmotionMomentum(store) {
 }
 
 // 世界连续性：比较本次天气与上次，生成连续性提示
-function buildWorldContinuity(current, last) {
+export function buildWorldContinuity(current, last) {
   if (!current?.condition || !last?.condition) return null;
   const sameCity = current.city && last.city && current.city === last.city;
   const sameCondition = current.condition === last.condition;
-  const sameDate = last.date && last.date !== new Date().toISOString().slice(0, 10);
-  if (!sameDate && sameCondition && sameCity) return null; // 同一天不重复
+  const isDifferentDay = last.date && last.date !== new Date().toISOString().slice(0, 10);
+  if (!isDifferentDay && sameCondition && sameCity) return null; // 同一天不重复
   if (sameCondition && sameCity) {
     return `上一次也是${current.condition}天，天气还没变。可以自然地提一句"还是没放晴"。`;
   }

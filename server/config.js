@@ -15,7 +15,7 @@ for (const envPath of envPaths) {
     const trimmed = line.trim();
     if (!trimmed || trimmed.startsWith('#') || !trimmed.includes('=')) continue;
     const [key, ...rest] = trimmed.split('=');
-    const value = rest.join('=').replace(/^['"]|['"]$/g, '');
+    const value = rest.join('=').replace(/^['"'](.*)['"']$/, '$1');
     if (!process.env[key]) process.env[key] = value;
   }
 }

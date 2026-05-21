@@ -588,6 +588,8 @@ app.post('/api/ai/game-radio', async (request) => {
     mode: 'game',
     mood,
     userRequest,
+    gameName,
+    gameVibe,
     deferTts: true,
     onTtsReady: (updatedPlan) => {
       broadcast('plan', updatedPlan);

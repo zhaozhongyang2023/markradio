@@ -68,3 +68,35 @@ test('buildDjContext includes MoodWave Steam Deck DJ direction', () => {
   assert.match(context.system, /15~30/);
   assert.match(context.system, /禁止客服/);
 });
+
+// buildWorldContinuity 同一天不重复，不同天天气变化/不变正确生成
+import { buildWorldContinuity } from '../server/scheduler.js';
+
+test('buildWorldContinuity same day returns null', () => {
+  const today = new Date().toISOString().slice(0, 10);
+  const current = { condition: '阴', city: '北京' };
+  const last = { condition: '阴', city: '北京', date: today };
+  assert.equal(buildWorldContinuity(current, last), null);
+});
+
+test('buildWorldContinuity different day same weather returns hint', () => {
+  const current = { condition: '阴', city: '北京' };
+  const last = { condition: '阴', city: '北京', date: '2020-01-01' };
+  const result = buildWorldContinuity(current, last);
+  assert.ok(result);
+  assert.match(result, /还是没放晴/);
+});
+
+test('buildWorldContinuity different day different weather returns hint', () => {
+  const current = { condition: '晴', city: '北京' };
+  const last = { condition: '阴', city: '北京', date: '2020-01-01' };
+  const result = buildWorldContinuity(current, last);
+  assert.ok(result);
+  assert.match(result, /变成了晴/);
+});
+
+test('buildWorldContinuity null inputs return null', () => {
+  assert.equal(buildWorldContinuity(null, {}), null);
+  assert.equal(buildWorldContinuity({}, null), null);
+  assert.equal(buildWorldContinuity({ condition: null }, { condition: '晴' }), null);
+});
