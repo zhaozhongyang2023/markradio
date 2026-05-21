@@ -115,7 +115,8 @@ export function buildDjContext({ taste, mood, specialDates, weather, recentPlays
       segue: '两首之间的转场。有留白。',
       mood: '开心|欢乐|悲伤|平静|焦虑|愤怒',
       tags: ['氛围标签'],
-      voiceStyle: 'TTS语气：偏慢，温柔，句短，句尾自然停顿。'
+      voiceStyle: 'TTS语气：偏慢，温柔，句短，句尾自然停顿。',
+      gameVibeSentence: '6~12字极短游戏陪伴文案，贴合游戏名称和场景氛围。仅游戏模式输出。'
     }
   };
 }
@@ -178,7 +179,7 @@ export function injectGameContext(gameContext) {
     gameContext.game_vibe ? `游戏氛围：${gameContext.game_vibe}。` : '',
     gameContext.music_direction?.length ? `音乐方向：${gameContext.music_direction.join('、')}。` : ''
   ].filter(Boolean);
-  return parts.length ? '[GAME_CONTEXT]\n' + parts.join('\n') + '\n选曲需匹配游戏世界感，不要破坏沉浸体验。' : '';
+  return parts.length ? '[GAME_CONTEXT]\n' + parts.join('\n') + '\n选曲需匹配游戏世界感，不要破坏沉浸体验。\n另外生成一句 6~12 字的极短游戏陪伴文案（gameVibeSentence），贴合游戏名称和场景氛围，像朋友在身边轻声说。' : '';
 }
 
 function buildTendencyBlock(tendency) {
