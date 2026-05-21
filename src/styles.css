@@ -3164,3 +3164,10 @@ p {
   color: #42d8b2;
   font-size: 13px;
 }
+.dna-stats {
+  color: rgba(0,0,0,0.35);
+  font-size: 11px;
+  padding-top: 4px;
+  border-top: 1px solid rgba(0,0,0,0.06);
+}
+

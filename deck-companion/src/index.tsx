@@ -774,10 +774,11 @@ function Content() {
               <span className="mw-minimal-loading-pct">{progress}%</span>
             </div>
           ) : null}
+          {djLine ? (
+            <div className="mw-minimal-quote">{djLine}</div>
+          ) : null}
           {djForTrack ? (
             <div className="mw-minimal-quote">{djForTrack}</div>
-          ) : djLine ? (
-            <div className="mw-minimal-quote">{djLine}</div>
           ) : null}
           <div className="mw-minimal-playing">📻 正在陪你</div>
           <div className="mw-minimal-track">{track.title || '未知歌曲'}{track.artist ? ' — ' + track.artist : ''}</div>

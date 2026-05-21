@@ -3285,24 +3285,30 @@ function seekTo(ratio) {
             ) : (
               <>
                 <div className="dna-result">
-                  {dnaResult.favorite_styles?.length > 0 && (
-                    <div className="dna-group">
-                      <span className="dna-label">风格</span>
-                      <div className="dna-tags">{dnaResult.favorite_styles.map((s) => <span key={s} className="dna-tag">{s}</span>)}</div>
-                    </div>
-                  )}
                   {dnaResult.core_feelings?.length > 0 && (
                     <div className="dna-group">
-                      <span className="dna-label">情绪</span>
+                      <span className="dna-label">核心情绪</span>
                       <div className="dna-tags">{dnaResult.core_feelings.map((s) => <span key={s} className="dna-tag">{s}</span>)}</div>
                     </div>
                   )}
-                  {dnaResult.preferred_scenes?.length > 0 && (
+                  {(dnaResult.listening_state?.length > 0 || dnaResult.preferred_scenes?.length > 0) && (
                     <div className="dna-group">
-                      <span className="dna-label">场景</span>
-                      <div className="dna-tags">{dnaResult.preferred_scenes.map((s) => <span key={s} className="dna-tag">{s}</span>)}</div>
+                      <span className="dna-label">听歌习惯</span>
+                      <div className="dna-tags">{(dnaResult.listening_state || dnaResult.preferred_scenes || []).map((s) => <span key={s} className="dna-tag">{s}</span>)}</div>
                     </div>
                   )}
+                  {(dnaResult.music_personality?.length > 0 || dnaResult.favorite_styles?.length > 0) && (
+                    <div className="dna-group">
+                      <span className="dna-label">音乐气质</span>
+                      <div className="dna-tags">{(dnaResult.music_personality || dnaResult.favorite_styles || []).map((s) => <span key={s} className="dna-tag">{s}</span>)}</div>
+                    </div>
+                  )}
+                  {(dnaResult.analyzed_tracks || dnaResult.analyzed_playlists) ? (
+                    <div className="dna-stats">
+                      已分析 {dnaResult.analyzed_tracks || 0} 首歌 · {dnaResult.analyzed_playlists || 0} 个歌单
+                      {dnaResult.analyzed_albums ? <> · {dnaResult.analyzed_albums} 张专辑</> : null}
+                    </div>
+                  ) : null}
                 </div>
                 <button className="dna-btn" onClick={async () => { await api.musicDnaReset(); setDnaResult(null); setDnaPreferences(''); }}>再了解我一些</button>
               </>
