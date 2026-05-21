@@ -312,7 +312,7 @@ function Content() {
     const city = now.weather?.city || '';
     const condition = now.weather?.condition || '未知';
     const temp = now.weather?.temperature != null ? ' ' + Math.round(now.weather.temperature) + '°C' : '';
-    const hasGame = Boolean(gameName.trim());
+    const hasGame = getActiveMode(now) === 'game' && Boolean(gameName.trim());
     const moodIcon = moods.find(m => m.id === currentMood)?.icon || '';
     const vibeSentence = now.plan?.plan?.gameVibeSentence || '';
     const vibe = gameVibes.find(v => v.id === gameVibe);
