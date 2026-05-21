@@ -16,6 +16,7 @@ deck-companion/dist/
 
 # Screenshots
 *.png
+!public/icon-*.png
 
 # Local/manual backups
 *.bak
