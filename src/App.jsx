@@ -866,7 +866,11 @@ function V4RadioView({
           {lastMessages.map((message) => (
             <article className={`v4-message ${message.role}`} key={message.id}>
               <div className="v4-message-avatar">
-                <V4PersonaAvatar role={message.role} />
+                {message.role === 'user' && netease.loggedIn && netease.profile?.avatarUrl ? (
+                  <img alt="网易云头像" src={netease.profile.avatarUrl} className="v4-avatar-glyph user" />
+                ) : (
+                  <V4PersonaAvatar role={message.role} />
+                )}
               </div>
               <div>
                 <span>{message.role === 'user' ? 'MMGUO' : 'MOODWAVE'}</span>
