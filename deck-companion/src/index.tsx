@@ -496,10 +496,6 @@ function Content() {
           vertical-align: 1px;
           animation: mw-pulse 1.2s ease-in-out infinite;
         }
-        @keyframes mw-spectrum {
-          0%, 100% { height: 3px; opacity: .35; }
-          50% { height: 14px; opacity: 1; }
-        }
         @keyframes mw-pulse {
           0%, 100% { opacity: 1; box-shadow: 0 0 8px rgba(66,216,178,.7); }
           50% { opacity: .4; box-shadow: 0 0 4px rgba(66,216,178,.3); }
@@ -598,24 +594,6 @@ function Content() {
           font-weight: 600;
           line-height: 16px;
         }
-        .mw-minimal-spectrum {
-          display: inline-flex;
-          align-items: flex-end;
-          gap: 2px;
-          margin-left: auto;
-          height: 16px;
-        }
-        .mw-minimal-spectrum-bar {
-          width: 2px;
-          border-radius: 1px;
-          background: #42d8b2;
-          animation: mw-spectrum 0.8s ease-in-out infinite;
-        }
-        .mw-minimal-spectrum-bar:nth-child(1) { animation-delay: 0s; }
-        .mw-minimal-spectrum-bar:nth-child(2) { animation-delay: 0.12s; }
-        .mw-minimal-spectrum-bar:nth-child(3) { animation-delay: 0.24s; }
-        .mw-minimal-spectrum-bar:nth-child(4) { animation-delay: 0.36s; }
-        .mw-minimal-spectrum-bar:nth-child(5) { animation-delay: 0.48s; }
         .mw-minimal-scene {
           color: rgba(255,255,255,.78);
           font-size: 9px;
@@ -825,13 +803,6 @@ function Content() {
           <div className="mw-minimal-tags">
             {now.weather ? <div className="mw-minimal-tag">{cityLabel(now.weather.city || '') || '本地'} · {now.weather.condition || '未知'}{now.weather.temperature != null ? ' ' + Math.round(now.weather.temperature) + '°C' : ''}</div> : <div className="mw-minimal-tag">本地 · 未知</div>}
             {currentMood ? <div className="mw-minimal-tag">{currentMood}</div> : null}
-            <div className="mw-minimal-spectrum" style={{ animationPlayState: playing ? "running" : "paused" }}>
-              <div className="mw-minimal-spectrum-bar" />
-              <div className="mw-minimal-spectrum-bar" />
-              <div className="mw-minimal-spectrum-bar" />
-              <div className="mw-minimal-spectrum-bar" />
-              <div className="mw-minimal-spectrum-bar" />
-            </div>
           </div>
           <div className="mw-minimal-scene">{getSceneText()}</div>
           {busy ? (
