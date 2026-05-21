@@ -5,15 +5,21 @@ PLUGIN_DIR = os.path.dirname(os.path.realpath(__file__))
 
 class Plugin:
     async def get_api_base(self):
-        # 1. config.json in plugin directory
-        config_path = os.path.join(PLUGIN_DIR, "config.json")
-        try:
-            with open(config_path, 'r') as f:
-                cfg = json.load(f)
-                if cfg.get("apiBase"):
-                    return cfg["apiBase"]
-        except Exception:
-            pass
+        # 1. config.json (try home dir first, then plugin dir)
+        config_paths = [
+            os.path.join(os.path.expanduser("~"), "moodwave-config.json"),
+            os.path.join(PLUGIN_DIR, "config.json")
+        ]
+        cfg = None
+        for p in config_paths:
+            try:
+                with open(p, 'r') as f:
+                    cfg = json.load(f)
+                    break
+            except Exception:
+                continue
+        if cfg and cfg.get("apiBase"):
+            return cfg["apiBase"]
         # 2. env var
         env = os.environ.get("MOODWAVE_API_BASE", "")
         if env:
