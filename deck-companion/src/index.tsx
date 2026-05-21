@@ -300,7 +300,10 @@ function Content() {
     const next = normalizeBase(value);
     setApiBase(next);
     localStorage.setItem(API_BASE_KEY, next);
-    setTimeout(() => refresh(), 100);
+    // 直接用新地址请求，避免闭包捕获旧 apiBase
+    apiRequest<NowPayload>(next, '/api/now')
+      .then((payload) => { setNow(payload); setStatus('在线'); })
+      .catch(() => {});
   }
 
   function getActiveMode(now: NowPayload): 'radio' | 'search' | 'game' | null {
