@@ -3,7 +3,7 @@ import { definePlugin } from '@decky/api';
 import { ChangeEvent, useEffect, useRef, useState } from 'react';
 
 const DEFAULT_API_BASE = 'http://192.168.2.33:8765';
-const CONFIG_VERSION = 4;
+const CONFIG_VERSION = 6;
 const API_BASE_KEY = 'moodwave.deck.apiBase';
 const GAME_NAME_KEY = 'moodwave.deck.gameName';
 const MINIMAL_KEY = 'moodwave.deck.minimalMode';
@@ -72,20 +72,15 @@ function normalizeBase(value: string) {
 }
 
 async function apiRequest<T>(apiBase: string, path: string, body?: unknown): Promise<T> {
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 15000);
-  try {
-    const response = await fetch(`${normalizeBase(apiBase)}${path}`, {
-      method: body ? 'POST' : 'GET',
-      headers: body ? { 'Content-Type': 'application/json' } : undefined,
-      body: body ? JSON.stringify(body) : undefined,
-      signal: controller.signal
-    });
-    if (!response.ok) throw new Error(`HTTP ${response.status}`);
-    return response.json() as Promise<T>;
-  } finally {
-    clearTimeout(timer);
-  }
+  const url = `${normalizeBase(apiBase)}${path}`;
+  const opts: RequestInit = {
+    method: body ? 'POST' : 'GET',
+    headers: body ? { 'Content-Type': 'application/json' } : undefined,
+    body: body ? JSON.stringify(body) : undefined,
+  };
+  const res = await fetch(url, opts);
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  return res.json() as Promise<T>;
 }
 
 function AppButton({
@@ -151,8 +146,8 @@ function Content() {
           setGameName(String(runningName));
         }
       } catch { /* DFL 不可用时静默跳过 */ }
-    } catch {
-      setStatus('离线');
+    } catch (e: any) {
+      setStatus('离线: ' + (e?.message || String(e)).slice(0, 40));
     }
   }
 

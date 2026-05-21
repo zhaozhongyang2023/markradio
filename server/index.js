@@ -105,8 +105,7 @@ let castLeaseTimer = null;
 await app.register(websocket);
 
 app.addHook('onRequest', async (request, reply) => {
-  const origin = request.headers.origin || config.webOrigin;
-  reply.header('Access-Control-Allow-Origin', origin);
+  reply.header('Access-Control-Allow-Origin', '*');
   reply.header('Access-Control-Allow-Headers', 'Content-Type');
   reply.header('Access-Control-Allow-Methods', 'GET,PUT,POST,OPTIONS');
   reply.header('Access-Control-Allow-Private-Network', 'true');
