@@ -147,15 +147,15 @@ export async function createRadioPlan({ store, mood: requestedMood = null, nowPl
   store.set('plan-' + mode, todayPlan);
   if (queue[0]) store.set('now', { mode, track: queue[0], progress: 0, playing: false, speaking: Boolean(tts.ok), mood });
   if (deferTts) {
-    // 主导读 TTS 异步生成
-    buildTts({ store, text: ttsText, mood, voiceStyle: plan.voiceStyle, nonce: planId })
+    // 主导读 TTS 优先同步生成（确保用户点播放时已就绪）
+    await buildTts({ store, text: ttsText, mood, voiceStyle: plan.voiceStyle, nonce: planId })
       .then((result) => updatePlanTts({ store, planId: todayPlan.id, tts: result, onTtsReady }))
       .catch((error) => updatePlanTts({
         store, planId: todayPlan.id,
         tts: { ok: false, pending: false, url: null, message: error.message, text: ttsText },
         onTtsReady
       }));
-    // 每首歌导读卡片 TTS
+    // 每首歌导读卡片 TTS（主导读就绪后再并行生成）
     queue.slice(0, TTS_PRELOAD_LIMIT).forEach((track, i) => {
       const text = track?.reason;
       if (!text) return;

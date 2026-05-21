@@ -142,45 +142,9 @@ p {
   image-rendering: pixelated;
 }
 
-.pixel-cup {
-  position: relative;
-  width: 18px;
-  height: 16px;
-}
 
-.pixel-cup::before {
-  position: absolute;
-  right: 1px;
-  bottom: 4px;
-  width: 4px;
-  height: 6px;
-  border: 2px solid #241b12;
-  border-left: 0;
-  content: "";
-}
 
-.pixel-cup span {
-  position: absolute;
-  right: 5px;
-  bottom: 2px;
-  left: 1px;
-  height: 9px;
-  background:
-    linear-gradient(#241b12 0 0) 0 0 / 100% 2px no-repeat,
-    linear-gradient(#c87a44 0 0) 2px 3px / 11px 5px no-repeat,
-    #f7e7c8;
-  box-shadow: 0 2px 0 #241b12;
-}
 
-.pixel-cup i {
-  position: absolute;
-  top: 0;
-  left: 5px;
-  width: 2px;
-  height: 5px;
-  background: #7a6a5a;
-  box-shadow: 5px -1px 0 #7a6a5a, 9px 1px 0 #7a6a5a;
-}
 
 .brand-lockup h1 {
   max-width: 440px;
@@ -3200,3 +3164,10 @@ p {
   color: #42d8b2;
   font-size: 13px;
 }
+.dna-stats {
+  color: rgba(0,0,0,0.35);
+  font-size: 11px;
+  padding-top: 4px;
+  border-top: 1px solid rgba(0,0,0,0.06);
+}
+

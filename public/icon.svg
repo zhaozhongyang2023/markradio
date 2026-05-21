@@ -1,6 +1,0 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" role="img" aria-label="MoodWave">
-  <rect width="256" height="256" rx="56" fill="#080909"/>
-  <circle cx="128" cy="92" r="36" fill="#f7f5ee"/>
-  <path d="M70 174c22-36 94-36 116 0" fill="none" stroke="#f7f5ee" stroke-width="18" stroke-linecap="round"/>
-  <path d="M70 56c-18 15-28 37-28 62s10 47 28 62M186 56c18 15 28 37 28 62s-10 47-28 62" fill="none" stroke="#54c982" stroke-width="10" stroke-linecap="round"/>
-</svg>

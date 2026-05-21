@@ -2,6 +2,7 @@
   "name": "moodwave-deck-companion",
   "version": "5.0.0",
   "private": true,
+  "main": "dist/index.js",
   "type": "module",
   "description": "MoodWave Deck Companion for Steam Deck game mode",
   "scripts": {

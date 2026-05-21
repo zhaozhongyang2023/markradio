@@ -77,16 +77,9 @@ function weatherIcon(condition = '') {
   return '✦';
 }
 
-function pixelCafe() {
-  return (
-    <div className="pixel-cup" aria-hidden="true">
-      <span />
-      <i />
-    </div>
-  );
-}
 
 function V4PersonaAvatar({ role }) {
+  if (role !== 'user') return <img alt="MoodWave" src="/icon-512.png" className="v4-avatar-glyph dj" />;
   const id = useId();
   const isUser = role === 'user';
   const coreId = `${id}-core`;
@@ -744,7 +737,7 @@ function V4RadioView({
             <button className="v4-avatar" onClick={onBack} title="自动荐歌">
               {netease.loggedIn && netease.profile?.avatarUrl ? (
                 <img alt="网易云头像" src={netease.profile.avatarUrl} />
-              ) : pixelCafe()}
+              ) : <img alt="MoodWave" src="/icon-512.png" />}
             </button>
             <button className="v4-wordmark" onClick={onBack} title="自动荐歌">MoodWave</button>
           </div>
@@ -873,7 +866,11 @@ function V4RadioView({
           {lastMessages.map((message) => (
             <article className={`v4-message ${message.role}`} key={message.id}>
               <div className="v4-message-avatar">
-                <V4PersonaAvatar role={message.role} />
+                {message.role === 'user' && netease.loggedIn && netease.profile?.avatarUrl ? (
+                  <img alt="网易云头像" src={netease.profile.avatarUrl} className="v4-avatar-glyph user" />
+                ) : (
+                  <V4PersonaAvatar role={message.role} />
+                )}
               </div>
               <div>
                 <span>{message.role === 'user' ? 'MMGUO' : 'MOODWAVE'}</span>
@@ -3288,24 +3285,30 @@ function seekTo(ratio) {
             ) : (
               <>
                 <div className="dna-result">
-                  {dnaResult.favorite_styles?.length > 0 && (
-                    <div className="dna-group">
-                      <span className="dna-label">风格</span>
-                      <div className="dna-tags">{dnaResult.favorite_styles.map((s) => <span key={s} className="dna-tag">{s}</span>)}</div>
-                    </div>
-                  )}
                   {dnaResult.core_feelings?.length > 0 && (
                     <div className="dna-group">
-                      <span className="dna-label">情绪</span>
+                      <span className="dna-label">核心情绪</span>
                       <div className="dna-tags">{dnaResult.core_feelings.map((s) => <span key={s} className="dna-tag">{s}</span>)}</div>
                     </div>
                   )}
-                  {dnaResult.preferred_scenes?.length > 0 && (
+                  {(dnaResult.listening_state?.length > 0 || dnaResult.preferred_scenes?.length > 0) && (
                     <div className="dna-group">
-                      <span className="dna-label">场景</span>
-                      <div className="dna-tags">{dnaResult.preferred_scenes.map((s) => <span key={s} className="dna-tag">{s}</span>)}</div>
+                      <span className="dna-label">听歌习惯</span>
+                      <div className="dna-tags">{(dnaResult.listening_state || dnaResult.preferred_scenes || []).map((s) => <span key={s} className="dna-tag">{s}</span>)}</div>
                     </div>
                   )}
+                  {(dnaResult.music_personality?.length > 0 || dnaResult.favorite_styles?.length > 0) && (
+                    <div className="dna-group">
+                      <span className="dna-label">音乐气质</span>
+                      <div className="dna-tags">{(dnaResult.music_personality || dnaResult.favorite_styles || []).map((s) => <span key={s} className="dna-tag">{s}</span>)}</div>
+                    </div>
+                  )}
+                  {(dnaResult.analyzed_tracks || dnaResult.analyzed_playlists) ? (
+                    <div className="dna-stats">
+                      已分析 {dnaResult.analyzed_tracks || 0} 首歌 · {dnaResult.analyzed_playlists || 0} 个歌单
+                      {dnaResult.analyzed_albums ? <> · {dnaResult.analyzed_albums} 张专辑</> : null}
+                    </div>
+                  ) : null}
                 </div>
                 <button className="dna-btn" onClick={async () => { await api.musicDnaReset(); setDnaResult(null); setDnaPreferences(''); }}>再了解我一些</button>
               </>
@@ -3393,7 +3396,7 @@ function seekTo(ratio) {
                 <button className="avatar" onClick={() => setViewMode('v4')} title="AI寻歌">
                   {netease.loggedIn && netease.profile?.avatarUrl ? (
                     <img alt="网易云头像" src={netease.profile.avatarUrl} />
-                  ) : pixelCafe()}
+                  ) : <img alt="MoodWave" src="/icon-512.png" />}
                 </button>
                 <div>
                   <button className="brand-title-button" onClick={() => setViewMode('v4')} title="AI寻歌">
