@@ -3,8 +3,12 @@ import { collectNeteaseLibrary } from './providers/netease.js';
 import { assertServiceAvailable, markServiceFailure, markServiceSuccess } from './circuit-breaker.js';
 
 import OpenAI from 'openai';
+
 export function loadMusicDNA(store) {
-  return store.get('musicDna') || null;
+  const raw = store.get('musicDna');
+  if (!raw) return null;
+  // 迁移旧版 DNA 到新版结构
+  return migrateDna(raw);
 }
 
 export function saveMusicDNA(store, dna) {
@@ -15,18 +19,20 @@ export function saveMusicDNA(store, dna) {
 export function getMusicDNASummary(dna) {
   if (!dna) return '';
   const parts = [];
-  if (dna.favorite_styles?.length) parts.push(dna.favorite_styles.slice(0, 3).join(' / '));
   if (dna.core_feelings?.length) parts.push(dna.core_feelings.slice(0, 3).join(' / '));
-  if (dna.preferred_scenes?.length) parts.push(dna.preferred_scenes.slice(0, 2).join(' / '));
+  if (dna.listening_state?.length) parts.push(dna.listening_state.slice(0, 2).join(' / '));
+  if (dna.music_personality?.length) parts.push(dna.music_personality.slice(0, 2).join(' / '));
+  // 兼容旧版
+  if (!parts.length && dna.favorite_styles?.length) parts.push(dna.favorite_styles.slice(0, 3).join(' / '));
   return parts.join(' · ') || '';
 }
 
 export async function generateMusicDNA(store, preferences = '') {
   if (!config.aiApiKey) {
     return {
-      favorite_styles: [],
       core_feelings: [],
-      preferred_scenes: [],
+      listening_state: [],
+      music_personality: [],
       source: 'empty',
       reason: '未配置 AI'
     };
@@ -47,25 +53,29 @@ export async function generateMusicDNA(store, preferences = '') {
   const libraryInfo = neteaseData
     ? `喜欢歌曲 ${neteaseData.likedCount} 首，收藏歌单 ${neteaseData.playlistCount} 个，收藏专辑 ${neteaseData.albumCount || 0} 张。
 歌单样本：${neteaseData.playlistSamples.map((p) => `【${p.name}】${p.tracks.slice(0, 5).join('、')}`).join('\n')}
-${neteaseData.albumCount ? '专辑样本：' + neteaseData.albumSamples.join('、') : ''}`
+${neteaseData.albumCount ? '专辑样本：' + neteaseData.albumSamples.join('、') : ''}
+${neteaseData.playlistInsights?.length ? '歌单简介：' + neteaseData.playlistInsights.map(p => '【' + p.name + '】' + p.description + (p.tags?.length ? ' 标签：' + p.tags.join('、') : '')).join('\n') : ''}`
     : '暂无网易云数据。';
+
   // 加载已有 DNA，用于叠加分析
-  const existingDna = store.get('musicDna');
+  const existingDna = migrateDna(store.get('musicDna'));
 
   const systemPrompt = `你是 MoodWave 的 AI DJ 音乐人格分析器。
-根据用户的网易云音乐收藏和自述偏好，分析用户的 Music DNA。
-返回纯 JSON，无 Markdown，无解释。
+你不是在分析音乐标签，而是在理解用户是一个什么样的听歌者。
 
 分析维度：
-- favorite_styles: 用户最喜欢的 2-5 个音乐风格
-- core_feelings: 用户常听音乐的核心情绪 2-4 个
-- preferred_scenes: 用户偏好的听歌场景 2-4 个`;
+- core_feelings: 用户听歌时的核心情绪状态 2~4 个（如：怀旧、平静、一个人、深夜思绪）
+- listening_state: 用户听歌习惯和状态 2~4 个（如：喜欢长时间循环、喜欢跑图时听、深夜必戴耳机）
+- music_personality: 用户整体音乐气质 2~4 个（如：更偏安静温暖、偏爱器乐氛围、喜欢低频沉浸）
+
+不要输出音乐风格标签（如"LoFi""JRPG OST"），而是输出对用户的深层理解。
+返回纯 JSON，无 Markdown，无解释。`;
 
   const userPrompt = existingDna?.source === 'ai_analysis'
-    ? `之前的音乐人格：
-- 风格：${existingDna.favorite_styles?.join('、') || '无'}
-- 情绪：${existingDna.core_feelings?.join('、') || '无'}
-- 场景：${existingDna.preferred_scenes?.join('、') || '无'}
+    ? `之前对用户的理解：
+- 核心情绪：${existingDna.core_feelings?.join('、') || '无'}
+- 听歌状态：${existingDna.listening_state?.join('、') || '无'}
+- 音乐气质：${existingDna.music_personality?.join('、') || '无'}
 
 网易云数据：
 ${libraryInfo}
@@ -74,9 +84,9 @@ ${libraryInfo}
 
 请融合更新。新增偏好优先级更高，但保留之前合理判断。返回 JSON：
 {
-  "favorite_styles": ["风格1", "风格2"],
-  "core_feelings": ["情绪1", "情绪2"],
-  "preferred_scenes": ["场景1", "场景2"]
+  "core_feelings": ["", ""],
+  "listening_state": ["", ""],
+  "music_personality": ["", ""]
 }`
     : `网易云数据：
 ${libraryInfo}
@@ -85,9 +95,9 @@ ${libraryInfo}
 
 请分析并返回 JSON：
 {
-  "favorite_styles": ["风格1", "风格2"],
-  "core_feelings": ["情绪1", "情绪2"],
-  "preferred_scenes": ["场景1", "场景2"]
+  "core_feelings": ["", ""],
+  "listening_state": ["", ""],
+  "music_personality": ["", ""]
 }`;
 
   assertServiceAvailable(config.aiProvider);
@@ -111,9 +121,9 @@ ${libraryInfo}
     const text = completion.choices?.[0]?.message?.content || '{}';
     const parsed = JSON.parse(text);
     return {
-      favorite_styles: Array.isArray(parsed.favorite_styles) ? parsed.favorite_styles.slice(0, 5) : [],
       core_feelings: Array.isArray(parsed.core_feelings) ? parsed.core_feelings.slice(0, 4) : [],
-      preferred_scenes: Array.isArray(parsed.preferred_scenes) ? parsed.preferred_scenes.slice(0, 4) : [],
+      listening_state: Array.isArray(parsed.listening_state) ? parsed.listening_state.slice(0, 4) : [],
+      music_personality: Array.isArray(parsed.music_personality) ? parsed.music_personality.slice(0, 4) : [],
       source: 'ai_analysis',
       ...(neteaseData ? {
         analyzed_tracks: neteaseData.likedCount,
@@ -125,4 +135,22 @@ ${libraryInfo}
     markServiceFailure(config.aiProvider);
     throw error;
   }
+}
+
+// 迁移旧版 DNA → 新版结构（兼容存量数据）
+function migrateDna(raw) {
+  if (!raw) return null;
+  // 已经是新版结构，直接返回
+  if (raw.listening_state || raw.music_personality) return raw;
+  // 旧版结构：favorite_styles / core_feelings / preferred_scenes
+  return {
+    core_feelings: raw.core_feelings || [],
+    listening_state: (raw.preferred_scenes || []),
+    music_personality: (raw.favorite_styles || []),
+    source: raw.source || 'migrated',
+    analyzed_tracks: raw.analyzed_tracks,
+    analyzed_playlists: raw.analyzed_playlists,
+    analyzed_albums: raw.analyzed_albums,
+    generated_at: raw.generated_at
+  };
 }

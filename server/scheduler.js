@@ -5,6 +5,7 @@ import { synthesizeVoice } from './voice.js';
 import { getWeather } from './weather.js';
 import { getSpecialDates } from './special-dates.js';
 import { recommendMood } from './mood.js';
+import { buildGameContext } from './game-understanding.js';
 import { randomUUID } from 'node:crypto';
 
 const DEFAULT_QUEUE_LIMIT = 5;
@@ -17,6 +18,9 @@ export async function createRadioPlan({ store, mood: requestedMood = null, nowPl
   const taste = store.get('taste');
   const voice = store.get('voice');
   const musicDna = store.get('musicDna');
+  const recentTendency = store.getTendency();
+  const gameContext = userRequest ? buildGameContext(userRequest, userRequest) : null;
+  const emotionMomentum = calcEmotionMomentum(store);
   const weather = await getWeather().catch((error) => ({
     source: 'error',
     condition: '未知',
@@ -24,6 +28,14 @@ export async function createRadioPlan({ store, mood: requestedMood = null, nowPl
     summary: error.message
   }));
   store.set('weather', weather);
+  // 世界连续性
+  const lastWorld = store.get('lastWorldContext') || {};
+  const worldContinuity = buildWorldContinuity(weather, lastWorld);
+  store.set('lastWorldContext', {
+    condition: weather?.condition || '',
+    city: weather?.city || '',
+    date: now.toISOString().slice(0, 10)
+  });
   const customDates = store.get('specialDates') || [];
   const specialDates = getSpecialDates(now, customDates);
   const mood = recommendMood({
@@ -52,7 +64,11 @@ export async function createRadioPlan({ store, mood: requestedMood = null, nowPl
     timeContext,
     userRequest,
     currentPlan,
-    musicDna
+    musicDna,
+    recentTendency,
+    emotionMomentum,
+    gameContext,
+    worldContinuity
   });
   const messages = buildMessages(context);
   const plan = await generateDjPlan({ messages, fallbackTracks: candidates, mood }).catch((error) =>
@@ -300,4 +316,34 @@ function periodName(hour) {
   if (hour < 18) return '下午';
   if (hour < 22) return '夜晚';
   return '夜深';
+}
+
+// Emotion Momentum: 根据连续播放历史计算 DJ 语气倾斜
+function calcEmotionMomentum(store) {
+  const recent = store.recentPlays(20);
+  if (!recent.length) return null;
+  const moods = recent.map(r => r.mood).filter(Boolean);
+  if (!moods.length) return null;
+  // 统计近期情绪分布
+  const quiet = moods.filter(m => ['平静', '悲伤', '治愈'].includes(m)).length;
+  const ratio = quiet / moods.length;
+  if (ratio >= 0.7) return '用户近期情绪偏安静、内敛。DJ 语气应比平时更慢、更温柔、更多留白。';
+  if (ratio <= 0.3) return '用户近期情绪偏活跃。DJ 语气可以稍微轻快一点，但仍保持克制。';
+  return null;
+}
+
+// 世界连续性：比较本次天气与上次，生成连续性提示
+function buildWorldContinuity(current, last) {
+  if (!current?.condition || !last?.condition) return null;
+  const sameCity = current.city && last.city && current.city === last.city;
+  const sameCondition = current.condition === last.condition;
+  const sameDate = last.date && last.date !== new Date().toISOString().slice(0, 10);
+  if (!sameDate && sameCondition && sameCity) return null; // 同一天不重复
+  if (sameCondition && sameCity) {
+    return `上一次也是${current.condition}天，天气还没变。可以自然地提一句"还是没放晴"。`;
+  }
+  if (sameCity && !sameCondition) {
+    return `上次是${last.condition}，今天变成了${current.condition}。可以自然地提一句天气变化。`;
+  }
+  return null;
 }

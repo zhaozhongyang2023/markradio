@@ -31,6 +31,11 @@ export class StateStore {
         path TEXT NOT NULL,
         created_at TEXT NOT NULL
       );
+      CREATE TABLE IF NOT EXISTS tendency (
+        style TEXT PRIMARY KEY,
+        weight REAL NOT NULL DEFAULT 1.0,
+        updated_at TEXT NOT NULL
+      );
     `);
     this.seed();
   }
@@ -75,6 +80,30 @@ export class StateStore {
       .prepare('INSERT OR REPLACE INTO tts_cache (hash, text, mood, path, created_at) VALUES (?, ?, ?, ?, ?)')
       .run(hash, text, mood, filePath, new Date().toISOString());
   }
+
+  // Recent Tendency — 记录播放偏好 + 时间衰减
+  recordTendency(styles) {
+    const now = new Date().toISOString();
+    const stmt = this.db.prepare(
+      'INSERT INTO tendency (style, weight, updated_at) VALUES (?, 1.0, ?) ON CONFLICT(style) DO UPDATE SET weight = weight + 1.0, updated_at = ?'
+    );
+    for (const s of (styles || [])) {
+      if (s) stmt.run(String(s).slice(0, 64), now, now);
+    }
+  }
+
+  getTendency() {
+    const now = Date.now();
+    const rows = this.db.prepare('SELECT style, weight, updated_at FROM tendency').all();
+    return rows.map((r) => {
+      const age = (now - new Date(r.updated_at).getTime()) / 86400000; // days
+      let decay;
+      if (age <= 3) decay = 1.0;
+      else if (age <= 14) decay = 0.5;
+      else decay = 0.1;
+      return { style: r.style, weight: Math.round((r.weight * decay) * 10) / 10 };
+    }).filter((r) => r.weight >= 0.5).sort((a, b) => b.weight - a.weight);
+  }
 }
 
 const defaultVoiceStyle = [
@@ -82,5 +111,5 @@ const defaultVoiceStyle = [
   '句子要短，停顿自然，不要连续解释太多。',
   '悲伤、忧郁时更慢，开心时可以带轻微笑意，治愈时更柔和。',
   '不要夸张播音腔，不要营销口吻，不要解释算法。',
-  '称呼电台为“MoodWave”。'
+  '称呼电台为"MoodWave"。'
 ].join('\n');
