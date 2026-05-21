@@ -255,4 +255,12 @@ npm test                              # 29 tests
 
 ---
 
-> 🛒 不想自己折腾？闲鱼搜 **MoodWave** 获取一键安装 + 终身技术支持。
+## ❤️ 支持项目
+
+如果 MoodWave 让你的 Steam Deck 多了一点陪伴——
+
+<p><a href="https://github.com/sponsors/zhaozhongyang2023"><img src="https://img.shields.io/badge/Sponsor-MoodWave-ea4aaa?logo=github" alt="GitHub Sponsors" /></a></p>
+
+- ⭐ **Star 这个仓库**——让更多人看到
+- 💰 **GitHub Sponsors** 或 [爱发电](https://afdian.com/a/moodwave) 请 DJ 喝杯咖啡
+- 🛒 **闲鱼搜 MoodWave**——获取一键安装 + 终身技术支持
