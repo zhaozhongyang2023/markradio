@@ -611,9 +611,9 @@ function Content() {
         }
         .mw-minimal-world-card {
           padding: 12px 14px;
-          border-left: 4px solid #42d8b2;
-          border-radius: 0 8px 8px 0;
-          background: rgba(66,216,178,.06);
+          border: 1px solid rgba(255,255,255,.1);
+          border-radius: 8px;
+          background: rgba(255,255,255,.04);
           margin-bottom: 10px;
           min-width: 0;
         }
