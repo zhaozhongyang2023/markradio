@@ -3,7 +3,6 @@ const GAME_WORLDS = {
   '巫师3': { world: ['中世纪', '篝火', '孤独旅程', '开放世界'], music: ['LoFi', '低频', '民谣感', '沉浸'] },
   '巫师三': { world: ['中世纪', '篝火', '孤独旅程', '开放世界'], music: ['LoFi', '低频', '民谣感', '沉浸'] },
   'gta5': { world: ['霓虹城市', '夜晚', '电子感', '都市孤独'], music: ['电子', 'Synthwave', '低频', '城市感'] },
-  'GTA5': { world: ['霓虹城市', '夜晚', '电子感', '都市孤独'], music: ['电子', 'Synthwave', '低频', '城市感'] },
   '原神': { world: ['开放世界', '奇幻', '探索', '元素'], music: ['管弦', '治愈', '冒险感', '氛围'] },
   '星露谷物语': { world: ['田园', '温暖', '慢节奏', '经营'], music: ['LoFi', '治愈', '轻快', '田园'] },
   '星露谷': { world: ['田园', '温暖', '慢节奏', '经营'], music: ['LoFi', '治愈', '轻快', '田园'] },
@@ -29,20 +28,21 @@ const VIBE_KEYWORDS = {
   '挂机': { world: ['安静', '陪伴', '背景'], music: ['LoFi', '治愈', '极低刺激'] },
   '探索': { world: ['自由', '冒险', '沉浸'], music: ['氛围', '管弦', '低频'] },
   '深夜': { world: ['安静', '孤独', '夜晚'], music: ['LoFi', '治愈', '低频'] },
-  'JRPG': { world: ['旅程', '伙伴', '回忆', '日式'], music: ['JRPG OST', '管弦', '治愈', '怀旧'] },
   'jrpg': { world: ['旅程', '伙伴', '回忆', '日式'], music: ['JRPG OST', '管弦', '治愈', '怀旧'] },
 };
 
 export function getGameDNA(gameName) {
   if (!gameName) return null;
-  const key = Object.keys(GAME_WORLDS).find(k => gameName.includes(k) || k.includes(gameName));
+  const lower = gameName.toLowerCase();
+  const key = Object.keys(GAME_WORLDS).find(k => lower.includes(k.toLowerCase()) || k.toLowerCase().includes(lower));
   if (key) return GAME_WORLDS[key];
   return null;
 }
 
 export function getVibeDNA(vibe) {
   if (!vibe) return null;
-  const key = Object.keys(VIBE_KEYWORDS).find(k => vibe.includes(k) || k.includes(vibe));
+  const lower = vibe.toLowerCase();
+  const key = Object.keys(VIBE_KEYWORDS).find(k => lower.includes(k.toLowerCase()) || k.toLowerCase().includes(lower));
   if (key) return VIBE_KEYWORDS[key];
   return null;
 }

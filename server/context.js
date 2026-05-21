@@ -144,10 +144,8 @@ function buildDnaBlock(dna) {
   if (mp.length) lines.push('音乐人格：' + mp.join('、'));
   if (!lines.length) {
     const fs = dna.favorite_styles || [];
-    const cf = dna.core_feelings || [];
     const ps = dna.preferred_scenes || [];
     if (fs.length) lines.push('风格：' + fs.join('、'));
-    if (cf.length) lines.push('情绪：' + cf.join('、'));
     if (ps.length) lines.push('场景：' + ps.join('、'));
   }
   if (!lines.length) return '';
