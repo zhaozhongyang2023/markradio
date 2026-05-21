@@ -48,7 +48,8 @@ export function normalizePlan(plan) {
     segue: String(plan.segue || '下一首，继续留在这个夜里。'),
     mood: String(plan.mood || '平静'),
     tags: Array.isArray(plan.tags) ? plan.tags.map(String).slice(0, 8) : [],
-    voiceStyle: String(plan.voiceStyle || '语速适中，温柔克制，停顿自然。')
+    voiceStyle: String(plan.voiceStyle || '语速适中，温柔克制，停顿自然。'),
+    gameVibeSentence: String(plan.gameVibeSentence || '')
   };
 }
 
@@ -95,6 +96,7 @@ export function demoPlan(fallbackTracks, mood, reason = 'Demo 模式') {
     segue: '下一首，把声音再放低一点。',
     mood,
     tags: [mood, 'MoodWave', '深夜电台'],
-    voiceStyle: '语速偏慢，温柔，句子短，句尾自然停顿，像深夜电台。'
+    voiceStyle: '语速偏慢，温柔，句子短，句尾自然停顿，像深夜电台。',
+    gameVibeSentence: ''
   };
 }

@@ -35,7 +35,7 @@ type NowPayload = {
     mode?: string;
     tts?: { text?: string; url?: string };
     queue?: Track[];
-    plan?: { say?: string; reply?: string };
+    plan?: { say?: string; reply?: string; gameVibeSentence?: string };
     cardTts?: Array<{ ok?: boolean; pending?: boolean; url?: string; text?: string; deferred?: boolean }>;
   };
   weather?: { source?: string; city?: string; condition?: string; temperature?: number | null; summary?: string } | null;
@@ -167,7 +167,6 @@ function Content() {
   const [gameName, setGameName] = useState(() => localStorage.getItem(GAME_NAME_KEY) || '');
   const gameNameEditedRef = useRef(false);  // 用户手动编辑后不再自动覆盖
   const [minimalMode, setMinimalMode] = useState(() => localStorage.getItem(MINIMAL_KEY) === '1');
-  const [pollVersion, setPollVersion] = useState(0);
 
   async function refresh() {
     try {
@@ -236,14 +235,12 @@ function Content() {
 
   useEffect(() => {
     refresh();
-    const timer = setInterval(refresh, 5000);
     const onVisible = () => { if (document.visibilityState === 'visible') refresh(); };
     document.addEventListener('visibilitychange', onVisible);
     return () => {
-      clearInterval(timer);
       document.removeEventListener('visibilitychange', onVisible);
     };
-  }, [pollVersion]);
+  }, []);
 
   const currentPlan = minimalMode ? now.plan : ((page !== 'settings' ? now.plans?.[page] : null) || now.plan);
   const track = now.now?.track || currentPlan?.queue?.[0] || null;
@@ -270,7 +267,7 @@ function Content() {
     const next = normalizeBase(value);
     setApiBase(next);
     localStorage.setItem(API_BASE_KEY, next);
-    setPollVersion(v => v + 1);
+    setTimeout(() => refresh(), 100);
   }
 
   function getActiveMode(now: NowPayload): 'radio' | 'search' | 'game' | null {
@@ -309,6 +306,18 @@ function Content() {
     }
     if (mode === 'search') return query.trim() ? '寻歌 · ' + query.trim() : '寻歌电台';
     return currentMood ? '心情电台 · ' + currentMood : '心情电台';
+  }
+
+  function getWorldContext() {
+    const city = now.weather?.city || '';
+    const condition = now.weather?.condition || '未知';
+    const temp = now.weather?.temperature != null ? ' ' + Math.round(now.weather.temperature) + '°C' : '';
+    const hasGame = getActiveMode(now) === 'game' && Boolean(gameName.trim());
+    const moodIcon = moods.find(m => m.id === currentMood)?.icon || '';
+    const vibeSentence = now.plan?.plan?.gameVibeSentence || '';
+    const vibe = gameVibes.find(v => v.id === gameVibe);
+    const vibeHint = vibe?.hint || '';
+    return { city, condition, temp, hasGame, moodIcon, vibeSentence, vibeHint };
   }
 
   function getCurrentLyric(track: Track | null, progressRatio: number): string {
@@ -600,6 +609,38 @@ function Content() {
           font-weight: 600;
           line-height: 16px;
         }
+        .mw-minimal-world-card {
+          padding: 12px 14px;
+          border-left: 4px solid #42d8b2;
+          border-radius: 0 8px 8px 0;
+          background: rgba(66,216,178,.06);
+          margin-bottom: 10px;
+          min-width: 0;
+        }
+        .mw-minimal-world-location {
+          color: rgba(255,255,255,.52);
+          font-size: 12px;
+          margin-bottom: 8px;
+        }
+        .mw-minimal-world-label {
+          color: rgba(255,255,255,.38);
+          font-size: 10px;
+          font-weight: 600;
+          margin-bottom: 3px;
+          letter-spacing: .04em;
+        }
+        .mw-minimal-world-game {
+          color: rgba(255,255,255,.92);
+          font-size: 18px;
+          font-weight: 800;
+          margin-bottom: 8px;
+          line-height: 1.2;
+        }
+        .mw-minimal-world-mood {
+          color: rgba(255,255,255,.6);
+          font-size: 11px;
+          font-weight: 500;
+        }
         .mw-minimal-scene {
           color: rgba(255,255,255,.78);
           font-size: 9px;
@@ -806,11 +847,30 @@ function Content() {
       {minimalMode && track ? (
         <div className="mw-minimal" style={{ position: "relative" }}>
           <img className="mw-minimal-logo" src={`data:image/png;base64,${ICON_BASE64}`} alt="MoodWave" />
-          <div className="mw-minimal-tags">
-            {now.weather ? <div className="mw-minimal-tag">{cityLabel(now.weather.city || '') || '本地'} · {now.weather.condition || '未知'}{now.weather.temperature != null ? ' ' + Math.round(now.weather.temperature) + '°C' : ''}</div> : <div className="mw-minimal-tag">本地 · 未知</div>}
-            {currentMood ? <div className="mw-minimal-tag">{currentMood}</div> : null}
-          </div>
-          <div className="mw-minimal-scene">{getSceneText()}</div>
+          {(() => {
+            const ctx = getWorldContext();
+            if (ctx.hasGame) {
+              return (
+                <div className="mw-minimal-world-card">
+                  <div className="mw-minimal-world-location">📍 {ctx.city || '本地'} · {ctx.condition}{ctx.temp}</div>
+                  <div className="mw-minimal-world-label">正在陪你玩</div>
+                  <div className="mw-minimal-world-game">🎮 {gameName}</div>
+                  <div className="mw-minimal-world-mood">
+                    {ctx.moodIcon ? ctx.moodIcon + ' ' : ''}{currentMood}{ctx.vibeSentence ? ' · "' + ctx.vibeSentence + '"' : ctx.vibeHint ? ' · ' + ctx.vibeHint : ''}
+                  </div>
+                </div>
+              );
+            }
+            return (
+              <>
+                <div className="mw-minimal-tags">
+                  {now.weather ? <div className="mw-minimal-tag">{cityLabel(now.weather.city || '') || '本地'} · {now.weather.condition || '未知'}{now.weather.temperature != null ? ' ' + Math.round(now.weather.temperature) + '°C' : ''}</div> : <div className="mw-minimal-tag">本地 · 未知</div>}
+                  {currentMood ? <div className="mw-minimal-tag">{currentMood}</div> : null}
+                </div>
+                <div className="mw-minimal-scene">{getSceneText()}</div>
+              </>
+            );
+          })()}
           {busy ? (
             <div className="mw-minimal-loading">
               <div className="mw-minimal-loading-bar">
