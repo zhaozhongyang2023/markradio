@@ -245,7 +245,40 @@ function Content() {
   const currentPlan = minimalMode ? now.plan : ((page !== 'settings' ? now.plans?.[page] : null) || now.plan);
   const track = now.now?.track || currentPlan?.queue?.[0] || null;
   const playing = Boolean(now.now?.playing);
-  const progressRatio = Number(now.now?.progressRatio) || 0;
+  const serverProgressRatio = Number(now.now?.progressRatio) || 0;
+  const [localProgressRatio, setLocalProgressRatio] = useState(serverProgressRatio);
+  const progressAnchorRef = useRef({ ratio: 0, ts: 0 });
+
+  // 本地进度计时器：播放时每 250ms 递增，不发起网络请求
+  useEffect(() => {
+    if (playing && track?.duration) {
+      setLocalProgressRatio(serverProgressRatio);
+      progressAnchorRef.current = { ratio: serverProgressRatio, ts: Date.now() };
+      const timer = setInterval(() => {
+        const elapsed = (Date.now() - progressAnchorRef.current.ts) / 1000;
+        const duration = (track.duration || 180);
+        const estimated = progressAnchorRef.current.ratio + elapsed / duration;
+        setLocalProgressRatio(Math.min(0.99, estimated));
+      }, 250);
+      return () => clearInterval(timer);
+    } else {
+      setLocalProgressRatio(serverProgressRatio);
+    }
+  }, [playing, track?.id, serverProgressRatio]);
+
+  const progressRatio = playing ? localProgressRatio : serverProgressRatio;
+
+  // 轻量心跳：播放中每 15s 同步一次服务端进度，校正漂移
+  const [progressTick, setProgressTick] = useState(0);
+  useEffect(() => {
+    if (!playing) return;
+    const timer = setInterval(() => setProgressTick(t => t + 1), 15000);
+    return () => clearInterval(timer);
+  }, [playing]);
+  useEffect(() => {
+    if (!playing || progressTick === 0) return;
+    refresh().catch(() => {});
+  }, [progressTick]);
   const currentMood = (now.now?.mood || currentPlan?.mood || '').trim();
   const queue = currentPlan?.queue || [];
   const djLine = currentPlan?.tts?.text || currentPlan?.plan?.say || currentPlan?.plan?.reply || '';
@@ -309,7 +342,7 @@ function Content() {
   }
 
   function getWorldContext() {
-    const city = now.weather?.city || '';
+    const city = cityLabel(now.weather?.city || '');
     const condition = now.weather?.condition || '未知';
     const temp = now.weather?.temperature != null ? ' ' + Math.round(now.weather.temperature) + '°C' : '';
     const hasGame = getActiveMode(now) === 'game' && Boolean(gameName.trim());
@@ -611,9 +644,9 @@ function Content() {
         }
         .mw-minimal-world-card {
           padding: 12px 14px;
-          border-left: 4px solid #42d8b2;
-          border-radius: 0 8px 8px 0;
-          background: rgba(66,216,178,.06);
+          border: 1px solid rgba(255,255,255,.1);
+          border-radius: 8px;
+          background: rgba(255,255,255,.04);
           margin-bottom: 10px;
           min-width: 0;
         }
