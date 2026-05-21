@@ -159,6 +159,7 @@ async function hydrateCurrentLyric() {
   if (!lyric.length) return;
 
   const nextTrack = { ...track, lyric };
+  if (_lyricHydrated.size > 500) _lyricHydrated.clear();
   _lyricHydrated.add(track.id);
   store.set('now', { ...now, track: nextTrack });
 
@@ -745,7 +746,7 @@ async function prepareCastMediaUrl(url = '', { requestHost = '' } = {}) {
   const existing = await fs.promises.stat(filePath).catch(() => null);
   if (existing?.size > 1024) return castMediaUrl(id, requestHost);
 
-  const target = await neteaseAudioUrl(id);
+  const target = await neteaseAudioUrl(id).catch(() => '');
   if (!/^https?:\/\//i.test(target)) throw new Error('invalid cast media url');
   const upstream = await fetch(target);
   if (!upstream.ok || !upstream.body) throw new Error(`media fetch failed: ${upstream.status}`);
@@ -829,7 +830,7 @@ async function streamMediaAudio(request, reply, routeId = '') {
   const id = String(routeId || request.query?.id || '');
   let target = String(request.query?.url || '');
   if (id) {
-    target = await neteaseAudioUrl(id);
+    target = await neteaseAudioUrl(id).catch(() => '');
   }
   if (!/^https?:\/\//i.test(target)) return reply.code(400).send({ error: 'invalid media url' });
   const upstream = await fetch(target, {
