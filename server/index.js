@@ -23,7 +23,6 @@ import { loadMusicDNA, saveMusicDNA, generateMusicDNA, getMusicDNASummary } from
 import { collectNeteaseLibrary } from './providers/netease.js';
 
 const store = new StateStore();
-const _lyricHydrated = new Set();
 
 
 // ─── Plugin helpers ───

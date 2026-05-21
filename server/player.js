@@ -16,6 +16,14 @@ function resolveFfplay() {
 }
 const ffplayPath = resolveFfplay();
 
+// 启动时验证 ffplay 可用
+try {
+  execSync(`"${ffplayPath}" -version`, { stdio: 'ignore', timeout: 3000 });
+} catch {
+  console.warn('[player] ffplay not found or not executable at: ' + ffplayPath);
+  console.warn('[player] Audio playback will be unavailable until ffplay is installed.');
+}
+
 let currentProcess = null;
 let activeSequenceId = 0;
 let _consecutiveErrors = 0;
