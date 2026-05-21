@@ -79,6 +79,7 @@ function weatherIcon(condition = '') {
 
 
 function V4PersonaAvatar({ role }) {
+  if (role !== 'user') return <img alt="MoodWave" src="/icon-512.png" className="v4-avatar-glyph dj" />;
   const id = useId();
   const isUser = role === 'user';
   const coreId = `${id}-core`;
