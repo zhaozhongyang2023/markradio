@@ -57,6 +57,7 @@ async function advanceToNext(store) {
     if (urls2.length) playSequence(urls2, { onEnd: () => advanceToNext(store), onTrackStart: () => {
       const n2 = store.get('now'); if (n2) { n2.startedAt = Date.now(); store.set('now', n2); }
     } });
+    delete now.startedAt;
     store.set('now', now); saveNowPerMode(store, now);
     broadcast('now', publicNow()); return;
   }
@@ -81,6 +82,7 @@ async function advanceToNext(store) {
           if (n && p && n.track && p.queue?.length) {
             n.playing = true;
             n.introPlayed = false;
+            delete n.startedAt;
             store.set('now', n);
             const u = buildPlaylist(n.track, p, n);
             if (u.length) playSequence(u, { onEnd: () => advanceToNext(store), onTrackStart: () => {
@@ -109,6 +111,7 @@ async function advanceToNext(store) {
         if (n) { n.startedAt = Date.now(); store.set('now', n); }
       } });
   store.addPlay(next, now.mood);
+  delete now.startedAt;
   store.set('now', now); saveNowPerMode(store, now);
   broadcast('now', publicNow());
 }
@@ -116,7 +119,7 @@ async function advanceToNext(store) {
 async function applyPluginAction(action, body = {}) {
   const now = store.get('now') || {}; const mode = now.mode || 'radio';
   const plan = store.get('plan-' + mode) || {};
-  if (action === 'play') { now.playing = true; playerStop(); const u = buildPlaylist(now.track, plan, now); now.introPlayed = true; if (u.length) playSequence(u, { onEnd: () => advanceToNext(store), onTrackStart: () => {
+  if (action === 'play') { now.playing = true; delete now.startedAt; playerStop(); const u = buildPlaylist(now.track, plan, now); now.introPlayed = true; if (u.length) playSequence(u, { onEnd: () => advanceToNext(store), onTrackStart: () => {
         const n = store.get('now');
         if (n) { n.startedAt = Date.now(); store.set('now', n); }
       } }); }
@@ -124,7 +127,7 @@ async function applyPluginAction(action, body = {}) {
   if ((action === 'next' || action === 'prev') && plan?.queue?.length) {
     const ci = plan.queue.findIndex(t => t.id === now.track?.id);
     const ni = action === 'prev' ? (ci > 0 ? ci - 1 : 0) : (ci >= 0 && ci < plan.queue.length - 1 ? ci + 1 : -1);
-    if (ni >= 0) { now.track = plan.queue[ni]; now.progress = 0; now.playing = true; store.addPlay(now.track, now.mood); playerStop(); const u = buildPlaylist(now.track, plan, now); if (u.length) playSequence(u, { onEnd: () => advanceToNext(store), onTrackStart: () => {
+    if (ni >= 0) { now.track = plan.queue[ni]; now.progress = 0; now.playing = true; delete now.startedAt; store.addPlay(now.track, now.mood); playerStop(); const u = buildPlaylist(now.track, plan, now); if (u.length) playSequence(u, { onEnd: () => advanceToNext(store), onTrackStart: () => {
         const n = store.get('now');
         if (n) { n.startedAt = Date.now(); store.set('now', n); }
       } }); }
