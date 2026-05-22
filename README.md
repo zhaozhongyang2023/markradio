@@ -1,6 +1,6 @@
 <p align="center"><img src="public/icon-512.png" width="128" alt="MoodWave Logo" /></p>
 
-# 🎵 MoodWave V15 — AI DJ 电台
+# 🎵 MoodWave V6 — AI DJ 电台
 
 > **不是播放器。是会越来越懂你的 AI DJ。**
 
