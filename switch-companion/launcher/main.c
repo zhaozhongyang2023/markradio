@@ -4,13 +4,21 @@
 
 #include <switch.h>
 #include <string.h>
+#include <stdio.h>
 
-// ═══ 在此修改默认服务器地址 ═══
-// 替换为你的 MoodWave 服务器局域网 IP 和端口
-#define MOODWAVE_URL "http://192.168.1.100:8765/switch"
+// ── 服务器地址（编译时通过 make SERVER_IP=... SERVER_PORT=... 设置）──
+#ifndef SERVER_IP
+#define SERVER_IP "192.168.2.33"
+#endif
+#ifndef SERVER_PORT
+#define SERVER_PORT "8765"
+#endif
+
 
 int main(int argc, char **argv)
 {
+    char url[256];
+    snprintf(url, sizeof(url), "http://%s:%s/switch", SERVER_IP, SERVER_PORT);
     consoleInit(NULL);
 
     // 初始化网络
@@ -18,12 +26,12 @@ int main(int argc, char **argv)
     nxlinkStdio();
 
     printf("MoodWave Switch Companion\n");
-    printf("正在连接到 %s ...\n", MOODWAVE_URL);
+    printf("正在连接到 %s ...\n", url);
 
     // 唤起 WebApplet 浏览器
     Result rc = 0;
     WebCommonConfig config;
-    webPageCreate(&config, MOODWAVE_URL);
+    webPageCreate(&config, url);
     webConfigSetWhitelist(&config, ".*");
     webConfigSetBootFooterButtonVisible(&config, WebFooterButtonId_Url, true);
 
@@ -35,7 +43,7 @@ int main(int argc, char **argv)
     if (R_FAILED(rc)) {
         printf("启动浏览器失败: 0x%x\n", rc);
         printf("请确保已安装 nx-bred 或类似浏览器 homebrew\n");
-        printf("或手动在浏览器中输入: %s\n", MOODWAVE_URL);
+        printf("或手动在浏览器中输入: %s\n", url);
         printf("\n按任意键退出...\n");
     } else {
         printf("浏览器已启动!\n");

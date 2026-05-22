@@ -14,7 +14,7 @@ NACP         :=
 
 # 默认 Switch 服务器地址 (可在 make 时覆盖)
 # make SERVER_IP=192.168.x.x
-SERVER_IP   ?= 192.168.1.100
+SERVER_IP   ?= 192.168.2.33
 SERVER_PORT ?= 8765
 DEFINES     := -DSERVER_IP="\"$(SERVER_IP)\"" -DSERVER_PORT=$(SERVER_PORT)
 

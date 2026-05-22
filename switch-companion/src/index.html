@@ -262,9 +262,16 @@
   // ─── state ───
   var apiBase = (function() {
     var port = window.location.port;
-    if (port === '8765' || port === '38765') return '';
-    if (port === '8080') return window.location.protocol + '//' + window.location.hostname + ':8765';
-    return window.location.protocol + '//' + window.location.hostname + ':8765';
+    var proto = window.location.protocol;
+    var host = window.location.hostname;
+    // API 端口直连
+    if (port === "8765" || port === "38765") return "";
+    // Web 端口 → API 端口映射
+    if (port === "80" || port === "8080") return proto + "//" + host + ":8765";
+    if (port === "38080") return proto + "//" + host + ":38765";
+    // 非标准端口，默认 8765
+    return proto + "//" + host + ":8765";
+  })();
   })();
   var page = 'radio';
   var now = {};
@@ -377,6 +384,7 @@
   function switchMode(mode) {
     if (mode === 'settings') { page = 'settings'; render(); return; }
     page = mode;
+    render();
     apiRequest('/api/switch-mode',{mode:mode}).catch(function(){});
     refresh();
   }
@@ -390,12 +398,19 @@
       if (pb) pb.style.width = progress + '%';
     }, 200);
     task().then(function() {
-      progress = 100; var pb = document.getElementById('mw-global-progress'); if (pb) pb.style.width = '100%';
-      setTimeout(function() { progress = 0; refresh(); }, 600);
+      progress = 100; render();
+      setTimeout(function() {
+        progress = 0;
+        clearInterval(runTimer); runTimer = null;
+        busy = false;
+        refresh();
+      }, 600);
     }).catch(function(e) {
-      progress = 0; statusText = (e && e.message || String(e)).slice(0, 40); refresh();
-    }).then(function() {
-      clearInterval(runTimer); runTimer = null; busy = false; render();
+      progress = 0;
+      statusText = (e && e.message || String(e)).slice(0, 40);
+      clearInterval(runTimer); runTimer = null;
+      busy = false;
+      render();
     });
   }
   function refresh() {
