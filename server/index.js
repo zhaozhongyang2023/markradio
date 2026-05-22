@@ -52,10 +52,10 @@ async function advanceToNext(store) {
   const ci = plan.queue.findIndex(t => t.id === now.track?.id);
   // 当前 track 不在 queue 中 → 从 queue[0] 重新开始
   if (ci < 0 && plan.queue.length > 0) {
-    now.track = plan.queue[0]; now.progress = 0; now.playing = true; now.introPlayed = false;
+    now.track = plan.queue[0]; now.progress = 0; now.playing = true; now.introPlayed = false; now.playSeq = (now.playSeq || 0) + 1;
     const urls2 = buildPlaylist(plan.queue[0], plan, now);
     if (urls2.length) playSequence(urls2, { onEnd: () => advanceToNext(store), onTrackStart: () => {
-      const n2 = store.get('now'); if (n2) { n2.startedAt = Date.now(); store.set('now', n2); }
+      const n2 = store.get('now'); if (n2) { n2.startedAt = Date.now(); n2.playSeq = (n2.playSeq || 0) + 1; store.set('now', n2); broadcast('now', publicNow()); }
     } });
     delete now.startedAt;
     store.set('now', now); saveNowPerMode(store, now);
@@ -87,7 +87,7 @@ async function advanceToNext(store) {
             const u = buildPlaylist(n.track, p, n);
             if (u.length) playSequence(u, { onEnd: () => advanceToNext(store), onTrackStart: () => {
               const sn = store.get('now');
-              if (sn) { sn.startedAt = Date.now(); store.set('now', sn); }
+              if (sn) { sn.startedAt = Date.now(); sn.playSeq = (sn.playSeq || 0) + 1; store.set('now', sn); broadcast('now', publicNow()); }
             } });
           }
           broadcast('now', publicNow());
@@ -104,11 +104,11 @@ async function advanceToNext(store) {
     saveNowPerMode(store, now); broadcast('now', publicNow()); return;
   }
   const next = plan.queue[ci + 1];
-  now.track = next; now.progress = 0; now.playing = true;
+  now.track = next; now.progress = 0; now.playing = true; now.playSeq = (now.playSeq || 0) + 1;
   const urls = buildPlaylist(next, plan, now);
   if (urls.length) playSequence(urls, { onEnd: () => advanceToNext(store), onTrackStart: () => {
         const n = store.get('now');
-        if (n) { n.startedAt = Date.now(); store.set('now', n); }
+        if (n) { n.startedAt = Date.now(); n.playSeq = (n.playSeq || 0) + 1; store.set('now', n); broadcast('now', publicNow()); }
       } });
   store.addPlay(next, now.mood);
   delete now.startedAt;
@@ -121,15 +121,15 @@ async function applyPluginAction(action, body = {}) {
   const plan = store.get('plan-' + mode) || {};
   if (action === 'play') { now.playing = true; delete now.startedAt; playerStop(); const u = buildPlaylist(now.track, plan, now); now.introPlayed = true; if (u.length) playSequence(u, { onEnd: () => advanceToNext(store), onTrackStart: () => {
         const n = store.get('now');
-        if (n) { n.startedAt = Date.now(); store.set('now', n); }
+        if (n) { n.startedAt = Date.now(); n.playSeq = (n.playSeq || 0) + 1; store.set('now', n); broadcast('now', publicNow()); }
       } }); }
   if (action === 'pause') { now.playing = false; playerStop(); }
   if ((action === 'next' || action === 'prev') && plan?.queue?.length) {
     const ci = plan.queue.findIndex(t => t.id === now.track?.id);
     const ni = action === 'prev' ? (ci > 0 ? ci - 1 : 0) : (ci >= 0 && ci < plan.queue.length - 1 ? ci + 1 : -1);
-    if (ni >= 0) { now.track = plan.queue[ni]; now.progress = 0; now.playing = true; delete now.startedAt; store.addPlay(now.track, now.mood); playerStop(); const u = buildPlaylist(now.track, plan, now); if (u.length) playSequence(u, { onEnd: () => advanceToNext(store), onTrackStart: () => {
+    if (ni >= 0) { now.track = plan.queue[ni]; now.progress = 0; now.playing = true; now.playSeq = (now.playSeq || 0) + 1; delete now.startedAt; store.addPlay(now.track, now.mood); playerStop(); const u = buildPlaylist(now.track, plan, now); if (u.length) playSequence(u, { onEnd: () => advanceToNext(store), onTrackStart: () => {
         const n = store.get('now');
-        if (n) { n.startedAt = Date.now(); store.set('now', n); }
+        if (n) { n.startedAt = Date.now(); n.playSeq = (n.playSeq || 0) + 1; store.set('now', n); broadcast('now', publicNow()); }
       } }); }
   }
   saveNowPerMode(store, now); store.set('now', now); broadcast('now', publicNow()); return publicNow();
