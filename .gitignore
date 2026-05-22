@@ -17,7 +17,10 @@ deck-companion/dist/
 # Screenshots
 *.png
 !public/icon-*.png
-
+!public/hero-scenes.png
+!public/game-radio-modes.png
+!public/core-tabs.png
+!public/decky-overlay.png
 # Local/manual backups
 *.bak
 *.bak2

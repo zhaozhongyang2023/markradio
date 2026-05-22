@@ -4,8 +4,8 @@
 
 > **不是播放器。是会越来越懂你的 AI DJ。**
 
-| 打 Boss，AI 配燃曲。 | 跑图时，AI 陪你慢慢走。 | 它会越用越懂你。 |
-|:--:|:--:|:--:|
+
+<p align="center"><img src="public/hero-scenes.png" width="800" alt="MoodWave Hero 氛围三连"></p>
 
 ---
 
@@ -41,6 +41,9 @@ MoodWave 不是播放器。不是 AI 工具。不是搜索系统。
 
 ---
 
+
+<p align="center"><img src="public/decky-overlay.png" width="700" alt="Decky 插件切歌对比"></p>
+
 ## 🎧 Music DNA：让 AI DJ 越来越懂你
 
 MoodWave 可以从网易云喜欢的音乐和收藏歌单中分析你的音乐人格。
@@ -68,6 +71,9 @@ JRPG OST / LoFi / City Pop
 
 ## 核心体验
 
+
+<p align="center"><img src="public/core-tabs.png" width="500" alt="MoodWave 三大核心 Tab"></p>
+
 ### 📻 AI 电台 — 按心情开电台
 
 选一个心情（开心 / 平静 / 忧郁 / 悲伤 / 治愈 / 愤怒），AI DJ 自动生成：
@@ -78,6 +84,9 @@ JRPG OST / LoFi / City Pop
 - ▶️ **自动播放** — 点一下，剩下的全自动
 
 ### 🎮 Game Radio — 游戏氛围电台
+
+
+<p align="center"><img src="public/game-radio-modes.png" width="750" alt="Game Radio 六大氛围"></p>
 
 **不用切出游戏**，Decky 插件里一键开启。
 
