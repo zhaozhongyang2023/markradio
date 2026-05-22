@@ -1,6 +1,6 @@
 {
   "name": "moodwave-radio",
-  "version": "15.0.0",
+  "version": "5.0.0",
   "private": true,
   "type": "module",
   "description": "MoodWave - 懂用户当前状态的 AI DJ 电台",

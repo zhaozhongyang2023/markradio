@@ -13,7 +13,8 @@ function run(command, args, options = {}) {
   }
 }
 
-const appTar = path.join(outDir, 'moodwave-v5.tar.gz');
+const pkg = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8'));
+const appTar = path.join(outDir, `moodwave-v${pkg.version}.tar.gz`);
 const pluginZip = path.join(outDir, 'moodwave-deck-companion.zip');
 const installer = path.join(outDir, 'install-moodwave.sh');
 
