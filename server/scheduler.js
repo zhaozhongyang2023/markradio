@@ -14,7 +14,7 @@ let _lastSessionCleanup = 0;
 const DEFAULT_QUEUE_LIMIT = 5;
 const TTS_PRELOAD_LIMIT = 5;
 
-export async function createRadioPlan({ store, mood: requestedMood = null, nowPlaying = null, deferTts = false, onTtsReady = null, userRequest = '', mode = 'radio', currentPlan = null, gameName = '', gameVibe = '' }) {
+export async function createRadioPlan({ store, mood: requestedMood = null, nowPlaying = null, deferTts = false, onTtsReady = null, userRequest = '', mode = 'radio', currentPlan = null, gameName = '', gameVibe = '', autoContinue = false }) {
   // 每 30 分钟清理一次 session 级别的已播放记录，防止长期泄漏
   const nowMs = Date.now();
   if (nowMs - _lastSessionCleanup > 1800000) { sessionPlayedIdsByMode.clear(); _lastSessionCleanup = nowMs; }
@@ -144,7 +144,13 @@ export async function createRadioPlan({ store, mood: requestedMood = null, nowPl
     plan,
     queue,
     tts,
-    cardTts
+    cardTts,
+    regenerate: autoContinue ? {
+      need: true,
+      userRequest: userRequest || '',
+      gameName: gameName || '',
+      gameVibe: gameVibe || ''
+    } : null
   };
   store.set('planToday', todayPlan);
   store.set('plan-' + mode, todayPlan);

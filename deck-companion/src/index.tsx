@@ -9,6 +9,7 @@ const CONFIG_VERSION = 7;
 const API_BASE_KEY = 'moodwave.deck.apiBase';
 const GAME_NAME_KEY = 'moodwave.deck.gameName';
 const MINIMAL_KEY = 'moodwave.deck.minimalMode';
+const AUTO_CONTINUE_KEY = 'moodwave.deck.autoContinue';
 const PAGE_KEY = 'moodwave.deck.page';
 
 type Track = {
@@ -167,6 +168,7 @@ function Content() {
   const [gameName, setGameName] = useState(() => localStorage.getItem(GAME_NAME_KEY) || '');
   const gameNameEditedRef = useRef(false);  // 用户手动编辑后不再自动覆盖
   const [minimalMode, setMinimalMode] = useState(() => localStorage.getItem(MINIMAL_KEY) === '1');
+  const [autoContinue, setAutoContinue] = useState(() => localStorage.getItem(AUTO_CONTINUE_KEY) === '1');
 
   async function refresh() {
     try {
@@ -370,7 +372,7 @@ function Content() {
 
   async function startRadio(mood: string) {
     await run(`正在开台 · ${mood}`, async () => {
-      await apiRequest(apiBase, '/api/ai/radio', { mood, mode: 'steamdeck', deferTts: true });
+      await apiRequest(apiBase, '/api/ai/radio', { mood, mode: 'steamdeck', deferTts: true, autoContinue: autoContinue });
     });
   }
 
@@ -378,13 +380,13 @@ function Content() {
     const prompt = query.trim();
     if (!prompt) return;
     await run('正在找歌单', async () => {
-      await apiRequest(apiBase, '/api/ai/search', { query: prompt, mode: 'steamdeck', deferTts: true });
+      await apiRequest(apiBase, '/api/ai/search', { query: prompt, mode: 'steamdeck', deferTts: true, autoContinue: autoContinue });
     });
   }
 
   async function nextRadio(scene = '') {
     await run('正在换氛围', async () => {
-      await apiRequest(apiBase, '/api/ai/next-radio', { scene: scene || '', mode: 'steamdeck', deferTts: true });
+      await apiRequest(apiBase, '/api/ai/next-radio', { scene: scene || '', mode: 'steamdeck', deferTts: true, autoContinue: autoContinue });
     });
   }
 
@@ -396,7 +398,8 @@ function Content() {
         gameName: gameName.trim() || undefined,
         vibeHint: vibe?.hint || '',
         mode: 'steamdeck',
-        deferTts: true
+        deferTts: true,
+        autoContinue: autoContinue
       });
     });
   }
@@ -1093,6 +1096,18 @@ function Content() {
           </PanelSectionRow>
           <PanelSectionRow>
             <AppButton disabled={busy} onClick={() => run('测试连接', refresh)}>测试连接</AppButton>
+          </PanelSectionRow>
+          <PanelSectionRow>
+            <AppButton
+              active={autoContinue}
+              onClick={() => {
+                const next = !autoContinue;
+                setAutoContinue(next);
+                localStorage.setItem(AUTO_CONTINUE_KEY, next ? '1' : '0');
+              }}
+            >
+              {autoContinue ? '✓ ' : ''}自动续播 · 播完自动换下一组
+            </AppButton>
           </PanelSectionRow>
         </PanelSection>
       )}
