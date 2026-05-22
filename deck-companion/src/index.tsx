@@ -9,6 +9,7 @@ const CONFIG_VERSION = 7;
 const API_BASE_KEY = 'moodwave.deck.apiBase';
 const GAME_NAME_KEY = 'moodwave.deck.gameName';
 const MINIMAL_KEY = 'moodwave.deck.minimalMode';
+const AUTO_CONTINUE_KEY = 'moodwave.deck.autoContinue';
 const PAGE_KEY = 'moodwave.deck.page';
 
 type Track = {
@@ -167,6 +168,7 @@ function Content() {
   const [gameName, setGameName] = useState(() => localStorage.getItem(GAME_NAME_KEY) || '');
   const gameNameEditedRef = useRef(false);  // 用户手动编辑后不再自动覆盖
   const [minimalMode, setMinimalMode] = useState(() => localStorage.getItem(MINIMAL_KEY) === '1');
+  const [autoContinue, setAutoContinue] = useState(() => localStorage.getItem(AUTO_CONTINUE_KEY) === '1');
 
   async function refresh() {
     try {
@@ -185,6 +187,9 @@ function Content() {
       setStatus('离线: ' + (e?.message || String(e)).slice(0, 40));
     }
   }
+  const refreshRef = useRef(refresh);
+  refreshRef.current = refresh;
+
 
   async function switchMode(mode: Page) {
     if (mode === 'settings') { setPage('settings'); return; }
@@ -234,10 +239,12 @@ function Content() {
   }, []);
 
   useEffect(() => {
-    refresh();
-    const onVisible = () => { if (document.visibilityState === 'visible') refresh(); };
+    refreshRef.current();
+    const timer = setInterval(() => refreshRef.current(), 5000);
+    const onVisible = () => { if (document.visibilityState === 'visible') refreshRef.current(); };
     document.addEventListener('visibilitychange', onVisible);
     return () => {
+      clearInterval(timer);
       document.removeEventListener('visibilitychange', onVisible);
     };
   }, []);
@@ -249,14 +256,15 @@ function Content() {
   const [localProgressRatio, setLocalProgressRatio] = useState(serverProgressRatio);
   const progressAnchorRef = useRef({ ratio: 0, ts: 0 });
 
-  // 本地进度计时器：播放时每 250ms 递增，不发起网络请求
+  // 本地进度计时器：播放时每 250ms 递增，锚点仅在新歌/恢复播放时设定
   useEffect(() => {
-    if (playing && track?.duration) {
-      setLocalProgressRatio(serverProgressRatio);
+    if (playing) {
+      const trackKey = track?.id || track?.sourceId || track?.title || '';
+      const duration = track?.duration || 180;
       progressAnchorRef.current = { ratio: serverProgressRatio, ts: Date.now() };
+      setLocalProgressRatio(serverProgressRatio);
       const timer = setInterval(() => {
         const elapsed = (Date.now() - progressAnchorRef.current.ts) / 1000;
-        const duration = (track.duration || 180);
         const estimated = progressAnchorRef.current.ratio + elapsed / duration;
         setLocalProgressRatio(Math.min(0.99, estimated));
       }, 250);
@@ -264,22 +272,11 @@ function Content() {
     } else {
       setLocalProgressRatio(serverProgressRatio);
     }
-  }, [playing, track?.id, serverProgressRatio]);
+  }, [playing, track?.id || track?.sourceId || track?.title]);
 
   const progressRatio = playing ? localProgressRatio : serverProgressRatio;
 
-  // 轻量心跳：播放中每 15s 同步一次服务端进度，校正漂移
-  const [progressTick, setProgressTick] = useState(0);
-  useEffect(() => {
-    if (!playing) return;
-    const timer = setInterval(() => setProgressTick(t => t + 1), 15000);
-    return () => clearInterval(timer);
-  }, [playing]);
-  useEffect(() => {
-    if (!playing || progressTick === 0) return;
-    refresh().catch(() => {});
-  }, [progressTick]);
-  const currentMood = (now.now?.mood || currentPlan?.mood || '').trim();
+  const currentMood = (now.now?.mood || currentPlan?.mood || now.plans?.radio?.mood || '').trim();
   const queue = currentPlan?.queue || [];
   const djLine = currentPlan?.tts?.text || currentPlan?.plan?.say || currentPlan?.plan?.reply || '';
   const djForTrack = (() => {
@@ -300,7 +297,10 @@ function Content() {
     const next = normalizeBase(value);
     setApiBase(next);
     localStorage.setItem(API_BASE_KEY, next);
-    setTimeout(() => refresh(), 100);
+    // 直接用新地址请求，避免闭包捕获旧 apiBase
+    apiRequest<NowPayload>(next, '/api/now')
+      .then((payload) => { setNow(payload); setStatus('在线'); })
+      .catch(() => {});
   }
 
   function getActiveMode(now: NowPayload): 'radio' | 'search' | 'game' | null {
@@ -323,10 +323,10 @@ function Content() {
     const mode = getActiveMode(now);
     if (mode === 'game') {
       await startGameRadio('换个感觉');
-    } else if (mode === 'radio') {
-      await nextRadio('');
-    } else {
+    } else if (mode === 'search') {
       await nextRadio(query);
+    } else {
+      await nextRadio('');
     }
   }
 
@@ -367,7 +367,7 @@ function Content() {
 
   async function startRadio(mood: string) {
     await run(`正在开台 · ${mood}`, async () => {
-      await apiRequest(apiBase, '/api/ai/radio', { mood, mode: 'steamdeck', deferTts: true });
+      await apiRequest(apiBase, '/api/ai/radio', { mood, mode: 'steamdeck', deferTts: true, autoContinue: autoContinue });
     });
   }
 
@@ -375,13 +375,13 @@ function Content() {
     const prompt = query.trim();
     if (!prompt) return;
     await run('正在找歌单', async () => {
-      await apiRequest(apiBase, '/api/ai/search', { query: prompt, mode: 'steamdeck', deferTts: true });
+      await apiRequest(apiBase, '/api/ai/search', { query: prompt, mode: 'steamdeck', deferTts: true, autoContinue: autoContinue });
     });
   }
 
   async function nextRadio(scene = '') {
     await run('正在换氛围', async () => {
-      await apiRequest(apiBase, '/api/ai/next-radio', { scene: scene || '', mode: 'steamdeck', deferTts: true });
+      await apiRequest(apiBase, '/api/ai/next-radio', { scene: scene || '', mode: 'steamdeck', deferTts: true, autoContinue: autoContinue });
     });
   }
 
@@ -393,7 +393,8 @@ function Content() {
         gameName: gameName.trim() || undefined,
         vibeHint: vibe?.hint || '',
         mode: 'steamdeck',
-        deferTts: true
+        deferTts: true,
+        autoContinue: autoContinue
       });
     });
   }
@@ -918,7 +919,7 @@ function Content() {
           {djForTrack ? (
             <div className="mw-minimal-quote mw-minimal-quote-track">{djForTrack}</div>
           ) : null}
-          <div className="mw-minimal-playing">📻 正在陪你</div>
+          <div className="mw-minimal-playing">{(() => { const m2 = getActiveMode(now); return m2 === 'game' ? '🎮 正在陪你' : '📻 正在陪你'; })()}</div>
           <div className="mw-minimal-track">{track.title || '未知歌曲'}{track.artist ? ' — ' + track.artist : ''}</div>
           {playing ? <div className="mw-minimal-progress"><div className="mw-minimal-progress-fill" style={{width: `${Math.round(progressRatio * 100)}%`}} /></div> : null}
           {(() => { const lyric = getCurrentLyric(track, progressRatio); return lyric ? <div className="mw-minimal-lyric">{lyric}</div> : null; })()}
@@ -1041,7 +1042,7 @@ function Content() {
           </PanelSectionRow>
           <div className="mw-action-row">
             <AppButton active disabled={busy || !query.trim()} onClick={searchRadio}>▶ 开始电台</AppButton>
-            <AppButton disabled={busy} onClick={nextRadio}>↻ 来点别的</AppButton>
+            <AppButton disabled={busy} onClick={() => nextRadio(query)}>↻ 来点别的</AppButton>
           </div>
         </div>
       )}
@@ -1090,6 +1091,19 @@ function Content() {
           </PanelSectionRow>
           <PanelSectionRow>
             <AppButton disabled={busy} onClick={() => run('测试连接', refresh)}>测试连接</AppButton>
+          </PanelSectionRow>
+          <div style={{ marginTop: 8 }} />
+          <PanelSectionRow>
+            <AppButton
+              active={autoContinue}
+              onClick={() => {
+                const next = !autoContinue;
+                setAutoContinue(next);
+                localStorage.setItem(AUTO_CONTINUE_KEY, next ? '1' : '0');
+              }}
+            >
+              {autoContinue ? '✓ ' : ''}自动续播 · 播完自动换下一组
+            </AppButton>
           </PanelSectionRow>
         </PanelSection>
       )}

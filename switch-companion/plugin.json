@@ -1,0 +1,10 @@
+{
+  "name": "MoodWave Switch Companion",
+  "author": "MoodWave",
+  "flags": [],
+  "api_version": 1,
+  "publish": {
+    "tags": ["music", "ai", "nintendo-switch", "radio", "homebrew"],
+    "description": "AI DJ Radio companion for Nintendo Switch homebrew."
+  }
+}

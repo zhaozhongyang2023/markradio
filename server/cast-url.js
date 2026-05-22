@@ -12,7 +12,8 @@ function isLocalHost(host) {
 }
 
 function configuredHost() {
-  if (cleanHost(station.apiHost)) return cleanHost(station.apiHost);
+  const apiHost = cleanHost(station.apiHost);
+  if (apiHost && !isLocalHost(apiHost)) return apiHost;
   try {
     return cleanHost(new URL(config.webOrigin).hostname);
   } catch (_) {

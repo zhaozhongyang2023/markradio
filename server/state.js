@@ -69,8 +69,10 @@ export class StateStore {
 
   addPlay(track, mood) {
     this.db
-      .prepare('INSERT INTO plays (track_id, title, artist, mood, played_at) VALUES (?, ?, ?, ?, ?)')
+      .prepare("INSERT INTO plays (track_id, title, artist, mood, played_at) VALUES (?, ?, ?, ?, ?)")
       .run(track.id, track.title, track.artist, mood, new Date().toISOString());
+    const styles = [mood, ...(track.mood || []), ...(track.tags || [])].filter(Boolean);
+    if (styles.length) this.recordTendency(styles);
   }
 
   recentPlays(limit = 20) {

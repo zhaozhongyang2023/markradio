@@ -42,6 +42,8 @@ function buildPlaylist(track, plan, now) {
   return [mainTts, url, track.url].filter(Boolean);
 }
 
+let _autoRegenerating = false;
+
 async function advanceToNext(store) {
   const now = store.get('now') || {};
   const mode = now.mode || 'radio';
@@ -59,6 +61,43 @@ async function advanceToNext(store) {
     broadcast('now', publicNow()); return;
   }
   if (ci >= plan.queue.length - 1) {
+    if (plan.regenerate?.need && !_autoRegenerating) {
+      _autoRegenerating = true;
+      const regenParams = {
+        store,
+        mode: plan.mode || mode,
+        mood: plan.mood,
+        userRequest: plan.regenerate.userRequest || '',
+        gameName: plan.regenerate.gameName || '',
+        gameVibe: plan.regenerate.gameVibe || '',
+        deferTts: true,
+        autoContinue: true
+      };
+      createRadioPlan(regenParams)
+        .then(() => {
+          _autoRegenerating = false;
+          const n = store.get('now');
+          const p = store.get('plan-' + (plan.mode || mode));
+          if (n && p && n.track && p.queue?.length) {
+            n.playing = true;
+            n.introPlayed = false;
+            store.set('now', n);
+            const u = buildPlaylist(n.track, p, n);
+            if (u.length) playSequence(u, { onEnd: () => advanceToNext(store), onTrackStart: () => {
+              const sn = store.get('now');
+              if (sn) { sn.startedAt = Date.now(); store.set('now', sn); }
+            } });
+          }
+          broadcast('now', publicNow());
+        })
+        .catch(() => {
+          _autoRegenerating = false;
+          now.playing = false;
+          store.set('now', now);
+          broadcast('now', publicNow());
+        });
+      return;
+    }
     now.playing = false; store.set('now', now);
     saveNowPerMode(store, now); broadcast('now', publicNow()); return;
   }
@@ -494,6 +533,7 @@ app.post('/api/ai/radio', async (request) => {
     store,
     mood,
     userRequest,
+    autoContinue: request.body?.autoContinue === true,
     deferTts: true,
     onTtsReady: (updatedPlan) => {
       broadcast('plan', updatedPlan);
@@ -521,6 +561,7 @@ app.post('/api/ai/search', async (request) => {
     mode: 'search',
     userRequest: query,
     currentPlan,
+    autoContinue: request.body?.autoContinue === true,
     deferTts: true,
     onTtsReady: (updatedPlan) => {
       broadcast('plan', updatedPlan);
@@ -552,6 +593,7 @@ app.post('/api/ai/next-radio', async (request) => {
     mood,
     userRequest: scene,
     currentPlan,
+    autoContinue: request.body?.autoContinue === true,
     deferTts: true,
     onTtsReady: (updatedPlan) => {
       broadcast('plan', updatedPlan);
@@ -589,6 +631,7 @@ app.post('/api/ai/game-radio', async (request) => {
     userRequest,
     gameName,
     gameVibe,
+    autoContinue: request.body?.autoContinue === true,
     deferTts: true,
     onTtsReady: (updatedPlan) => {
       broadcast('plan', updatedPlan);
@@ -932,6 +975,7 @@ function sendRawCastMedia(req, res) {
 }
 
 const distDir = path.resolve(process.cwd(), 'dist');
+const switchCompanionSrcDir = path.resolve(process.cwd(), "switch-companion", "src");
 if (fs.existsSync(distDir)) {
   webApp.post('/api/cast/stop', async () => {
     clearCastLease();
@@ -942,6 +986,9 @@ if (fs.existsSync(distDir)) {
   await webApp.register(fastifyStatic, {
     root: distDir,
     prefix: '/'
+  });
+  webApp.get("/switch", async (_request, reply) => {
+    return reply.sendFile("index.html", { root: switchCompanionSrcDir });
   });
   webApp.setNotFoundHandler((request, reply) => reply.sendFile('index.html'));
   await webApp.listen({ host: config.host, port: config.webPort });

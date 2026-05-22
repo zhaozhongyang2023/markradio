@@ -101,6 +101,7 @@ async function getEndpointTracks(store, endpoint, params, mood, sourceLabel) {
     return { error };
   });
   if (data?.error) return [];
+  markServiceSuccess("netease");
   return normalizeNeteaseResponse(data, mood, sourceLabel);
 }
 

@@ -106,6 +106,15 @@ deploy_to() {
     remote "$user" "$host" "$pass" "rm -rf /tmp/moodwave-deck-sync"
     green "  ✓ Decky 插件已同步"
   fi
+  # Switch 插件同步（使 /switch 路由可用）
+  if [ -f "$PROJECT_DIR/switch-companion/src/index.html" ]; then
+    echo '  [2c/3] 同步 Switch 插件...'
+    remote "$user" "$host" "$pass" "mkdir -p $dir/switch-companion/src"
+    remote_rsync "$user" "$host" "$pass" \
+      "$PROJECT_DIR/switch-companion/src/index.html" "$user@$host:$dir/switch-companion/src/"
+    green '  ✓ Switch 插件已同步'
+  fi
+
 
   # 3. 重启服务
   echo "  [3/3] 远端执行: $mode_override..."
