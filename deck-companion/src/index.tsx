@@ -28,6 +28,7 @@ type NowPayload = {
     track?: Track | null;
     playing?: boolean;
     progressRatio?: number;
+    playSeq?: number;
     mood?: string;
     mode?: string;
   };
@@ -272,9 +273,10 @@ function Content() {
     } else {
       setLocalProgressRatio(serverProgressRatio);
     }
-  }, [playing, track?.id || track?.sourceId || track?.title]);
+  }, [playing, track?.id || track?.sourceId || track?.title, playSeq]);
 
   const progressRatio = playing ? localProgressRatio : serverProgressRatio;
+  const playSeq = Number(now.now?.playSeq) || 0;
 
   const currentMood = (now.now?.mood || currentPlan?.mood || now.plans?.radio?.mood || '').trim();
   const queue = currentPlan?.queue || [];
