@@ -2,7 +2,7 @@
 
 # 🎵 MoodWave V6 — AI DJ 电台
 
-<p align="center"><img src="public/hero.png?v=2" width="600" alt="MoodWave Hero"></p>
+<p align="center"><img src="public/hero.png" width="800" alt="MoodWave Hero"></p>
 
 ## 它是什么
 
