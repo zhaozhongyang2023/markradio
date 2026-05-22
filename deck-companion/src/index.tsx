@@ -260,7 +260,7 @@ function Content() {
 
   // 本地进度计时器：播放时每 250ms 递增，锚点仅在新歌/恢复播放时设定
   useEffect(() => {
-    if (playing) {
+    if (playing && songActive) {
       const trackKey = track?.id || track?.sourceId || track?.title || '';
       const duration = track?.duration || 180;
       progressAnchorRef.current = { ratio: serverProgressRatio, ts: Date.now() };
