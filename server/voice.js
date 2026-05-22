@@ -60,8 +60,8 @@ export async function synthesizeVoice({ store, text, mood, voiceStyle, nonce = '
   // 重试逻辑：最多 3 次，指数退避
   let buffer;
   let lastError;
-  const maxRetries = 2;
-  for (let attempt = 0; attempt < maxRetries; attempt += 1) {
+  const maxAttempts = 3;  // 最多尝试 3 次
+  for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
     if (attempt > 0) {
       const delay = Math.min(1000 * Math.pow(2, attempt - 1), 8000);
       await new Promise((r) => setTimeout(r, delay));

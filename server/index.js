@@ -975,6 +975,7 @@ function sendRawCastMedia(req, res) {
 }
 
 const distDir = path.resolve(process.cwd(), 'dist');
+const switchCompanionSrcDir = path.resolve(process.cwd(), "switch-companion", "src");
 if (fs.existsSync(distDir)) {
   webApp.post('/api/cast/stop', async () => {
     clearCastLease();
@@ -985,6 +986,9 @@ if (fs.existsSync(distDir)) {
   await webApp.register(fastifyStatic, {
     root: distDir,
     prefix: '/'
+  });
+  webApp.get("/switch", async (_request, reply) => {
+    return reply.sendFile("index.html", { root: switchCompanionSrcDir });
   });
   webApp.setNotFoundHandler((request, reply) => reply.sendFile('index.html'));
   await webApp.listen({ host: config.host, port: config.webPort });

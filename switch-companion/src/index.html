@@ -1,0 +1,695 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+<meta name="theme-color" content="#080909" />
+<title>MoodWave Switch</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; background: #080909; color: rgba(255,255,255,.86); font-family: -apple-system, "Helvetica Neue", sans-serif; -webkit-font-smoothing: antialiased; overflow-x: hidden; }
+  body { display: flex; justify-content: center; align-items: flex-start; }
+
+  .mw-root {
+    position: relative;
+    width: 100%; max-width: 560px;
+    padding: 10px 14px 40px;
+    min-height: 100%;
+  }
+  .mw-progress {
+    position: absolute; top: 0; left: 0; height: 2px;
+    background: #42d8b2; transition: width .3s ease;
+    border-radius: 0 1px 1px 0; z-index: 10;
+  }
+  .mw-icon-img { width: 18px; height: 18px; opacity: .7; }
+  .mw-brand-bar {
+    display: flex; align-items: center; gap: 6px;
+    margin-bottom: 8px; padding-bottom: 8px;
+    border-bottom: 1px solid rgba(255,255,255,.06);
+  }
+  .mw-brand-bar span {
+    color: rgba(255,255,255,.38); font-size: 12px;
+    font-weight: 600; letter-spacing: .02em;
+  }
+  .mw-status {
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 8px; margin: 0 0 8px;
+    color: rgba(255,255,255,.52); font-size: 13px; line-height: 16px; min-width: 0;
+  }
+  .mw-topbar {
+    display: grid; grid-template-columns: minmax(0, 1fr) 36px;
+    gap: 6px; margin-bottom: 10px;
+  }
+  .mw-tabs { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 5px; }
+  .mw-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+  .mw-grid.two { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .mw-button {
+    display: flex; align-items: center; justify-content: center; gap: 0;
+    width: 100%; min-width: 0; height: 40px; padding: 0 8px;
+    border: 1px solid rgba(255,255,255,.11); border-radius: 8px;
+    background: rgba(255,255,255,.055); color: rgba(255,255,255,.76);
+    font-size: 14px; font-weight: 700; line-height: 1;
+    letter-spacing: 0; text-align: center; white-space: nowrap;
+    overflow: hidden; text-overflow: ellipsis;
+    cursor: pointer; -webkit-tap-highlight-color: transparent;
+  }
+  .mw-button.is-active {
+    border-color: rgba(66,216,178,.7); background: rgba(66,216,178,.16); color: #42d8b2;
+  }
+  .mw-button:disabled { opacity: .42; cursor: default; }
+  .mw-button.is-icon {
+    display: flex; align-items: center; justify-content: center;
+    padding: 0; font-size: 18px; line-height: 1; text-overflow: clip;
+  }
+  .mw-button .mw-icon {
+    display: inline-block; min-width: 16px; margin-right: 5px;
+    color: rgba(66,216,178,.92); font-size: 13px; text-align: center;
+  }
+  .mw-button.is-icon .mw-icon { margin-right: 0; }
+  .mw-button.is-transport { padding: 0; font-size: 18px; line-height: 1; text-overflow: clip; }
+  .mw-busy-dot {
+    display: inline-block; width: 7px; height: 7px; margin-right: 6px;
+    border-radius: 999px; background: #42d8b2;
+    box-shadow: 0 0 8px rgba(66,216,178,.7); vertical-align: 1px;
+    animation: mw-pulse 1.2s ease-in-out infinite;
+  }
+  @keyframes mw-pulse {
+    0%, 100% { opacity: 1; box-shadow: 0 0 8px rgba(66,216,178,.7); }
+    50% { opacity: .4; box-shadow: 0 0 4px rgba(66,216,178,.3); }
+  }
+  .mw-busy-ellipsis {
+    display: inline-flex; gap: 3px; margin-left: 2px;
+  }
+  .mw-busy-ellipsis i {
+    display: inline-block; width: 5px; height: 5px; border-radius: 50%;
+    background: #42d8b2; animation: mw-bounce 1.2s ease-in-out infinite;
+  }
+  .mw-busy-ellipsis i:nth-child(1) { animation-delay: 0s; }
+  .mw-busy-ellipsis i:nth-child(2) { animation-delay: .2s; }
+  .mw-busy-ellipsis i:nth-child(3) { animation-delay: .4s; }
+  @keyframes mw-bounce {
+    0%, 80%, 100% { transform: translateY(0); opacity: .3; }
+    40% { transform: translateY(-5px); opacity: 1; }
+  }
+  .mw-button:focus-visible { outline: 2px solid #42d8b2; outline-offset: 1px; }
+
+  .mw-card {
+    padding: 10px 14px; border: 1px solid rgba(255,255,255,.08);
+    border-radius: 8px; background: rgba(255,255,255,.04); min-width: 0;
+  }
+  .mw-card-accent { background: rgba(66,216,178,0.06); }
+  .mw-mini { margin-bottom: 10px; }
+  .mw-mini-head {
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 8px; margin-bottom: 8px;
+  }
+  .mw-mini-title {
+    min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    color: rgba(255,255,255,.82); font-size: 14px; font-weight: 800;
+  }
+  .mw-mini-state {
+    flex: 0 0 auto; color: rgba(66,216,178,.86);
+    font-size: 12px; font-weight: 800;
+  }
+  .mw-progress-bar {
+    height: 3px; margin: 6px 0 0; border-radius: 2px;
+    background: rgba(255,255,255,.08); overflow: hidden;
+  }
+  .mw-progress-bar-fill {
+    height: 100%; background: #42d8b2; border-radius: 2px; transition: width .5s linear;
+  }
+  .mw-minimal { padding: 6px 0; }
+  .mw-minimal-logo {
+    position: absolute; top: 10px; right: 10px;
+    width: 18px; height: 18px; opacity: .5;
+  }
+  .mw-minimal-tags { display: flex; align-items: center; gap: 6px; margin-bottom: 6px; flex-wrap: wrap; }
+  .mw-minimal-tag {
+    display: inline-flex; align-items: center; padding: 2px 8px;
+    border: 1px solid rgba(255,255,255,.1); border-radius: 4px;
+    background: rgba(255,255,255,.04); color: rgba(255,255,255,.78);
+    font-size: 11px; font-weight: 600; line-height: 18px;
+  }
+  .mw-minimal-world-card {
+    padding: 14px 16px; border: 1px solid rgba(255,255,255,.1);
+    border-radius: 8px; background: rgba(255,255,255,.04);
+    margin-bottom: 12px; min-width: 0;
+  }
+  .mw-minimal-world-location { color: rgba(255,255,255,.52); font-size: 14px; margin-bottom: 10px; }
+  .mw-minimal-world-label { color: rgba(255,255,255,.38); font-size: 12px; font-weight: 600; margin-bottom: 4px; letter-spacing: .04em; }
+  .mw-minimal-world-game { color: rgba(255,255,255,.92); font-size: 22px; font-weight: 800; margin-bottom: 10px; line-height: 1.2; }
+  .mw-minimal-world-mood { color: rgba(255,255,255,.6); font-size: 13px; font-weight: 500; }
+  .mw-minimal-scene { color: rgba(255,255,255,.78); font-size: 11px; font-weight: 500; margin-bottom: 12px; line-height: 1.3; letter-spacing: .02em; }
+  .mw-minimal-loading { display: flex; align-items: center; gap: 6px; margin-bottom: 12px; }
+  .mw-minimal-loading-bar { flex: 1; height: 3px; border-radius: 2px; background: rgba(255,255,255,.08); }
+  .mw-minimal-loading-fill { height: 100%; border-radius: 2px; background: #42d8b2; transition: width .3s linear; }
+  .mw-minimal-loading-pct { color: rgba(66,216,178,.78); font-size: 11px; font-weight: 600; min-width: 28px; text-align: right; }
+  .mw-minimal-quote {
+    padding: 12px 14px; border-left: 4px solid #42d8b2;
+    border-radius: 0 8px 8px 0; background: rgba(66,216,178,.08);
+    color: #42d8b2; font-size: 16px; font-weight: 700;
+    line-height: 1.4; margin-bottom: 12px; min-width: 0;
+  }
+  .mw-minimal-quote-track {
+    font-size: 13px; font-weight: 500; color: rgba(66,216,178,.6);
+    border-left: none; padding-left: 14px; margin-top: -4px;
+  }
+  .mw-minimal-playing { color: rgba(66,216,178,.78); font-size: 11px; font-weight: 600; margin-bottom: 3px; }
+  .mw-minimal-track {
+    color: rgba(255,255,255,.74); font-size: 14px; font-weight: 700;
+    margin-bottom: 8px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .mw-minimal-progress { height: 2.5px; margin-bottom: 10px; border-radius: 2px; background: rgba(255,255,255,.08); overflow: hidden; }
+  .mw-minimal-progress-fill { height: 100%; background: #42d8b2; border-radius: 2px; transition: width .5s linear; }
+  .mw-minimal-lyric {
+    color: rgba(255,255,255,.48); font-size: 11px; margin-bottom: 8px;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .mw-minimal-transport { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 5px; margin-bottom: 6px; }
+  .mw-minimal-transport .mw-button { font-size: 16px; height: 36px; }
+  .mw-minimal-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+  .mw-minimal-actions .mw-button { height: 36px; font-size: 13px; }
+  .mw-minimal-toggle {
+    flex: 0 0 auto; padding: 2px 8px;
+    border: 1px solid rgba(66,216,178,.5); border-radius: 4px;
+    background: transparent; color: #42d8b2;
+    font-size: 12px; font-weight: 700; cursor: pointer; line-height: 18px;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .mw-section-title {
+    display: flex; align-items: center; gap: 6px;
+    margin: 10px 0 6px; color: rgba(255,255,255,.9);
+    font-size: 18px; font-weight: 800; line-height: 20px;
+  }
+  .mw-section-title span { color: #42d8b2; font-size: 16px; }
+  .mw-action-row {
+    display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 6px; margin-top: 10px;
+  }
+  .mw-dj { margin-bottom: 6px; color: #42d8b2; font-size: 14px; font-weight: 700; line-height: 1.35; }
+  .mw-song { padding: 5px 0; border-top: 1px solid rgba(255,255,255,.06); min-width: 0; }
+  .mw-song:first-of-type { border-top: 0; padding-top: 0; }
+  .mw-song-active {
+    position: relative; padding-left: 8px;
+    border-left: 3px solid #42d8b2; background: rgba(66,216,178,0.04); border-radius: 2px;
+  }
+  .mw-song-active::before {
+    content: "▶"; position: absolute; left: -18px; top: 5px;
+    font-size: 10px; color: #42d8b2;
+  }
+  .mw-song-title, .mw-track { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .mw-song-title { color: rgba(255,255,255,.82); font-size: 13px; font-weight: 700; }
+  .mw-song-artist, .mw-song-reason { color: rgba(255,255,255,.46); font-size: 12px; line-height: 1.35; }
+  .mw-track { margin-bottom: 8px; color: rgba(255,255,255,.78); font-size: 14px; font-weight: 700; }
+
+  .mw-input {
+    width: 100%; height: 40px; padding: 0 10px;
+    border: 1px solid rgba(255,255,255,.11); border-radius: 8px;
+    background: rgba(255,255,255,.055); color: rgba(255,255,255,.76);
+    font-size: 14px; outline: none; -webkit-appearance: none;
+  }
+  .mw-input:focus { border-color: rgba(66,216,178,.7); }
+  .mw-input-label { display: block; color: rgba(255,255,255,.52); font-size: 12px; font-weight: 600; margin-bottom: 4px; }
+  .mw-input-wrap { margin-bottom: 10px; }
+  .mw-spacer { margin-top: 10px; }
+
+  @media (max-width: 480px) {
+    .mw-root { padding: 8px 10px 36px; }
+    .mw-button { height: 36px; font-size: 13px; }
+    .mw-section-title { font-size: 16px; }
+  }
+</style>
+</head>
+<body>
+<div class="mw-root" id="app"></div>
+<script>
+(function() {
+  'use strict';
+
+  // ─── constants ───
+  var moods = [
+    { id: '开心', icon: '☼' },
+    { id: '平静', icon: '◌' },
+    { id: '忧郁', icon: '☁' },
+    { id: '悲伤', icon: '☂' },
+    { id: '治愈', icon: '✦' },
+    { id: '愤怒', icon: '⚡' }
+  ];
+  var searchExamples = [
+    { id: '雨天英文老歌', icon: '🌧' },
+    { id: '中古世纪民谣', icon: '🎻' },
+    { id: '九零年代港乐', icon: '📼' },
+    { id: '儿时玩的网吧', icon: '🖥' }
+  ];
+  var gameVibes = [
+    { id: 'Boss战', icon: '⚔', hint: '今晚燃一点，法印按到底' },
+    { id: '探索地图', icon: '⌖', hint: '慢慢走，不急着赶路' },
+    { id: '雨夜跑图', icon: '🌙', hint: '外面下雨，适合慢慢走' },
+    { id: '赛车竞速', icon: '🏎️', hint: '今晚速度别停' },
+    { id: '种田放松', icon: '✧', hint: '今晚别太累了' },
+    { id: '模拟器怀旧', icon: '▣', hint: '像小时候一样' }
+  ];
+  var cityNameMap = {
+    'Rongcheng':'荣成','Beijing':'北京','Shanghai':'上海','Guangzhou':'广州',
+    'Shenzhen':'深圳','Hangzhou':'杭州','Chengdu':'成都','Nanjing':'南京',
+    'Wuhan':'武汉','Xiamen':'厦门','Qingdao':'青岛','Dalian':'大连',
+    'Suzhou':'苏州','Chongqing':'重庆','Xian':'西安','Changsha':'长沙',
+    'Kunming':'昆明','Fuzhou':'福州','Zhengzhou':'郑州','Jinan':'济南',
+    'Harbin':'哈尔滨','Shenyang':'沈阳','Tianjin':'天津'
+  };
+  function cityLabel(raw) { var name = (raw||'').split(',')[0].trim(); return cityNameMap[name]||name; }
+
+  // ─── state ───
+  var apiBase = (function() {
+    var port = window.location.port;
+    if (port === '8765' || port === '38765') return '';
+    if (port === '8080') return window.location.protocol + '//' + window.location.hostname + ':8765';
+    return window.location.protocol + '//' + window.location.hostname + ':8765';
+  })();
+  var page = 'radio';
+  var now = {};
+  var busy = false;
+  var progress = 0;
+  var statusText = '连接中';
+  var query = searchExamples[0].id;
+  var gameVibe = '探索地图';
+  var gameName = '';
+  var gameNameEdited = false;
+  var minimalMode = false;
+  var autoContinue = false;
+  var localProgressRatio = 0;
+  var progressAnchor = { ratio: 0, ts: 0 };
+  var runTimer = null;
+  var pollTimer = null;
+  var progressTimer = null;
+
+  // ─── API ───
+  function apiRequest(path, body) {
+    var url = apiBase.replace(/\/+$/,'') + path;
+    var opts = { method: body ? 'POST' : 'GET', headers: body ? {'Content-Type':'application/json'} : undefined, body: body ? JSON.stringify(body) : undefined };
+    return fetch(url, opts).then(function(res) {
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      return res.json();
+    });
+  }
+
+  // ─── render helpers ───
+  function el(tag, cls, html) { var e = document.createElement(tag); if (cls) e.className = cls; if (html) e.innerHTML = html; return e; }
+  function btn(cls, html, active, disabled, title, onclick) {
+    var b = el('button', cls, html);
+    if (active) b.classList.add('is-active');
+    if (disabled) b.disabled = true;
+    if (title) b.title = title;
+    if (onclick) b.addEventListener('click', onclick);
+    return b;
+  }
+  function render() { document.getElementById('app').innerHTML = ''; document.getElementById('app').appendChild(buildDOM()); }
+
+  // ─── data ───
+  function getCurrentPlan() { return minimalMode ? now.plan : ((page!=='settings' && now.plans && now.plans[page]) ? now.plans[page] : now.plan); }
+  function getTrack() { var p = getCurrentPlan(); return (now.now && now.now.track) || (p && p.queue && p.queue[0]) || null; }
+  function getPlaying() { return !!(now.now && now.now.playing); }
+  function getProgressRatio() {
+    var serverRatio = (now.now && now.now.progressRatio) ? Number(now.now.progressRatio) : 0;
+    return getPlaying() ? localProgressRatio : serverRatio;
+  }
+  function getCurrentMood() { var p = getCurrentPlan(); return ((now.now && now.now.mood) || (p && p.mood) || '').trim(); }
+  function getQueue() { var p = getCurrentPlan(); return (p && p.queue) || []; }
+  function getDjLine() { var p = getCurrentPlan(); return (p && p.tts && p.tts.text) || (p && p.plan && p.plan.say) || (p && p.plan && p.plan.reply) || ''; }
+  function getDjForTrack() {
+    var p = getCurrentPlan(); var t = getTrack(); var q = p && p.queue;
+    if (!q || !t) return '';
+    for (var i = 0; i < q.length; i++) { if (q[i].id === t.id || q[i].sourceId === t.sourceId) { if (p.cardTts && p.cardTts[i] && p.cardTts[i].text) return p.cardTts[i].text; break; } }
+    return '';
+  }
+  function getTrackLine() { var t = getTrack(); return t && t.title ? t.title + (t.artist ? ' - ' + t.artist : '') : 'AI DJ 准备中...'; }
+  function getActiveMode() {
+    var m = now.now && now.now.mode;
+    if (m === 'radio' || m === 'search' || m === 'game') return m;
+    var plans = now.plans || {}; var p = now.plan;
+    if (p && p.queue && p.queue.length) {
+      var modes = ['game','search','radio'];
+      for (var i = 0; i < modes.length; i++) {
+        var mp = plans[modes[i]];
+        if (mp && mp.queue && mp.queue.length && mp.queue[0].id === p.queue[0].id) return modes[i];
+      }
+    }
+    if (plans.game && plans.game.queue && plans.game.queue.length) return 'game';
+    if (plans.search && plans.search.queue && plans.search.queue.length) return 'search';
+    if (plans.radio && plans.radio.queue && plans.radio.queue.length) return 'radio';
+    return null;
+  }
+  function getSceneText() {
+    var mode = getActiveMode();
+    if (mode === 'game' && gameName.trim()) return '🎮 正在陪你玩 ' + gameName.trim();
+    if (mode === 'game') { var v = gameVibes.filter(function(g){return g.id===gameVibe;})[0]; return v ? v.icon+' '+v.id+' — ' + v.hint : ('🎮 '+(gameVibe||'游戏电台')); }
+    if (mode === 'search') return query.trim() ? '寻歌 · ' + query.trim() : '寻歌电台';
+    return getCurrentMood() ? '心情电台 · ' + getCurrentMood() : '心情电台';
+  }
+  function getWorldContext() {
+    var w = now.weather || {};
+    var c = cityLabel(w.city||'');
+    var cond = w.condition||'未知';
+    var temp = w.temperature!=null ? ' ' + Math.round(w.temperature) + '°C' : '';
+    var hasGame = getActiveMode()==='game' && !!gameName.trim();
+    var mi = moods.filter(function(m){return m.id===getCurrentMood();})[0];
+    var moodIcon = mi ? mi.icon : '';
+    var vs = (now.plan && now.plan.plan && now.plan.plan.gameVibeSentence) || '';
+    var v = gameVibes.filter(function(g){return g.id===gameVibe;})[0];
+    var vh = v ? v.hint : '';
+    return {city:c,condition:cond,temp:temp,hasGame:hasGame,moodIcon:moodIcon,vibeSentence:vs,vibeHint:vh};
+  }
+  function getCurrentLyric(track, ratio) {
+    if (!track || !track.lyric || !track.lyric.length) return '';
+    var dur = track.duration || 180; var sec = ratio * dur; var idx = -1;
+    for (var i = 0; i < track.lyric.length; i++) { if (track.lyric[i].time <= sec) idx = i; else break; }
+    return idx >= 0 ? track.lyric[idx].text : '';
+  }
+  function handleMinimalNextBetter() {
+    var mode = getActiveMode();
+    if (mode === 'game') startGameRadio('换个感觉');
+    else if (mode === 'radio') nextRadio('');
+    else nextRadio(query);
+  }
+
+  // ─── actions ───
+  function setApiBase(v) { apiBase = v.replace(/\/+$/,''); apiRequest('/api/now').then(function(p){now=p;statusText='在线';render();}).catch(function(){}); }
+  function switchMode(mode) {
+    if (mode === 'settings') { page = 'settings'; render(); return; }
+    page = mode;
+    apiRequest('/api/switch-mode',{mode:mode}).catch(function(){});
+    refresh();
+  }
+  function run(label, task) {
+    busy = true; statusText = label; progress = 0; render();
+    runTimer = setInterval(function() {
+      if (progress >= 85) return;
+      var step = progress < 30 ? 6 : progress < 60 ? 3 : 1;
+      progress = Math.min(85, progress + step);
+      var pb = document.getElementById('mw-global-progress');
+      if (pb) pb.style.width = progress + '%';
+    }, 200);
+    task().then(function() {
+      progress = 100; var pb = document.getElementById('mw-global-progress'); if (pb) pb.style.width = '100%';
+      setTimeout(function() { progress = 0; refresh(); }, 600);
+    }).catch(function(e) {
+      progress = 0; statusText = (e && e.message || String(e)).slice(0, 40); refresh();
+    }).then(function() {
+      clearInterval(runTimer); runTimer = null; busy = false; render();
+    });
+  }
+  function refresh() {
+    apiRequest('/api/now').then(function(p) { now = p; statusText = '在线'; try { if (!gameNameEdited && window.DFL && window.DFL.Router && window.DFL.Router.MainRunningApp) { var rn = window.DFL.Router.MainRunningApp.display_name; if (rn) gameName = String(rn); } } catch(e){} render(); }).catch(function(e) { statusText = '离线: ' + (e&&e.message||String(e)).slice(0,40); render(); });
+  }
+  function startRadio(mood) { run('正在开台 · ' + mood, function() { return apiRequest('/api/ai/radio',{mood:mood,mode:'steamdeck',deferTts:true,autoContinue:autoContinue}); }); }
+  function searchRadio() {
+    var p = query.trim(); if (!p) return;
+    run('正在找歌单', function() { return apiRequest('/api/ai/search',{query:p,mode:'steamdeck',deferTts:true,autoContinue:autoContinue}); });
+  }
+  function nextRadio(scene) { run('正在换氛围', function() { return apiRequest('/api/ai/next-radio',{scene:scene||'',mode:'steamdeck',deferTts:true,autoContinue:autoContinue}); }); }
+  function startGameRadio(label) {
+    var v = gameVibes.filter(function(g){return g.id===gameVibe;})[0];
+    run(label||'AI DJ 准备中', function() { return apiRequest('/api/ai/game-radio',{gameVibe:gameVibe,gameName:gameName.trim()||undefined,vibeHint:v?v.hint:'',mode:'steamdeck',deferTts:true,autoContinue:autoContinue}); });
+  }
+
+  // ─── progress timer ───
+  function updateProgressTimer() {
+    clearInterval(progressTimer);
+    var track = getTrack(); var playing = getPlaying();
+    if (playing && track && track.duration) {
+      var sr = (now.now && now.now.progressRatio) ? Number(now.now.progressRatio) : 0;
+      progressAnchor = { ratio: sr, ts: Date.now() };
+      localProgressRatio = sr;
+      progressTimer = setInterval(function() {
+        var elapsed = (Date.now() - progressAnchor.ts) / 1000;
+        var dur = track.duration || 180;
+        localProgressRatio = Math.min(0.99, progressAnchor.ratio + elapsed / dur);
+        render();
+      }, 250);
+    } else {
+      localProgressRatio = (now.now && now.now.progressRatio) ? Number(now.now.progressRatio) : 0;
+    }
+  }
+
+  // ─── poll ───
+  function startPoll() {
+    refresh();
+    pollTimer = setInterval(refresh, 5000);
+    document.addEventListener('visibilitychange', function() { if (document.visibilityState === 'visible') refresh(); });
+  }
+
+  // ─── DOM builder ───
+  function buildDOM() {
+    var root = el('div', 'mw-root');
+    var cp = getCurrentPlan(); var track = getTrack(); var playing = getPlaying();
+    var pr = getProgressRatio(); var cm = getCurrentMood();
+    var queue = getQueue(); var djLine = getDjLine(); var djForTrack = getDjForTrack();
+
+    // global progress bar
+    if (busy || progress > 0) {
+      var pb = el('div', 'mw-progress'); pb.id = 'mw-global-progress'; pb.style.width = progress + '%'; root.appendChild(pb);
+    }
+
+    if (minimalMode && track) {
+      // ─── minimal mode ───
+      var mm = el('div', 'mw-minimal');
+      mm.style.position = 'relative';
+      mm.appendChild(el('div', 'mw-minimal-logo', '🎵'));
+
+      var ctx = getWorldContext();
+      if (ctx.hasGame) {
+        var wc = el('div', 'mw-minimal-world-card');
+        wc.appendChild(el('div', 'mw-minimal-world-location', '📍 '+(ctx.city||'本地')+' · '+ctx.condition+ctx.temp));
+        wc.appendChild(el('div', 'mw-minimal-world-label', '正在陪你玩'));
+        wc.appendChild(el('div', 'mw-minimal-world-game', '🎮 '+gameName));
+        var moodStr = (ctx.moodIcon?ctx.moodIcon+' ':'')+cm+(ctx.vibeSentence?' · "'+ctx.vibeSentence+'"':ctx.vibeHint?' · '+ctx.vibeHint:'');
+        wc.appendChild(el('div', 'mw-minimal-world-mood', moodStr));
+        mm.appendChild(wc);
+      } else {
+        var tags = el('div', 'mw-minimal-tags');
+        if (now.weather) {
+          tags.appendChild(el('div', 'mw-minimal-tag', (cityLabel(now.weather.city||'')||'本地')+' · '+(now.weather.condition||'未知')+(now.weather.temperature!=null?' '+Math.round(now.weather.temperature)+'°C':'')));
+        } else { tags.appendChild(el('div', 'mw-minimal-tag', '本地 · 未知')); }
+        if (cm) tags.appendChild(el('div', 'mw-minimal-tag', cm));
+        mm.appendChild(tags);
+        mm.appendChild(el('div', 'mw-minimal-scene', getSceneText()));
+      }
+
+      if (busy) {
+        var ld = el('div', 'mw-minimal-loading');
+        var ldb = el('div', 'mw-minimal-loading-bar');
+        var ldf = el('div', 'mw-minimal-loading-fill'); ldf.style.width = progress+'%'; ldb.appendChild(ldf);
+        ld.appendChild(ldb);
+        ld.appendChild(el('div', 'mw-minimal-loading-pct', progress+'%'));
+        mm.appendChild(ld);
+      }
+
+      if (djLine) mm.appendChild(el('div', 'mw-minimal-quote', djLine));
+      if (djForTrack) { var qt = el('div', 'mw-minimal-quote mw-minimal-quote-track', djForTrack); mm.appendChild(qt); }
+
+      mm.appendChild(el('div', 'mw-minimal-playing', '📻 正在陪你'));
+      mm.appendChild(el('div', 'mw-minimal-track', (track.title||'未知歌曲')+(track.artist?' — '+track.artist:'')));
+
+      if (playing) {
+        var mpb = el('div', 'mw-minimal-progress');
+        var mpbf = el('div', 'mw-minimal-progress-fill'); mpbf.style.width = Math.round(pr*100)+'%'; mpb.appendChild(mpbf);
+        mm.appendChild(mpb);
+      }
+
+      (function() {
+        var lyric = getCurrentLyric(track, pr);
+        if (lyric) mm.appendChild(el('div', 'mw-minimal-lyric', lyric));
+      })();
+
+      var trans = el('div', 'mw-minimal-transport');
+      trans.appendChild(btn('mw-button is-transport', '⏮', false, busy, '上一首', function() { run('上一首', function() { return apiRequest('/api/prev',{}); }); }));
+      trans.appendChild(btn('mw-button is-transport', playing?'⏯':'▶', false, busy, playing?'暂停':'播放', function() { run(playing?'暂停':'播放', function() { return apiRequest(playing?'/api/pause':'/api/play',{}); }); }));
+      trans.appendChild(btn('mw-button is-transport', '⏭', false, busy, '下一首', function() { run('下一首', function() { return apiRequest('/api/next',{}); }); }));
+      mm.appendChild(trans);
+
+      var act = el('div', 'mw-minimal-actions');
+      act.appendChild(btn('mw-button', '↻ 来点别的', false, busy, '', handleMinimalNextBetter));
+      act.appendChild(btn('mw-button', '✦ 打开电台', false, false, '', function() { minimalMode = false; render(); }));
+      mm.appendChild(act);
+
+      root.appendChild(mm);
+      // update progress timer
+      updateProgressTimer();
+      return root;
+    }
+
+    // ─── standard mode ───
+    // status bar
+    var st = el('div', 'mw-status');
+    var stLeft = '';
+    if (busy) {
+      stLeft = '<span style="font-size:12px;opacity:.6;margin-right:8px">'+progress+'%</span><span class="mw-busy-dot"></span><span>'+statusText+'</span><span class="mw-busy-ellipsis"><i></i><i></i><i></i></span>';
+    } else {
+      stLeft = statusText + (cm ? ' · ' + cm : '');
+    }
+    st.innerHTML = '<span>' + stLeft + '</span>';
+    if (playing && track) {
+      var toggle = el('button', 'mw-minimal-toggle', '◁ 极简');
+      toggle.addEventListener('click', function() { minimalMode = true; render(); });
+      st.appendChild(toggle);
+    }
+    root.appendChild(st);
+
+    // brand bar
+    var bb = el('div', 'mw-brand-bar');
+    bb.innerHTML = '<span class="mw-icon-img">🎵</span><span>MoodWave · AI DJ</span>';
+    root.appendChild(bb);
+
+    // topbar
+    var tb = el('div', 'mw-topbar');
+    var tabs = el('div', 'mw-tabs');
+    tabs.appendChild(btn('mw-button' + (page==='radio'?' is-active':''), '<span class="mw-icon">◉</span>电台', false, busy, '', function() { switchMode('radio'); }));
+    tabs.appendChild(btn('mw-button' + (page==='search'?' is-active':''), '<span class="mw-icon">⌕</span>寻歌', false, busy, '', function() { switchMode('search'); }));
+    tabs.appendChild(btn('mw-button' + (page==='game'?' is-active':''), '<span class="mw-icon">▣</span>游戏', false, busy, '', function() { switchMode('game'); }));
+    tb.appendChild(tabs);
+    tb.appendChild(btn('mw-button is-icon' + (page==='settings'?' is-active':''), '<span>⚙</span>', false, busy, '设置', function() { switchMode('settings'); }));
+    root.appendChild(tb);
+
+    // mini player card
+    if (page !== 'settings') {
+      var mc = el('div', 'mw-card mw-mini');
+      var mh = el('div', 'mw-mini-head');
+      mh.appendChild(el('div', 'mw-mini-title', getTrackLine()));
+      mh.appendChild(el('div', 'mw-mini-state', playing ? '📻 正在陪你' : '我在等你'));
+      mc.appendChild(mh);
+
+      var mg = el('div', 'mw-grid');
+      mg.appendChild(btn('mw-button is-transport', playing?'Ⅱ':'▶', false, busy, playing?'暂停':'播放', function() { run(playing?'暂停':'播放', function() { return apiRequest(playing?'/api/pause':'/api/play',{}); }); }));
+      mg.appendChild(btn('mw-button is-transport', '‹', false, busy, '上一首', function() { run('上一首', function() { return apiRequest('/api/prev',{}); }); }));
+      mg.appendChild(btn('mw-button is-transport', '›', false, busy, '下一首', function() { run('下一首', function() { return apiRequest('/api/next',{}); }); }));
+      mc.appendChild(mg);
+
+      if (playing) {
+        var pb2 = el('div', 'mw-progress-bar');
+        var pbf2 = el('div', 'mw-progress-bar-fill'); pbf2.style.width = Math.round(pr*100)+'%'; pb2.appendChild(pbf2);
+        mc.appendChild(pb2);
+      }
+      root.appendChild(mc);
+    }
+
+    // ─── Radio Tab ───
+    if (page === 'radio') {
+      var rDiv = el('div');
+      var rt = el('div', 'mw-section-title'); rt.innerHTML = '<span>◉</span>现在是什么感觉？'; rDiv.appendChild(rt);
+      var rgc = el('div', 'mw-card');
+      var rg = el('div', 'mw-grid');
+      moods.forEach(function(mood) {
+        rg.appendChild(btn('mw-button' + (cm===mood.id?' is-active':''), '<span class="mw-icon">'+mood.icon+'</span>'+mood.id, false, busy, '', function() { startRadio(mood.id); }));
+      });
+      rgc.appendChild(rg); rDiv.appendChild(rgc);
+      var ar = el('div', 'mw-action-row');
+      ar.appendChild(btn('mw-button is-active', '▶ 开播', false, busy, '', function() { startRadio(cm||'平静'); }));
+      ar.appendChild(btn('mw-button', '↻ 来点别的', false, busy, '', function() { nextRadio(''); }));
+      rDiv.appendChild(ar);
+      root.appendChild(rDiv);
+    }
+
+    // ─── Search Tab ───
+    if (page === 'search') {
+      var sDiv = el('div');
+      var st = el('div', 'mw-section-title'); st.innerHTML = '<span>⌕</span>🎮 现在在玩什么？'; sDiv.appendChild(st);
+      var sc = el('div', 'mw-card');
+      var sg = el('div', 'mw-grid two');
+      searchExamples.forEach(function(ex) {
+        sg.appendChild(btn('mw-button'+(query===ex.id?' is-active':''), '<span class="mw-icon">'+ex.icon+'</span>'+ex.id, false, busy, ex.id, function() { query = ex.id; render(); }));
+      });
+      sc.appendChild(sg); sDiv.appendChild(sc);
+
+      var iw = el('div', 'mw-input-wrap');
+      iw.style.marginTop = '10px';
+      iw.appendChild(el('label', 'mw-input-label', '🎧 想听什么？'));
+      var inp = el('input', 'mw-input'); inp.value = query; inp.addEventListener('input', function() { query = this.value; });
+      iw.appendChild(inp); sDiv.appendChild(iw);
+
+      var ar2 = el('div', 'mw-action-row');
+      ar2.appendChild(btn('mw-button is-active', '▶ 开始电台', false, busy||!query.trim(), '', searchRadio));
+      ar2.appendChild(btn('mw-button', '↻ 来点别的', false, busy, '', function() { nextRadio(''); }));
+      sDiv.appendChild(ar2);
+      root.appendChild(sDiv);
+    }
+
+    // ─── Game Tab ───
+    if (page === 'game') {
+      var gDiv = el('div');
+      var gt = el('div', 'mw-section-title'); gt.innerHTML = '<span>▣</span>现在想怎么玩？'; gDiv.appendChild(gt);
+      var gc = el('div', 'mw-card');
+      var gg = el('div', 'mw-grid two');
+      gameVibes.forEach(function(vibe) {
+        gg.appendChild(btn('mw-button'+(gameVibe===vibe.id?' is-active':''), '<span class="mw-icon">'+vibe.icon+'</span>'+vibe.id, false, busy, vibe.hint, function() { gameVibe = vibe.id; render(); }));
+      });
+      gc.appendChild(gg); gDiv.appendChild(gc);
+
+      var iw2 = el('div', 'mw-input-wrap');
+      iw2.style.marginTop = '10px';
+      iw2.appendChild(el('label', 'mw-input-label', '🎮 现在在玩什么？'));
+      var inp2 = el('input', 'mw-input'); inp2.value = gameName;
+      inp2.addEventListener('input', function() { gameName = this.value; gameNameEdited = true; });
+      inp2.addEventListener('blur', function() { gameNameEdited = true; });
+      iw2.appendChild(inp2); gDiv.appendChild(iw2);
+
+      var ar3 = el('div', 'mw-action-row');
+      ar3.appendChild(btn('mw-button is-active', '▶ 开始电台', false, busy||!gameVibe, '', function() { startGameRadio('电台启动中'); }));
+      ar3.appendChild(btn('mw-button', '↻ 来点别的', false, busy||!gameVibe, '', function() { startGameRadio('换个感觉'); }));
+      gDiv.appendChild(ar3);
+      root.appendChild(gDiv);
+    }
+
+    // ─── Settings Tab ───
+    if (page === 'settings') {
+      var setDiv = el('div');
+      var setTitle = el('div', 'mw-section-title', '⚙ 设置'); setDiv.appendChild(setTitle);
+
+      var iw3 = el('div', 'mw-input-wrap');
+      iw3.appendChild(el('label', 'mw-input-label', '🎮 现在在玩什么？'));
+      var inp3 = el('input', 'mw-input'); inp3.value = gameName;
+      inp3.addEventListener('input', function() { gameName = this.value; gameNameEdited = false; });
+      inp3.addEventListener('blur', function() { gameNameEdited = true; });
+      iw3.appendChild(inp3); setDiv.appendChild(iw3);
+
+      var iw4 = el('div', 'mw-input-wrap');
+      iw4.appendChild(el('label', 'mw-input-label', 'API Base'));
+      var inp4 = el('input', 'mw-input'); inp4.value = apiBase;
+      inp4.addEventListener('input', function() { apiBase = this.value; });
+      iw4.appendChild(inp4); setDiv.appendChild(iw4);
+
+      setDiv.appendChild(btn('mw-button', '测试连接', false, busy, '', function() { run('测试连接', function() { return apiRequest('/api/now'); }); }));
+
+      var sp = el('div', 'mw-spacer');
+      sp.appendChild(btn('mw-button'+(autoContinue?' is-active':''), (autoContinue?'✓ ':'')+'自动续播 · 播完自动换下一组', false, false, '', function() { autoContinue = !autoContinue; render(); }));
+      setDiv.appendChild(sp);
+      root.appendChild(setDiv);
+    }
+
+    // ─── DJ Card ───
+    if (page !== 'settings' && (djLine || queue.length > 0)) {
+      var djDiv = el('div');
+      var djt = el('div', 'mw-section-title'); djt.innerHTML = '<span>✦</span>AI DJ'; djDiv.appendChild(djt);
+      var djc = el('div', 'mw-card mw-card-accent');
+      if (djLine) djc.appendChild(el('div', 'mw-dj', djLine));
+      queue.forEach(function(item, index) {
+        var isCur = track && (item.id===track.id || item.sourceId===track.sourceId);
+        var song = el('div', 'mw-song'+(isCur?' mw-song-active':''));
+        song.appendChild(el('div', 'mw-song-title', item.title||'未知歌曲'));
+        if (item.artist) song.appendChild(el('div', 'mw-song-artist', item.artist));
+        if (item.reason) song.appendChild(el('div', 'mw-song-reason', item.reason));
+        djc.appendChild(song);
+      });
+      djDiv.appendChild(djc);
+      root.appendChild(djDiv);
+    }
+
+    updateProgressTimer();
+    return root;
+  }
+
+  // ─── init ───
+  startPoll();
+})();
+</script>
+</body>
+</html>
