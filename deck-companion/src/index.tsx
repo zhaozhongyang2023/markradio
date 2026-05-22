@@ -268,7 +268,7 @@ function Content() {
     } else {
       setLocalProgressRatio(serverProgressRatio);
     }
-  }, [playing, track?.id]);
+  }, [playing, track?.id || track?.sourceId]);
 
   const progressRatio = playing ? localProgressRatio : serverProgressRatio;
 
