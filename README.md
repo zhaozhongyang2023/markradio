@@ -2,12 +2,9 @@
 
 # 🎵 MoodWave V6 — AI DJ 电台
 
-> **不是播放器。是会越来越懂你的 AI DJ。**
 
-| 打 Boss，AI 配燃曲。 | 跑图时，AI 陪你慢慢走。 | 它会越用越懂你。 |
-|:--:|:--:|:--:|
+<p align="center"><img src="public/hero.png" width="600" alt="MoodWave Hero"></p>
 
----
 
 ## 它是什么
 
@@ -41,6 +38,9 @@ MoodWave 不是播放器。不是 AI 工具。不是搜索系统。
 
 ---
 
+
+<p align="center"><img src="public/companion.png" width="700" alt="极简陪伴模式"></p>
+
 ## 🎧 Music DNA：让 AI DJ 越来越懂你
 
 MoodWave 可以从网易云喜欢的音乐和收藏歌单中分析你的音乐人格。
@@ -68,6 +68,9 @@ JRPG OST / LoFi / City Pop
 
 ## 核心体验
 
+<p align="center"><img src="public/ai-dj.png" width="700" alt="AI DJ 三大能力"></p>
+
+
 ### 📻 AI 电台 — 按心情开电台
 
 选一个心情（开心 / 平静 / 忧郁 / 悲伤 / 治愈 / 愤怒），AI DJ 自动生成：
@@ -78,6 +81,9 @@ JRPG OST / LoFi / City Pop
 - ▶️ **自动播放** — 点一下，剩下的全自动
 
 ### 🎮 Game Radio — 游戏氛围电台
+
+<p align="center"><img src="public/game-radio.png" width="800" alt="Game Radio 游戏融合"></p>
+
 
 **不用切出游戏**，Decky 插件里一键开启。
 
@@ -152,6 +158,9 @@ JRPG OST / LoFi / City Pop
 ---
 
 ## 快速开始
+
+<p align="center"><img src="public/web-radio.png" width="600" alt="Web Radio 界面"></p>
+
 
 ### Steam Deck 一键安装
 
