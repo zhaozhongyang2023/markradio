@@ -112,6 +112,7 @@ JRPG OST / LoFi / City Pop
 | 平台 | 模式 | 说明 |
 |------|------|------|
 | 🎮 Steam Deck | 桌面 PWA + 游戏模式 Decky 插件 | 主力平台，游戏模式极简世界卡片 |
+| 🎮 Switch | 浏览器伴侣 | Homebrew 打开网页即可，辅助场景 |
 | 🖥️ 树莓派 | 局域网电台 | 部署在 Pi 上，全家人共用 |
 | 💻 MacBook | 开发调试 | 本地 dev server |
 
