@@ -7,12 +7,12 @@
 <title>MoodWave Switch</title>
 <style>
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-  html, body { height: 100%; background: #080909; color: rgba(255,255,255,.86); font-family: -apple-system, "Helvetica Neue", sans-serif; -webkit-font-smoothing: antialiased; overflow-x: hidden; }
-  body { display: -webkit-flex; display: flex; -webkit-justify-content: center; justify-content: center; -webkit-align-items: flex-start; align-items: flex-start; }
+  html, body { width: 100%; height: 100%; background: #080909; color: rgba(255,255,255,.86); font-family: -apple-system, "Helvetica Neue", sans-serif; -webkit-font-smoothing: antialiased; overflow-x: hidden; }
+  body { width: 100%; display: flex; justify-content: center; align-items: flex-start; }
 
   .mw-root {
     position: relative;
-    width: 100%; max-width: 560px;
+    width: 100%; max-width: 560px; min-width: 320px;
     margin: 0 auto;
     padding: 12px 16px 50px;
     min-height: 100%;
@@ -33,7 +33,7 @@
     color: rgba(255,255,255,.38); font-size: 12px;
     font-weight: 600; letter-spacing: .02em;
   }
-  .mw-brand-img { width: 20px; height: 20px; opacity: .7; font-size: 16px; line-height: 20px; }
+  .mw-brand-img { width: 16px; height: 16px; opacity: .7; font-size: 14px; line-height: 16px; }
 
   .mw-status {
     display: -webkit-flex; display: flex; -webkit-align-items: center; align-items: center;
@@ -42,25 +42,24 @@
     color: rgba(255,255,255,.52); font-size: 13px; line-height: 16px; min-width: 0;
   }
   .mw-topbar {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) 36px;
-    gap: 5px;
-    margin-bottom: 10px;
+    display: -webkit-flex; display: flex; gap: 5px; margin-bottom: 10px;
   }
   .mw-tabs {
-    display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 5px;
+    -webkit-flex: 1; flex: 1; min-width: 0;
+    display: -webkit-flex; display: flex; gap: 5px;
   }
+  .mw-tabs > * { -webkit-flex: 1; flex: 1; min-width: 0; }
+  .mw-topbar > .mw-button { width: 36px; -webkit-flex-shrink: 0; flex-shrink: 0; }
 
   .mw-grid {
-    display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    display: -webkit-flex; display: flex; flex-wrap: nowrap;
     gap: 6px;
   }
-  .mw-grid.two {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+  .mw-grid > * {
+    -webkit-flex: 1 1 0%; flex: 1 1 0%;
+    min-width: 0;
   }
+  .mw-grid .mw-button { width: auto; }
 
   .mw-action-row {
     display: -webkit-flex; display: flex; gap: 6px; margin-top: 10px;
@@ -70,10 +69,11 @@
   .mw-button {
     display: -webkit-flex; display: flex; -webkit-align-items: center; align-items: center;
     -webkit-justify-content: center; justify-content: center; gap: 0;
-    width: 100%; min-width: 0; height: 40px; padding: 0 8px;
-    border: 1px solid rgba(255,255,255,.11); border-radius: 8px;
+    width: 100%; min-width: 0; height: 28px; padding: 0 6px;
+    border: 1px solid rgba(255,255,255,.11); border-radius: 6px;
+    -webkit-appearance: none; appearance: none;
     background: rgba(255,255,255,.055); color: rgba(255,255,255,.76);
-    font-size: 14px; font-weight: 700; line-height: 1;
+    font-size: 10.5px; font-weight: 700; line-height: 1;
     letter-spacing: 0; text-align: center; white-space: nowrap;
     overflow: hidden; text-overflow: ellipsis;
     cursor: pointer; -webkit-tap-highlight-color: transparent;
@@ -84,12 +84,12 @@
   }
   .mw-button[disabled] { opacity: .42; cursor: default; }
   .mw-button.is-icon {
-    padding: 0; font-size: 18px; text-overflow: clip;
+    padding: 0; font-size: 14px; text-overflow: clip;
   }
-  .mw-button.is-transport { padding: 0; font-size: 18px; text-overflow: clip; }
+  .mw-button.is-transport { padding: 0; font-size: 14px; text-overflow: clip; }
   .mw-button .mw-icon {
-    display: inline-block; min-width: 16px; margin-right: 5px;
-    color: rgba(66,216,178,.92); font-size: 13px; text-align: center;
+    display: inline-block; min-width: 14px; margin-right: 4px;
+    color: rgba(66,216,178,.92); font-size: 10.5px; text-align: center;
   }
   .mw-button.is-icon .mw-icon { margin-right: 0; }
 
@@ -110,7 +110,7 @@
     0%, 100% { opacity: 1; box-shadow: 0 0 8px rgba(66,216,178,.7); }
     50% { opacity: .4; box-shadow: 0 0 4px rgba(66,216,178,.3); }
   }
-  .mw-busy-ellipsis { display: inline; margin-left: 2px; }
+  .mw-busy-ellipsis { display: inline-flex; gap: 3px; margin-left: 2px; }
   .mw-busy-ellipsis i {
     display: inline-block; width: 5px; height: 5px; border-radius: 50%;
     background: #42d8b2; margin: 0 1px;
@@ -132,8 +132,9 @@
 
   /* cards */
   .mw-card {
-    padding: 12px 14px; border: 1px solid rgba(255,255,255,.08);
-    border-radius: 8px; background: rgba(255,255,255,.04); min-width: 0;
+    padding: 7px 8px; border: 1px solid rgba(255,255,255,.08);
+    border-radius: 7px; background: rgba(255,255,255,.04); min-width: 0;
+    overflow: hidden;
   }
   .mw-card-accent { background: rgba(66,216,178,0.06); }
   .mw-mini { margin-bottom: 10px; }
@@ -197,9 +198,9 @@
   }
   .mw-minimal-loading-pct { color: rgba(66,216,178,.78); font-size: 11px; font-weight: 600; min-width: 28px; text-align: right; }
   .mw-minimal-quote {
-    padding: 14px 16px; border-left: 4px solid #42d8b2;
+    padding: 10px 12px; border-left: 4px solid #42d8b2;
     border-radius: 0 8px 8px 0; background: rgba(66,216,178,.08);
-    color: #42d8b2; font-size: 16px; font-weight: 700;
+    color: #42d8b2; font-size: 14px; font-weight: 700;
     line-height: 1.4; margin-bottom: 12px; min-width: 0;
   }
   .mw-minimal-quote-track {
@@ -232,7 +233,7 @@
   .mw-minimal-actions .mw-button { height: 36px; font-size: 13px; }
   .mw-minimal-toggle {
     display: inline-block; -webkit-flex-shrink: 0; flex-shrink: 0;
-    padding: 2px 8px; border: 1px solid rgba(66,216,178,.5);
+    padding: 2px 8px; border: 1px solid rgba(66,216,178,.5); font-size: 10px;
     border-radius: 4px; background: transparent; color: #42d8b2;
     font-size: 12px; font-weight: 700; cursor: pointer; line-height: 18px;
     -webkit-tap-highlight-color: transparent; -webkit-user-select: none; user-select: none;
@@ -241,30 +242,25 @@
   .mw-section-title {
     display: -webkit-flex; display: flex; -webkit-align-items: center; align-items: center;
     gap: 6px; margin: 12px 0 8px; color: rgba(255,255,255,.9);
-    font-size: 18px; font-weight: 800; line-height: 20px;
+    font-size: 13px; font-weight: 800; line-height: 16px;
   }
   .mw-section-title span { color: #42d8b2; font-size: 16px; }
 
-  .mw-dj { margin-bottom: 6px; color: #42d8b2; font-size: 14px; font-weight: 700; line-height: 1.35; }
+  .mw-dj { margin-bottom: 5px; color: #42d8b2; font-size: 10.5px; font-weight: 700; line-height: 1.35; }
   .mw-song { padding: 6px 0; border-top: 1px solid rgba(255,255,255,.06); min-width: 0; }
   .mw-song:first-of-type { border-top: 0; padding-top: 0; }
   .mw-song-active {
-    position: relative; padding-left: 8px;
-    border-left: 3px solid #42d8b2; background: rgba(66,216,178,0.04); border-radius: 2px;
+    background: rgba(66,216,178,0.06); border-radius: 4px;
   }
-  .mw-song-active:before {
-    content: "\\25B6"; position: absolute; left: -18px; top: 5px;
-    font-size: 10px; color: #42d8b2;
-  }
-  .mw-song-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: rgba(255,255,255,.82); font-size: 13px; font-weight: 700; }
-  .mw-song-artist, .mw-song-reason { color: rgba(255,255,255,.46); font-size: 12px; line-height: 1.35; }
+  .mw-song-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: rgba(255,255,255,.82); font-size: 10.5px; font-weight: 700; }
+  .mw-song-artist, .mw-song-reason { color: rgba(255,255,255,.46); font-size: 10px; line-height: 1.35; }
   .mw-track { margin-bottom: 8px; color: rgba(255,255,255,.78); font-size: 14px; font-weight: 700; }
 
   .mw-input {
-    width: 100%; height: 40px; padding: 0 10px;
-    border: 1px solid rgba(255,255,255,.11); border-radius: 8px;
+    width: 100%; height: 28px; padding: 0 8px;
+    border: 1px solid rgba(255,255,255,.11); border-radius: 6px;
     background: rgba(255,255,255,.055); color: rgba(255,255,255,.76);
-    font-size: 14px; outline: none; -webkit-appearance: none; appearance: none;
+    font-size: 10.5px; outline: none; -webkit-appearance: none; appearance: none;
     box-sizing: border-box;
   }
   .mw-input:focus { border-color: rgba(66,216,178,.7); }
@@ -274,13 +270,13 @@
 
   @media (max-width: 480px) {
     .mw-root { padding: 10px 12px 36px; }
-    .mw-button { height: 36px; font-size: 13px; }
-    .mw-section-title { font-size: 16px; }
+    .mw-button { height: 28px; font-size: 10.5px; }
+    .mw-section-title { font-size: 13px; }
   }
 </style>
 </head>
 <body>
-<div id="app"></div>
+  <div id="app"></div>
 <script>
 (function() {
   // ─── constants ───
@@ -293,16 +289,16 @@
     { id: "\u6124\u6012", icon: "\u26A1" }
   ];
   var searchExamples = [
-    { id: "\u96E8\u5929\u82F1\u6587\u8001\u6B4C", icon: "\uD83C\uDF27" },
-    { id: "\u4E2D\u53E4\u4E16\u7EAA\u6C11\u8C23", icon: "\uD83C\uDFBB" },
+    { id: "\u96E8\u5929\u82F1\u6587\u8001\u6B4C", icon: "\u2602" },
+    { id: "\u4E2D\u53E4\u4E16\u7EAA\u6C11\u8C23", icon: "\u266A" },
     { id: "\u4E5D\u96F6\u5E74\u4EE3\u6E2F\u4E50", icon: "\uD83D\uDCFC" },
-    { id: "\u513F\u65F6\u73A9\u7684\u7F51\u5427", icon: "\uD83D\uDDA5" }
+    { id: "\u513F\u65F6\u73A9\u7684\u7F51\u5427", icon: "\u25A3" }
   ];
   var gameVibes = [
     { id: "Boss\u6218", icon: "\u2694", hint: "\u4ECA\u665A\u71C3\u4E00\u70B9\uFF0C\u6CD5\u5370\u6309\u5230\u5E95" },
     { id: "\u63A2\u7D22\u5730\u56FE", icon: "\u2316", hint: "\u6162\u6162\u8D70\uFF0C\u4E0D\u6025\u7740\u8D76\u8DEF" },
-    { id: "\u96E8\u591C\u8DD1\u56FE", icon: "\uD83C\uDF19", hint: "\u5916\u9762\u4E0B\u96E8\uFF0C\u9002\u5408\u6162\u6162\u8D70" },
-    { id: "\u8D5B\u8F66\u7ADE\u901F", icon: "\uD83C\uDFCE", hint: "\u4ECA\u665A\u901F\u5EA6\u522B\u505C" },
+    { id: "\u96E8\u591C\u8DD1\u56FE", icon: "\u25D0", hint: "\u5916\u9762\u4E0B\u96E8\uFF0C\u9002\u5408\u6162\u6162\u8D70" },
+    { id: "\u8D5B\u8F66\u7ADE\u901F", icon: "", hint: "\u4ECA\u665A\u901F\u5EA6\u522B\u505C" },
     { id: "\u79CD\u7530\u653E\u677E", icon: "\u2727", hint: "\u4ECA\u665A\u522B\u592A\u7D2F\u4E86" },
     { id: "\u6A21\u62DF\u5668\u6000\u65E7", icon: "\u25A3", hint: "\u50CF\u5C0F\u65F6\u5019\u4E00\u6837" }
   ];
@@ -332,6 +328,13 @@
   var LS_AUTO = "moodwave.switch.autoContinue";
   function lsGet(k, d) { try { var v = localStorage.getItem(k); return v !== null ? v : d; } catch(e) { return d; } }
   function lsSet(k, v) { try { localStorage.setItem(k, v); } catch(e) {} }
+  function showToast(msg) {
+    var t = document.createElement("div");
+    t.style.cssText = "position:fixed;top:10px;left:50%;transform:translateX(-50%);background:#e74c3c;color:#fff;padding:6px 16px;border-radius:6px;font-size:11px;font-weight:700;z-index:999;white-space:nowrap;max-width:90%;overflow:hidden;text-overflow:ellipsis;";
+    t.textContent = msg;
+    document.body.appendChild(t);
+    setTimeout(function() { if (t.parentNode) t.parentNode.removeChild(t); }, 3000);
+  }
 
   var page = lsGet(LS_PAGE, "radio");
   var now = {};
@@ -364,6 +367,7 @@
         catch(e) { callback(new Error("JSON parse error")); }
       } else { callback(new Error("HTTP " + xhr.status)); }
     };
+    xhr.timeout = 15000;
     xhr.onerror = function() { callback(new Error("network error")); };
     xhr.ontimeout = function() { callback(new Error("timeout")); };
     xhr.send(body ? JSON.stringify(body) : null);
@@ -440,12 +444,12 @@
   }
   function getSceneText() {
     var mode = getActiveMode();
-    if (mode === "game" && gameName.trim()) return "\uD83C\uDFAE \u6B63\u5728\u966A\u4F60\u73A9 " + gameName.trim();
+    if (mode === "game" && gameName.trim()) return "\u25A3 \u6B63\u5728\u966A\u4F60\u73A9 " + gameName.trim();
     if (mode === "game") {
       for (var i = 0; i < gameVibes.length; i++) {
         if (gameVibes[i].id === gameVibe) return gameVibes[i].icon + " " + gameVibes[i].id + " \u2014 " + gameVibes[i].hint;
       }
-      return "\uD83C\uDFAE " + (gameVibe || "\u6E38\u620F\u7535\u53F0");
+      return "\u25A3 " + (gameVibe || "\u6E38\u620F\u7535\u53F0");
     }
     if (mode === "search") return query.trim() ? "\u5BFB\u6B4C \u00B7 " + query.trim() : "\u5BFB\u6B4C\u7535\u53F0";
     return getCurrentMood() ? "\u5FC3\u60C5\u7535\u53F0 \u00B7 " + getCurrentMood() : "\u5FC3\u60C5\u7535\u53F0";
@@ -481,7 +485,8 @@
         statusText = "\u79BB\u7EBF: " + (err.message || String(err)).slice(0, 40);
       } else {
         now = data; statusText = "\u5728\u7EBF";
-        try {
+        var t = getTrack();
+                try {
           if (!gameNameEdited && window.DFL && window.DFL.Router && window.DFL.Router.MainRunningApp) {
             var rn = window.DFL.Router.MainRunningApp.display_name;
             if (rn) { gameName = String(rn); lsSet(LS_GAME_NAME, gameName); }
@@ -515,9 +520,10 @@
       clearInterval(runTimer); runTimer = null;
       if (err) {
         progress = 0;
-        statusText = (err.message || String(err)).slice(0, 40);
+        statusText = "\\u26A0 " + (err.message || String(err)).slice(0, 40);
         busy = false;
         render();
+        showToast(statusText);
         if (onComplete) onComplete();
       } else {
         progress = 100; render();
@@ -603,8 +609,9 @@
   // ─── render ───
   function render() {
     var root = document.getElementById("app");
+    var dom = buildDOM();
     root.innerHTML = "";
-    root.appendChild(buildDOM());
+    root.appendChild(dom);
   }
 
   function buildDOM() {
@@ -630,14 +637,14 @@
     if (minimalMode && track) {
       var mm = el("div", "mw-minimal");
       mm.style.position = "relative";
-      mm.appendChild(el("div", "mw-minimal-logo", "\uD83C\uDFB5"));
+      mm.appendChild(el("div", "mw-minimal-logo", "\u266A"));
 
       var ctx = getWorldContext();
       if (ctx.hasGame) {
         var wc = el("div", "mw-minimal-world-card");
-        wc.appendChild(el("div", "mw-minimal-world-location", "\uD83D\uDCCD " + (ctx.city||"\u672C\u5730") + " \u00B7 " + ctx.condition + ctx.temp));
+        wc.appendChild(el("div", "mw-minimal-world-location", "\u25CF " + (ctx.city||"\u672C\u5730") + " \u00B7 " + ctx.condition + ctx.temp));
         wc.appendChild(el("div", "mw-minimal-world-label", "\u6B63\u5728\u966A\u4F60\u73A9"));
-        wc.appendChild(el("div", "mw-minimal-world-game", "\uD83C\uDFAE " + gameName));
+        wc.appendChild(el("div", "mw-minimal-world-game", "\u25A3 " + gameName));
         var moodStr = (ctx.moodIcon ? ctx.moodIcon + " " : "") + cm + (ctx.vibeSentence ? " \u00B7 \u201C" + ctx.vibeSentence + "\u201D" : ctx.vibeHint ? " \u00B7 " + ctx.vibeHint : "");
         wc.appendChild(el("div", "mw-minimal-world-mood", moodStr));
         mm.appendChild(wc);
@@ -665,7 +672,7 @@
       if (djLine) mm.appendChild(el("div", "mw-minimal-quote", djLine));
       if (djForTrack) { var qt = el("div", "mw-minimal-quote mw-minimal-quote-track", djForTrack); mm.appendChild(qt); }
 
-      mm.appendChild(el("div", "mw-minimal-playing", "\uD83D\uDCFB \u6B63\u5728\u966A\u4F60"));
+      mm.appendChild(el("div", "mw-minimal-playing", "\u266A \u6B63\u5728\u966A\u4F60"));
       mm.appendChild(el("div", "mw-minimal-track", (track.title||"\u672A\u77E5\u6B4C\u66F2") + (track.artist ? " \u2014 " + track.artist : "")));
 
       if (playing) {
@@ -682,16 +689,15 @@
       // transport
       var trans = el("div", "mw-minimal-transport");
       trans.appendChild(btn("mw-button is-transport", "\u23EE", busy, "\u4E0A\u4E00\u9996", function() {
-        run("\u4E0A\u4E00\u9996", function(cb) { apiRequest("/api/prev", {}, cb); });
+        run("\u4E0A\u4E00\u9996", function(cb) { apiRequest("/api/prev", {}, function(e,d) { cb(e,d); }); });
       }));
       trans.appendChild(btn("mw-button is-transport", playing ? "\u23EF" : "\u25B6", busy, playing ? "\u6682\u505C" : "\u64AD\u653E", function() {
-        run(playing ? "\u6682\u505C" : "\u64AD\u653E", function(cb) { apiRequest(playing ? "/api/pause" : "/api/play", {}, cb); });
+        run(playing ? "\u6682\u505C" : "\u64AD\u653E", function(cb) { apiRequest(playing ? "/api/pause" : "/api/play", {}, function(e,d) { cb(e,d); }); });
       }));
       trans.appendChild(btn("mw-button is-transport", "\u23ED", busy, "\u4E0B\u4E00\u9996", function() {
-        run("\u4E0B\u4E00\u9996", function(cb) { apiRequest("/api/next", {}, cb); });
+        run("\u4E0B\u4E00\u9996", function(cb) { apiRequest("/api/next", {}, function(e,d) { cb(e,d); }); });
       }));
       mm.appendChild(trans);
-
       var act = el("div", "mw-minimal-actions");
       act.appendChild(btn("mw-button", "\u21BB \u6765\u70B9\u522B\u7684", busy, "", handleMinimalNextBetter));
       act.appendChild(btn("mw-button", "\u2726 \u6253\u5F00\u7535\u53F0", false, "", function() { minimalMode = false; lsSet(LS_MINIMAL, "0"); render(); }));
@@ -731,7 +737,7 @@
 
     // brand bar
     var bb = el("div", "mw-brand-bar");
-    bb.innerHTML = "<span class=\"mw-brand-img\">\uD83C\uDFB5</span><span>MoodWave \u00B7 AI DJ</span>";
+    bb.innerHTML = "<span class=\"mw-brand-img\">\u266A</span><span>MoodWave \u00B7 AI DJ</span>";
     rootDiv.appendChild(bb);
 
     // topbar
@@ -749,21 +755,20 @@
       var mc = el("div", "mw-card mw-mini");
       var mh = el("div", "mw-mini-head");
       mh.appendChild(el("div", "mw-mini-title", getTrackLine()));
-      mh.appendChild(el("div", "mw-mini-state", playing ? "\uD83D\uDCFB \u6B63\u5728\u966A\u4F60" : "\u6211\u5728\u7B49\u4F60"));
+      mh.appendChild(el("div", "mw-mini-state", playing ? "\u266A \u6B63\u5728\u966A\u4F60" : "\u6211\u5728\u7B49\u4F60"));
       mc.appendChild(mh);
 
       var mg = el("div", "mw-grid");
-      mg.appendChild(btn("mw-button is-transport", playing ? "\u2161" : "\u25B6", busy, playing ? "\u6682\u505C" : "\u64AD\u653E", function() {
-        run(playing ? "\u6682\u505C" : "\u64AD\u653E", function(cb) { apiRequest(playing ? "/api/pause" : "/api/play", {}, cb); });
+      mg.appendChild(btn("mw-button is-transport", playing ? "\u23EF" : "\u25B6", busy, playing ? "\u6682\u505C" : "\u64AD\u653E", function() {
+        run(playing ? "\u6682\u505C" : "\u64AD\u653E", function(cb) { apiRequest(playing ? "/api/pause" : "/api/play", {}, function(e,d) { cb(e,d); }); });
       }));
-      mg.appendChild(btn("mw-button is-transport", "\u2039", busy, "\u4E0A\u4E00\u9996", function() {
-        run("\u4E0A\u4E00\u9996", function(cb) { apiRequest("/api/prev", {}, cb); });
+      mg.appendChild(btn("mw-button is-transport", "\u23EE", busy, "\u4E0A\u4E00\u9996", function() {
+        run("\u4E0A\u4E00\u9996", function(cb) { apiRequest("/api/prev", {}, function(e,d) { cb(e,d); }); });
       }));
-      mg.appendChild(btn("mw-button is-transport", "\u203A", busy, "\u4E0B\u4E00\u9996", function() {
-        run("\u4E0B\u4E00\u9996", function(cb) { apiRequest("/api/next", {}, cb); });
+      mg.appendChild(btn("mw-button is-transport", "\u23ED", busy, "\u4E0B\u4E00\u9996", function() {
+        run("\u4E0B\u4E00\u9996", function(cb) { apiRequest("/api/next", {}, function(e,d) { cb(e,d); }); });
       }));
       mc.appendChild(mg);
-
       if (playing) {
         var pb2 = el("div", "mw-progress-bar");
         var pbf2 = el("div", "mw-progress-bar-fill"); pbf2.style.width = Math.round(pr * 100) + "%"; pb2.appendChild(pbf2);
@@ -798,7 +803,7 @@
     if (page === "search") {
       var sDiv = el("div");
       var st2 = el("div", "mw-section-title");
-      st2.innerHTML = "<span>\u2315</span>\uD83C\uDFAE \u73B0\u5728\u5728\u73A9\u4EC0\u4E48\uFF1F";
+      st2.innerHTML = "<span>\u2315</span>\u25A3 \u73B0\u5728\u5728\u73A9\u4EC0\u4E48\uFF1F";
       sDiv.appendChild(st2);
 
       var sc = el("div", "mw-card");
@@ -810,7 +815,7 @@
       sc.appendChild(sg); sDiv.appendChild(sc);
 
       var iw = el("div", "mw-input-wrap"); iw.style.marginTop = "10px";
-      iw.appendChild(el("div", "mw-input-label", "\uD83C\uDFA7 \u60F3\u542C\u4EC0\u4E48\uFF1F"));
+      iw.appendChild(el("div", "mw-input-label", "\u266A \u60F3\u542C\u4EC0\u4E48\uFF1F"));
       var inp = el("input", "mw-input"); inp.value = query;
       inp.oninput = function() { query = this.value; };
       iw.appendChild(inp); sDiv.appendChild(iw);
@@ -838,7 +843,7 @@
       gc.appendChild(gg); gDiv.appendChild(gc);
 
       var iw2 = el("div", "mw-input-wrap"); iw2.style.marginTop = "10px";
-      iw2.appendChild(el("div", "mw-input-label", "\uD83C\uDFAE \u73B0\u5728\u5728\u73A9\u4EC0\u4E48\uFF1F"));
+      iw2.appendChild(el("div", "mw-input-label", "\u25A3 \u73B0\u5728\u5728\u73A9\u4EC0\u4E48\uFF1F"));
       var inp2 = el("input", "mw-input"); inp2.value = gameName;
       inp2.oninput = function() { gameName = this.value; gameNameEdited = true; };
       inp2.onblur = function() { gameNameEdited = true; lsSet(LS_GAME_NAME, gameName); };
@@ -857,7 +862,7 @@
       setDiv.appendChild(el("div", "mw-section-title", "\u2699 \u8BBE\u7F6E"));
 
       var iw3 = el("div", "mw-input-wrap");
-      iw3.appendChild(el("div", "mw-input-label", "\uD83C\uDFAE \u73B0\u5728\u5728\u73A9\u4EC0\u4E48\uFF1F"));
+      iw3.appendChild(el("div", "mw-input-label", "\u25A3 \u73B0\u5728\u5728\u73A9\u4EC0\u4E48\uFF1F"));
       var inp3 = el("input", "mw-input"); inp3.value = gameName;
       inp3.oninput = function() { gameName = this.value; gameNameEdited = false; };
       inp3.onblur = function() { gameNameEdited = true; lsSet(LS_GAME_NAME, gameName); };

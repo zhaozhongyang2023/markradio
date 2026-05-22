@@ -298,7 +298,7 @@ function Content() {
 
   function saveGameName(value: string, fromBlur = false) {
     const v = String(value || "");
-    if (fromBlur) gameNameEditedRef.current = true;
+    if (fromBlur) gameNameEditedRef.current = v.length > 0;
     setGameName(v);
     localStorage.setItem(GAME_NAME_KEY, v);
   }
@@ -1027,7 +1027,7 @@ function Content() {
 
       {page === 'search' && (
         <div>
-          <div className="mw-section-title"><span>⌕</span>🎮 现在在玩什么？</div>
+          <div className="mw-section-title"><span>⌕</span>🎧 想听什么风格？</div>
           <div className="mw-card">
             <div className="mw-grid two">
               {searchExamples.map((example) => (
@@ -1052,7 +1052,7 @@ function Content() {
           </PanelSectionRow>
           <div className="mw-action-row">
             <AppButton active disabled={busy || !query.trim()} onClick={searchRadio}>▶ 开始电台</AppButton>
-            <AppButton disabled={busy} onClick={() => nextRadio(query)}>↻ 来点别的</AppButton>
+            <AppButton disabled={busy || !query.trim()} onClick={() => nextRadio(query)}>↻ 来点别的</AppButton>
           </div>
         </div>
       )}

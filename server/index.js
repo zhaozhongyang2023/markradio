@@ -128,7 +128,7 @@ async function applyPluginAction(action, body = {}) {
       playerStop();
       if (!now.startedAt) now.startedAt = Date.now();
       saveNowPerMode(store, now); store.set('now', now);
-      playSequence([now.track.url], { onEnd: () => advanceToNext(store), onTrackStart: () => {
+      if (!body.noLocalPlayback) playSequence([now.track.url], { onEnd: () => advanceToNext(store), onTrackStart: () => {
         const n = store.get('now');
         if (n) { n.startedAt = Date.now(); n.songActive = true; store.set('now', n); }
       } });
@@ -136,7 +136,7 @@ async function applyPluginAction(action, body = {}) {
     }
     // 首次播放：含导语
     now.playing = true; now.songActive = false; delete now.startedAt; playerStop(); const u = buildPlaylist(now.track, plan, now); now.introPlayed = true;
-    if (u.length) playSequence(u, { onEnd: () => advanceToNext(store), onTrackStart: () => {
+    if (u.length && !body.noLocalPlayback) playSequence(u, { onEnd: () => advanceToNext(store), onTrackStart: () => {
       const n = store.get('now');
       if (n) { n.startedAt = Date.now(); n.songActive = true; store.set('now', n); broadcast('now', publicNow()); }
     } });
@@ -148,7 +148,7 @@ async function applyPluginAction(action, body = {}) {
     if (ni < 0) { saveNowPerMode(store, now); store.set('now', now); broadcast('now', publicNow()); return { ok: false, reason: action === 'prev' ? 'first' : 'last', now: publicNow().now }; }
     now.track = plan.queue[ni]; now.progress = 0; now.playing = true; now.songActive = false; delete now.startedAt; store.addPlay(now.track, now.mood);
     playerStop(); const u = buildPlaylist(now.track, plan, now);
-    if (u.length) playSequence(u, { onEnd: () => advanceToNext(store), onTrackStart: () => {
+    if (u.length && !body.noLocalPlayback) playSequence(u, { onEnd: () => advanceToNext(store), onTrackStart: () => {
       const n = store.get('now');
       if (n) { n.startedAt = Date.now(); n.songActive = true; store.set('now', n); broadcast('now', publicNow()); }
     } });
