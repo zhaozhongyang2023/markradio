@@ -189,7 +189,7 @@ function publicNow() {
   const plan = store.get('plan-' + mode) || {};
   const duration = (now.track?.duration || 180) * 1000;
   const elapsed = now.startedAt ? Date.now() - now.startedAt : 0;
-  const progressRatio = now.playing ? Math.min(0.99, elapsed / duration) : (now.progress || 0);
+  const progressRatio = (now.playing && now.songActive) ? Math.min(0.99, elapsed / duration) : 0;
   return {
     now: { ...now, progressRatio }, plan,
     plans: { radio: store.get('plan-radio') || null, search: store.get('plan-search') || null, game: store.get('plan-game') || null },
