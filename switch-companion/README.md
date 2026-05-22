@@ -1,6 +1,6 @@
 # MoodWave Switch Companion
 
-Nintendo Switch（破解版）AI DJ 电台伴侣插件。
+Nintendo Switch AI DJ 电台伴侣插件。
 
 ## 安装
 
