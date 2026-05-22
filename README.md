@@ -10,10 +10,6 @@
 
 剩下的全部由 AI DJ 自动完成：**开场白、歌单、推荐理由、语音朗读、自动播放。**
 
-MoodWave 不是播放器。不是 AI 工具。不是搜索系统。
-
-它是 **AI DJ + 情绪电台 + 游戏陪伴**——克制、少语、有留白。陪伴感胜过信息量。
-
 | ✅ 这样说 | ❌ 不这样说 |
 |---------|---------|
 | 今晚适合安静一点 | 根据您的当前情绪推荐以下歌曲 |
@@ -35,9 +31,6 @@ MoodWave 不是播放器。不是 AI 工具。不是搜索系统。
 | AI 不懂你口味，推荐总是跑偏 | **Music DNA**，网易云扫码导入，AI 分析你长期音乐人格 |
 
 ---
-
-<p align="center"><img src="public/companion.png" width="700" alt="极简陪伴模式"></p>
-
 ## 🎧 Music DNA：让 AI DJ 越来越懂你
 
 MoodWave 可以从网易云喜欢的音乐和收藏歌单中分析你的音乐人格。
@@ -84,7 +77,6 @@ JRPG OST / LoFi / City Pop
 
 游戏模式下，插件渲染**极简世界卡片**——天气 ☁️ + 游戏名 🎮 + 心情 😌 + 一句温柔的独白，不抢注意力。
 
-
 > 输入游戏名（如「巫师3」），AI 自动感知**游戏世界氛围**——中世纪篝火 → 民谣感、赛博霓虹 → Synthwave。
 
 ### 🔍 AI 寻歌 — 自然语言找歌
@@ -97,6 +89,8 @@ JRPG OST / LoFi / City Pop
 "来点 90 年代港乐"
 "像小时候网吧一样"
 ```
+<p align="center"><img src="public/companion.png" width="700" alt="极简陪伴模式"></p>
+
 
 ---
 
@@ -125,22 +119,6 @@ JRPG OST / LoFi / City Pop
 | 🔗 **网易云深度集成** | 扫码登录，读取红心、歌单、日推、私人 FM |
 | 📡 **DLNA/UPnP 投播** | Streaming 到客厅音箱 / 树莓派 DAC |
 | 🛡️ **熔断器保护** | 所有外部 API 有自动降级，单点故障不影响使用 |
-
-### AI DJ 灵魂系统（核心壁垒）
-
-```text
-┌──────────────────────────────┐
-│ ① 人格层：克制少语 DJ          │  → 陪伴感 > 信息量，40% 场景不输出文案
-├──────────────────────────────┤
-│ ② 世界层：真实时空感知          │  → 城市、天气、时间、节气、节日、上次世界状态
-├──────────────────────────────┤
-│ ③ 用户层：长期理解 + 近期势能    │  → Music DNA + 情绪倾向 + 情绪动量
-├──────────────────────────────┤
-│ ④ 游戏层：世界感映射            │  → 12 款游戏 DNA → 音乐方向自动适配 + vibe 文案
-├──────────────────────────────┤
-│ ⑤ 输出层：自然语言硬规则        │  → 15-30 字，禁止客服腔/工具腔/算法腔
-└──────────────────────────────┘
-```
 
 ---
 
@@ -206,6 +184,9 @@ npm run dev:web    # 终端 2 → http://localhost:8080
 
 ---
 
+<details>
+<summary>📡 API（开发者点击展开）</summary>
+
 ## API
 
 兼容 V3/V4/V5 旧接口：
@@ -231,6 +212,9 @@ POST   /api/profile/music-dna/save     # 手动保存 Music DNA
 POST   /api/profile/music-dna/reset    # 重置 Music DNA
 ```
 
+
+</details>
+
 ---
 
 ## 安全
@@ -242,12 +226,18 @@ POST   /api/profile/music-dna/reset    # 重置 Music DNA
 
 ---
 
+<details>
+<summary>📦 发布（开发者点击展开）</summary>
+
 ## 发布
 
 ```bash
 node scripts/package-steamdeck.mjs   # → release/
 npm test                              # 29 tests
 ```
+
+
+</details>
 
 ---
 
