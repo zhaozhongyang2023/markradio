@@ -1,7 +1,16 @@
 <p align="center"><img src="public/icon-512.png" width="128" alt="MoodWave Logo" /></p>
 
-# 🎵 MoodWave V6 — AI DJ 电台
+# 🎵 MoodWave — AI DJ 电台
 
+当你在 Steam Deck 里独自旅行时，
+有个 AI DJ 会一直陪着你。
+
+- 自动识别当前游戏
+- 自动切换氛围音乐
+- 深夜低语式 AI DJ
+- 不打扰你的沉浸感
+
+我的世界，你一直在。
 <p align="center"><img src="public/hero.png?1" width="800" alt="MoodWave Hero"></p>
 
 ## 它是什么
