@@ -28,7 +28,7 @@ type NowPayload = {
     track?: Track | null;
     playing?: boolean;
     progressRatio?: number;
-    playSeq?: number;
+    songActive?: boolean;
     mood?: string;
     mode?: string;
   };
@@ -256,6 +256,7 @@ function Content() {
   const serverProgressRatio = Number(now.now?.progressRatio) || 0;
   const [localProgressRatio, setLocalProgressRatio] = useState(serverProgressRatio);
   const progressAnchorRef = useRef({ ratio: 0, ts: 0 });
+  const songActive = Boolean(now.now?.songActive);
 
   // 本地进度计时器：播放时每 250ms 递增，锚点仅在新歌/恢复播放时设定
   useEffect(() => {
@@ -273,10 +274,9 @@ function Content() {
     } else {
       setLocalProgressRatio(serverProgressRatio);
     }
-  }, [playing, track?.id || track?.sourceId || track?.title, playSeq]);
+  }, [playing, track?.id || track?.sourceId || track?.title, songActive]);
 
   const progressRatio = playing ? localProgressRatio : serverProgressRatio;
-  const playSeq = Number(now.now?.playSeq) || 0;
 
   const currentMood = (now.now?.mood || currentPlan?.mood || now.plans?.radio?.mood || '').trim();
   const queue = currentPlan?.queue || [];
