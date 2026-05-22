@@ -78,14 +78,21 @@ function normalizeBase(value: string) {
 
 async function apiRequest<T>(apiBase: string, path: string, body?: unknown): Promise<T> {
   const url = `${normalizeBase(apiBase)}${path}`;
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 15000);
   const opts: RequestInit = {
     method: body ? 'POST' : 'GET',
     headers: body ? { 'Content-Type': 'application/json' } : undefined,
     body: body ? JSON.stringify(body) : undefined,
+    signal: controller.signal,
   };
-  const res = await fetch(url, opts);
-  if (!res.ok) throw new Error(`HTTP ${res.status}`);
-  return res.json() as Promise<T>;
+  try {
+    const res = await fetch(url, opts);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    return res.json() as Promise<T>;
+  } finally {
+    clearTimeout(timeout);
+  }
 }
 
 function AppButton({
@@ -216,23 +223,26 @@ function Content() {
     try {
       await task();
       setProgress(100);
-      setTimeout(() => setProgress(0), 600);
+      runTimeoutRef.current = setTimeout(() => setProgress(0), 600);
       await refresh();
     } catch (error) {
       setProgress(0);
       setStatus(error instanceof Error ? error.message : '请求失败');
     } finally {
       clearInterval(timer);
+      if (runTimeoutRef.current) { clearTimeout(runTimeoutRef.current); runTimeoutRef.current = null; }
       runTimerRef.current = null;
       setBusy(false);
     }
   }
 
   const runTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const runTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   // 组件卸载时清理运行中的 timer
   useEffect(() => {
     return () => {
       if (runTimerRef.current) clearInterval(runTimerRef.current);
+      if (runTimeoutRef.current) clearTimeout(runTimeoutRef.current);
       setBusy(false);
       setProgress(0);
     };
@@ -260,7 +270,6 @@ function Content() {
   // 本地进度计时器：播放时每 250ms 递增，锚点仅在新歌/恢复播放时设定
   useEffect(() => {
     if (playing && songStarted) {
-      const trackKey = track?.id || track?.sourceId || track?.title || '';
       const duration = track?.duration || 180;
       progressAnchorRef.current = { ratio: serverProgressRatio, ts: Date.now() };
       setLocalProgressRatio(serverProgressRatio);
