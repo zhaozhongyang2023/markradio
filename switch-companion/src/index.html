@@ -13,6 +13,7 @@
   .mw-root {
     position: relative;
     width: 100%; max-width: 560px;
+    margin: 0 auto;
     padding: 12px 16px 50px;
     min-height: 100%;
   }
@@ -276,10 +277,9 @@
 </style>
 </head>
 <body>
-<div class="mw-root" id="app"></div>
+<div id="app"></div>
 <script>
 (function() {
-  try {
   // ─── constants ───
   var moods = [
     { id: "\u5F00\u5FC3", icon: "\u260C" },
@@ -896,10 +896,6 @@
 
   // ─── init ───
   startPoll();
-  } catch(e) {
-    var app = document.getElementById("app");
-    if (app) app.innerHTML = "<div style=\"color:#42d8b2;font-size:16px;padding:40px;\"><b>JS Error:</b><br><br>" + (e.message || String(e)).replace(/</g,"&lt;") + "<br><br>Line: " + (e.lineNumber||"?") + "</div>";
-  }
 })();
 </script>
 </body>

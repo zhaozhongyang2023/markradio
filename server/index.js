@@ -120,10 +120,10 @@ async function advanceToNext(store) {
 async function applyPluginAction(action, body = {}) {
   const now = store.get('now') || {}; const mode = now.mode || 'radio';
   const plan = store.get('plan-' + mode) || {};
-  if (action === 'play') { now.playing = true; delete now.startedAt; now.songActive = false; saveNowPerMode(store, now); store.set('now', now); playerStop(); const u = buildPlaylist(now.track, plan, now); now.introPlayed = true; if (u.length) playSequence(u, { onEnd: () => advanceToNext(store), onTrackStart: () => {
+  if (action === 'play') { now.playing = true; delete now.startedAt; playerStop(); const u = buildPlaylist(now.track, plan, now); now.introPlayed = true; if (u.length) playSequence(u, { onEnd: () => advanceToNext(store), onTrackStart: () => {
         const n = store.get('now');
         if (n) { n.startedAt = Date.now(); n.songActive = true; store.set('now', n); broadcast('now', publicNow()); }
-      } }); broadcast('now', publicNow()); return publicNow(); }
+      } }); }
   if (action === 'pause') { now.playing = false; playerStop(); }
   if ((action === 'next' || action === 'prev') && plan?.queue?.length) {
     const ci = plan.queue.findIndex(t => t.id === now.track?.id);
