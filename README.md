@@ -91,7 +91,6 @@ JRPG OST / LoFi / City Pop
 ```
 <p align="center"><img src="public/companion.png" width="700" alt="极简陪伴模式"></p>
 
-
 ---
 
 ## 平台支持
@@ -105,20 +104,21 @@ JRPG OST / LoFi / City Pop
 
 ---
 
-## 技术亮点
+<details>
+<summary>🧠 技术亮点（好奇就看看）</summary>
 
-| 亮点 | 说明 |
-|------|------|
-| 🧠 **AI DJ 灵魂系统** | 克制少语人格 + 世界连续性 + 情绪势能追踪——像一个活在你时空里的 DJ |
-| 🌍 **游戏世界感** | 12 款游戏世界 DNA 映射（巫师3→中世纪篝火、赛博朋克→霓虹都市孤独） |
-| 🖼️ **极简世界卡片** | 游戏模式 Decky 插件渲染天气+游戏名+心情+vibe，不抢游戏注意力 |
-| 🧬 **Music DNA 升级** | 三维音乐人格：核心情绪 / 聆听状态 / 音乐性格，比标签更深入 |
-| 🌤️ **情绪势能追踪** | 记录近期情绪倾向 + 情绪动量，避免连续推荐同质化 |
-| 🎭 **世界连续性** | DJ 活在真实时空里——知道外面下雨、今天是节气、上次你听的最后几首 |
-| 🔊 **Fish Audio TTS** | DJ 语音朗读，温柔克制的声线，不是冷冰冰的播音腔 |
-| 🔗 **网易云深度集成** | 扫码登录，读取红心、歌单、日推、私人 FM |
-| 📡 **DLNA/UPnP 投播** | Streaming 到客厅音箱 / 树莓派 DAC |
-| 🛡️ **熔断器保护** | 所有外部 API 有自动降级，单点故障不影响使用 |
+- 🧠 **AI DJ 灵魂系统** — 克制、少语，像一个活在你时空里的 DJ
+- 🌍 **游戏世界感** — 在巫师3里像中世纪篝火，在赛博朋克里像霓虹都市
+- 🖼️ **极简世界卡片** — 天气 + 游戏名 + 心情 + 一句温柔的独白，不抢注意力
+- 🧬 **Music DNA** — 三维音乐人格：核心情绪 / 聆听状态 / 音乐性格
+- 🌤️ **情绪势能追踪** — 记得你上次听的是什么，不会让你腻
+- 🎭 **世界连续性** — 知道外面下雨、今天是节气、你上次听的最后几首
+- 🔊 **DJ 语音朗读** — 温柔克制的声线，不是冷冰冰的播音腔
+- 🔗 **网易云深度集成** — 扫码登录，红心、歌单、日推都认
+- 📡 **投到客厅音箱** — DLNA/UPnP 投播到树莓派 DAC，全家人一起听
+- 🛡️ **自己扛住** — 外部服务挂了自动降级，不影响你用
+
+</details>
 
 ---
 
@@ -137,21 +137,6 @@ bash scripts/install-steamdeck.sh --repo https://github.com/zhaozhongyang2023/ma
 安装后，扫码登录网易云 → AI 自动生成你的 Music DNA → 电台变得越来越懂你。
 
 详细教程 → [INSTALL.md](./INSTALL.md)（零基础可操作，全程复制粘贴）
-
-### 配置
-
-支持 `.env`（树莓派/开发）或 `~/.config/moodwave/config.env`（Steam Deck）。
-
-| 变量 | 必填 | 说明 |
-|------|------|------|
-| `AI_PROVIDER` | ✅ | deepseek / openai / qwen / gemini / custom |
-| `AI_API_KEY` | ✅ | AI 平台 API Key（DeepSeek 免费注册） |
-| `AI_BASE_URL` | - | 自定义 API 地址 |
-| `AI_MODEL` | - | 模型名（自动匹配平台） |
-| `FISH_AUDIO_API_KEY` | - | Fish Audio 语音朗读 |
-| `NETEASE_API_BASE` | - | 网易云 API 地址（Music DNA 需要） |
-| `OPENWEATHER_API_KEY` | - | 天气 API（不填默认晴天） |
-| `MUSIC_DIR` | - | 本地音乐目录 |
 
 ### 树莓派部署
 
@@ -212,9 +197,22 @@ POST   /api/profile/music-dna/save     # 手动保存 Music DNA
 POST   /api/profile/music-dna/reset    # 重置 Music DNA
 ```
 
-
 </details>
 
+## 配置
+
+支持 `.env`（树莓派/开发）或 `~/.config/moodwave/config.env`（Steam Deck）。
+
+| 变量 | 必填 | 说明 |
+|------|------|------|
+| `AI_PROVIDER` | ✅ | deepseek / openai / qwen / gemini / custom |
+| `AI_API_KEY` | ✅ | AI 平台 API Key（DeepSeek 免费注册） |
+| `AI_BASE_URL` | - | 自定义 API 地址 |
+| `AI_MODEL` | - | 模型名（自动匹配平台） |
+| `FISH_AUDIO_API_KEY` | - | Fish Audio 语音朗读 |
+| `NETEASE_API_BASE` | - | 网易云 API 地址（Music DNA 需要） |
+| `OPENWEATHER_API_KEY` | - | 天气 API（不填默认晴天） |
+| `MUSIC_DIR` | - | 本地音乐目录 |
 ---
 
 ## 安全
@@ -235,7 +233,6 @@ POST   /api/profile/music-dna/reset    # 重置 Music DNA
 node scripts/package-steamdeck.mjs   # → release/
 npm test                              # 29 tests
 ```
-
 
 </details>
 
