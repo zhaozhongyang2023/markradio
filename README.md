@@ -2,9 +2,7 @@
 
 # 🎵 MoodWave V6 — AI DJ 电台
 
-
 <p align="center"><img src="public/hero.png" width="600" alt="MoodWave Hero"></p>
-
 
 ## 它是什么
 
@@ -38,7 +36,6 @@ MoodWave 不是播放器。不是 AI 工具。不是搜索系统。
 
 ---
 
-
 <p align="center"><img src="public/companion.png" width="700" alt="极简陪伴模式"></p>
 
 ## 🎧 Music DNA：让 AI DJ 越来越懂你
@@ -70,7 +67,6 @@ JRPG OST / LoFi / City Pop
 
 <p align="center"><img src="public/ai-dj.png" width="700" alt="AI DJ 三大能力"></p>
 
-
 ### 📻 AI 电台 — 按心情开电台
 
 选一个心情（开心 / 平静 / 忧郁 / 悲伤 / 治愈 / 愤怒），AI DJ 自动生成：
@@ -84,17 +80,10 @@ JRPG OST / LoFi / City Pop
 
 <p align="center"><img src="public/game-radio.png" width="800" alt="Game Radio 游戏融合"></p>
 
-
 **不用切出游戏**，Decky 插件里一键开启。
 
 游戏模式下，插件渲染**极简世界卡片**——天气 ☁️ + 游戏名 🎮 + 心情 😌 + AI 生成的 vibe 文案，不抢注意力。
 
-| 氛围 | AI DJ 会这样说 | 适合 |
-|:--|:--|:--|
-| 🌙 雨夜跑图 | "外面下雨，慢慢来。" | 艾尔登法环雨夜、JRPG 长途跋涉 |
-| 🏎️ 赛车竞速 | "速度别停。" | 马车8、Forza |
-| 🌾 种田放松 | "别太累了。" | 星露谷、牧场物语 |
-| 📺 模拟器怀旧 | "像小时候一样。" | GBA、PSP 模拟器 |
 
 > 输入游戏名（如「巫师3」），AI 自动感知**游戏世界氛围**——中世纪篝火 → 民谣感、赛博霓虹 → Synthwave。
 
@@ -158,7 +147,6 @@ JRPG OST / LoFi / City Pop
 ## 快速开始
 
 <p align="center"><img src="public/web-radio.png" width="600" alt="Web Radio 界面"></p>
-
 
 ### Steam Deck 一键安装
 
