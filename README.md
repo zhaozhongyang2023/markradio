@@ -1,6 +1,6 @@
 <p align="center"><img src="public/icon-512.png" width="128" alt="MoodWave Logo" /></p>
 
-# 🎵 MoodWave V15 — AI DJ 电台
+# 🎵 MoodWave V6 — AI DJ 电台
 
 > **不是播放器。是会越来越懂你的 AI DJ。**
 
@@ -112,8 +112,9 @@ JRPG OST / LoFi / City Pop
 | 平台 | 模式 | 说明 |
 |------|------|------|
 | 🎮 Steam Deck | 桌面 PWA + 游戏模式 Decky 插件 | 主力平台，游戏模式极简世界卡片 |
+| 🎮 Switch | 浏览器伴侣 | Homebrew 打开网页即可，辅助场景 |
 | 🖥️ 树莓派 | 局域网电台 | 部署在 Pi 上，全家人共用 |
-| 💻 MacBook | 开发调试 | 本地 dev server |
+| 📱 iPhone | PWA 添加到桌面 | 手机控制 + 电台随身听 |
 
 ---
 

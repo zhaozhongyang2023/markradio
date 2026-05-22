@@ -75,8 +75,8 @@ clear_cache() {
   echo -n "清理缓存..."
   rm -rf "$MOODWAVE_DIR_PATH/data/cache/tts"/* 2>/dev/null || true
   # 只清除 TTS/播放记录/当前计划，保留网易云登录、口味、声线等配置
-  if [ -f "$MOODWAVE_DIR_PATH/data/moodwave.db" ]; then
-    sqlite3 "$MOODWAVE_DIR_PATH/data/moodwave.db" "
+  if [ -f "$MOODWAVE_DIR_PATH/data/markradio.db" ]; then
+    sqlite3 "$MOODWAVE_DIR_PATH/data/markradio.db" "
       DELETE FROM tts_cache;
       DELETE FROM plays;
       DELETE FROM kv WHERE key='planToday';
@@ -146,8 +146,6 @@ start_radio() {
   NODE_ENV=production \
   MOODWAVE_API_PORT="$API_PORT" \
   MOODWAVE_PORT="$API_PORT" \
-  MOODWAVE_WEB_PORT="$WEB_PORT" \
-  MOODWAVE_API_PORT="$API_PORT" \
   MOODWAVE_WEB_PORT="$WEB_PORT" \
   nohup node server/index.js > "$MOODWAVE_LOG" 2>&1 &
   echo $! > "$MOODWAVE_PID"

@@ -1,4 +1,4 @@
-# 🎵 MoodWave V15 — Steam Deck 完整安装手册
+# 🎵 MoodWave V6 — Steam Deck 完整安装手册
 
 > 装好后，你的 Steam Deck 就多了一个长期陪伴的 AI DJ。🎧
 
@@ -133,7 +133,7 @@ http://127.0.0.1:38080/api/health
 
 这是 MoodWave 的核心功能。AI 分析你的网易云听歌记录，生成专属 **Music DNA**，三种模式都会参考。
 
-V15 升级：Music DNA 变成三维结构——**核心情绪 / 聆听状态 / 音乐性格**，比简单的风格标签更深入。
+V6 升级：Music DNA 变成三维结构——**核心情绪 / 聆听状态 / 音乐性格**，比简单的风格标签更深入。
 
 ### 操作流程
 
@@ -198,7 +198,7 @@ curl -L https://github.com/SteamDeckHomebrew/decky-loader/raw/main/dist/install_
 - 🎮 **Game Radio** — 选游戏氛围配 BGM（注入 DJ 灵魂 + 游戏世界感）
 - 🔍 **AI 寻歌** — 告诉 AI 想听什么（参考 Music DNA）
 
-> V15 新特性：Game Radio 输入游戏名（如「巫师3」），AI 自动感知**游戏世界氛围**，插件渲染**极简世界卡片**（天气+游戏+心情+vibe）。
+> V6 新特性：Game Radio 输入游戏名（如「巫师3」），AI 自动感知**游戏世界氛围**，插件渲染**极简世界卡片**（天气+游戏+心情+vibe）。
 
 ---
 
