@@ -255,12 +255,13 @@ function Content() {
 
   // 本地进度计时器：播放时每 250ms 递增，锚点仅在新歌/恢复播放时设定
   useEffect(() => {
-    if (playing && track?.duration) {
+    if (playing) {
+      const trackKey = track?.id || track?.sourceId || track?.title || '';
+      const duration = track?.duration || 180;
       progressAnchorRef.current = { ratio: serverProgressRatio, ts: Date.now() };
       setLocalProgressRatio(serverProgressRatio);
       const timer = setInterval(() => {
         const elapsed = (Date.now() - progressAnchorRef.current.ts) / 1000;
-        const duration = (track.duration || 180);
         const estimated = progressAnchorRef.current.ratio + elapsed / duration;
         setLocalProgressRatio(Math.min(0.99, estimated));
       }, 250);
@@ -268,7 +269,7 @@ function Content() {
     } else {
       setLocalProgressRatio(serverProgressRatio);
     }
-  }, [playing, track?.id || track?.sourceId]);
+  }, [playing, track?.id || track?.sourceId || track?.title]);
 
   const progressRatio = playing ? localProgressRatio : serverProgressRatio;
 
