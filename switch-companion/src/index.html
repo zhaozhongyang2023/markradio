@@ -42,22 +42,25 @@
     color: rgba(255,255,255,.52); font-size: 13px; line-height: 16px; min-width: 0;
   }
   .mw-topbar {
-    display: -webkit-flex; display: flex; gap: 6px; margin-bottom: 10px;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 36px;
+    gap: 5px;
+    margin-bottom: 10px;
   }
-  .mw-tabs-wrap {
-    -webkit-flex: 1; flex: 1; min-width: 0;
-    display: -webkit-flex; display: flex; gap: 5px;
+  .mw-tabs {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 5px;
   }
-  .mw-tabs-wrap > * {
-    -webkit-flex: 1; flex: 1; min-width: 0;
-  }
-  .mw-topbar > .mw-button { width: 36px; -webkit-flex-shrink: 0; flex-shrink: 0; }
 
   .mw-grid {
-    display: -webkit-flex; display: flex; flex-wrap: wrap; gap: 6px;
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 6px;
   }
-  .mw-grid > * { width: calc((100% - 12px) / 3); -webkit-flex-shrink: 0; flex-shrink: 0; }
-  .mw-grid.two > * { width: calc((100% - 6px) / 2); }
+  .mw-grid.two {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 
   .mw-action-row {
     display: -webkit-flex; display: flex; gap: 6px; margin-top: 10px;
@@ -349,10 +352,11 @@
 
   // ─── API (XMLHttpRequest, no fetch/Promise) ───
   function apiRequest(path, body, callback) {
-    var url = apiBase.replace(/\\/+$/, "") + path;
+    var url = apiBase.replace(/\/+$/, "") + path;
     var method = body ? "POST" : "GET";
     var xhr = new XMLHttpRequest();
     xhr.open(method, url, true);
+    xhr.timeout = 15000;
     if (body) xhr.setRequestHeader("Content-Type", "application/json");
     xhr.onload = function() {
       if (xhr.status >= 200 && xhr.status < 300) {
@@ -372,9 +376,8 @@
     if (html !== undefined) e.innerHTML = html;
     return e;
   }
-  function btn(cls, html, active, disabled, title, onclick) {
-    var c = cls + (active ? " is-active" : "");
-    var b = el("button", c, html);
+  function btn(cls, html, disabled, title, onclick) {
+    var b = el("button", cls, html);
     if (disabled) b.setAttribute("disabled", "disabled");
     if (title) b.setAttribute("title", title);
     if (onclick) { b.onclick = onclick; }
@@ -481,7 +484,7 @@
         try {
           if (!gameNameEdited && window.DFL && window.DFL.Router && window.DFL.Router.MainRunningApp) {
             var rn = window.DFL.Router.MainRunningApp.display_name;
-            if (rn) gameName = String(rn);
+            if (rn) { gameName = String(rn); lsSet(LS_GAME_NAME, gameName); }
           }
         } catch(e) {}
       }
@@ -491,8 +494,8 @@
   }
 
   function switchMode(mode) {
-    if (mode === "settings") { page = "settings"; render(); return; }
-    page = mode;
+    if (mode === "settings") { page = "settings"; lsSet(LS_PAGE, page); render(); return; }
+    page = mode; lsSet(LS_PAGE, page);
     render();
     apiRequest("/api/switch-mode", {mode: mode}, function(){});
     refresh();
@@ -678,20 +681,20 @@
 
       // transport
       var trans = el("div", "mw-minimal-transport");
-      trans.appendChild(btn("mw-button is-transport", "\u23EE", false, busy, "\u4E0A\u4E00\u9996", function() {
+      trans.appendChild(btn("mw-button is-transport", "\u23EE", busy, "\u4E0A\u4E00\u9996", function() {
         run("\u4E0A\u4E00\u9996", function(cb) { apiRequest("/api/prev", {}, cb); });
       }));
-      trans.appendChild(btn("mw-button is-transport", playing ? "\u23EF" : "\u25B6", false, busy, playing ? "\u6682\u505C" : "\u64AD\u653E", function() {
+      trans.appendChild(btn("mw-button is-transport", playing ? "\u23EF" : "\u25B6", busy, playing ? "\u6682\u505C" : "\u64AD\u653E", function() {
         run(playing ? "\u6682\u505C" : "\u64AD\u653E", function(cb) { apiRequest(playing ? "/api/pause" : "/api/play", {}, cb); });
       }));
-      trans.appendChild(btn("mw-button is-transport", "\u23ED", false, busy, "\u4E0B\u4E00\u9996", function() {
+      trans.appendChild(btn("mw-button is-transport", "\u23ED", busy, "\u4E0B\u4E00\u9996", function() {
         run("\u4E0B\u4E00\u9996", function(cb) { apiRequest("/api/next", {}, cb); });
       }));
       mm.appendChild(trans);
 
       var act = el("div", "mw-minimal-actions");
-      act.appendChild(btn("mw-button", "\u21BB \u6765\u70B9\u522B\u7684", false, busy, "", handleMinimalNextBetter));
-      act.appendChild(btn("mw-button", "\u2726 \u6253\u5F00\u7535\u53F0", false, false, "", function() { minimalMode = false; render(); }));
+      act.appendChild(btn("mw-button", "\u21BB \u6765\u70B9\u522B\u7684", busy, "", handleMinimalNextBetter));
+      act.appendChild(btn("mw-button", "\u2726 \u6253\u5F00\u7535\u53F0", false, "", function() { minimalMode = false; lsSet(LS_MINIMAL, "0"); render(); }));
       mm.appendChild(act);
 
       rootDiv.appendChild(mm);
@@ -721,7 +724,7 @@
 
     if (playing && track) {
       var toggle = el("button", "mw-minimal-toggle", "\u25C1 \u6781\u7B80");
-      toggle.onclick = function() { minimalMode = true; render(); };
+      toggle.onclick = function() { minimalMode = true; lsSet(LS_MINIMAL, "1"); render(); };
       st.appendChild(toggle);
     }
     rootDiv.appendChild(st);
@@ -733,12 +736,12 @@
 
     // topbar
     var tb = el("div", "mw-topbar");
-    var tw = el("div", "mw-tabs-wrap");
-    tw.appendChild(btn("mw-button" + (page==="radio"?" is-active":""), "<span class=\"mw-icon\">\u25C9</span>\u7535\u53F0", false, busy, "", function() { switchMode("radio"); }));
-    tw.appendChild(btn("mw-button" + (page==="search"?" is-active":""), "<span class=\"mw-icon\">\u2315</span>\u5BFB\u6B4C", false, busy, "", function() { switchMode("search"); }));
-    tw.appendChild(btn("mw-button" + (page==="game"?" is-active":""), "<span class=\"mw-icon\">\u25A3</span>\u6E38\u620F", false, busy, "", function() { switchMode("game"); }));
+    var tw = el("div", "mw-tabs");
+    tw.appendChild(btn("mw-button" + (page==="radio"?" is-active":""), "<span class=\"mw-icon\">\u25C9</span>\u7535\u53F0", busy, "", function() { switchMode("radio"); }));
+    tw.appendChild(btn("mw-button" + (page==="search"?" is-active":""), "<span class=\"mw-icon\">\u2315</span>\u5BFB\u6B4C", busy, "", function() { switchMode("search"); }));
+    tw.appendChild(btn("mw-button" + (page==="game"?" is-active":""), "<span class=\"mw-icon\">\u25A3</span>\u6E38\u620F", busy, "", function() { switchMode("game"); }));
     tb.appendChild(tw);
-    tb.appendChild(btn("mw-button is-icon" + (page==="settings"?" is-active":""), "\u2699", false, busy, "\u8BBE\u7F6E", function() { switchMode("settings"); }));
+    tb.appendChild(btn("mw-button is-icon" + (page==="settings"?" is-active":""), "\u2699", busy, "\u8BBE\u7F6E", function() { switchMode("settings"); }));
     rootDiv.appendChild(tb);
 
     // mini player
@@ -750,13 +753,13 @@
       mc.appendChild(mh);
 
       var mg = el("div", "mw-grid");
-      mg.appendChild(btn("mw-button is-transport", playing ? "\u2161" : "\u25B6", false, busy, playing ? "\u6682\u505C" : "\u64AD\u653E", function() {
+      mg.appendChild(btn("mw-button is-transport", playing ? "\u2161" : "\u25B6", busy, playing ? "\u6682\u505C" : "\u64AD\u653E", function() {
         run(playing ? "\u6682\u505C" : "\u64AD\u653E", function(cb) { apiRequest(playing ? "/api/pause" : "/api/play", {}, cb); });
       }));
-      mg.appendChild(btn("mw-button is-transport", "\u2039", false, busy, "\u4E0A\u4E00\u9996", function() {
+      mg.appendChild(btn("mw-button is-transport", "\u2039", busy, "\u4E0A\u4E00\u9996", function() {
         run("\u4E0A\u4E00\u9996", function(cb) { apiRequest("/api/prev", {}, cb); });
       }));
-      mg.appendChild(btn("mw-button is-transport", "\u203A", false, busy, "\u4E0B\u4E00\u9996", function() {
+      mg.appendChild(btn("mw-button is-transport", "\u203A", busy, "\u4E0B\u4E00\u9996", function() {
         run("\u4E0B\u4E00\u9996", function(cb) { apiRequest("/api/next", {}, cb); });
       }));
       mc.appendChild(mg);
@@ -780,13 +783,13 @@
       var rg = el("div", "mw-grid");
       for (var mi = 0; mi < moods.length; mi++) {
         var mood = moods[mi];
-        rg.appendChild(btn("mw-button" + (cm===mood.id?" is-active":""), "<span class=\"mw-icon\">" + mood.icon + "</span>" + mood.id, false, busy, "", function(m) { return function() { startRadio(m.id); }; }(mood)));
+        rg.appendChild(btn("mw-button" + (cm===mood.id?" is-active":""), "<span class=\"mw-icon\">" + mood.icon + "</span>" + mood.id, busy, "", function(m) { return function() { startRadio(m.id); }; }(mood)));
       }
       rgc.appendChild(rg); rDiv.appendChild(rgc);
 
       var ar = el("div", "mw-action-row");
-      ar.appendChild(btn("mw-button is-active", "\u25B6 \u5F00\u64AD", false, busy, "", function() { startRadio(cm||"\u5E73\u9759"); }));
-      ar.appendChild(btn("mw-button", "\u21BB \u6765\u70B9\u522B\u7684", false, busy, "", function() { nextRadio(""); }));
+      ar.appendChild(btn("mw-button is-active", "\u25B6 \u5F00\u64AD", busy, "", function() { startRadio(cm||"\u5E73\u9759"); }));
+      ar.appendChild(btn("mw-button", "\u21BB \u6765\u70B9\u522B\u7684", busy, "", function() { nextRadio(""); }));
       rDiv.appendChild(ar);
       rootDiv.appendChild(rDiv);
     }
@@ -802,7 +805,7 @@
       var sg = el("div", "mw-grid two");
       for (var si = 0; si < searchExamples.length; si++) {
         var ex = searchExamples[si];
-        sg.appendChild(btn("mw-button" + (query===ex.id?" is-active":""), "<span class=\"mw-icon\">" + ex.icon + "</span>" + ex.id, false, busy, ex.id, function(e) { return function() { query = e.id; render(); }; }(ex)));
+        sg.appendChild(btn("mw-button" + (query===ex.id?" is-active":""), "<span class=\"mw-icon\">" + ex.icon + "</span>" + ex.id, busy, ex.id, function(e) { return function() { query = e.id; render(); }; }(ex)));
       }
       sc.appendChild(sg); sDiv.appendChild(sc);
 
@@ -813,8 +816,8 @@
       iw.appendChild(inp); sDiv.appendChild(iw);
 
       var ar2 = el("div", "mw-action-row");
-      ar2.appendChild(btn("mw-button is-active", "\u25B6 \u5F00\u59CB\u7535\u53F0", false, busy||!query.trim(), "", searchRadio));
-      ar2.appendChild(btn("mw-button", "\u21BB \u6765\u70B9\u522B\u7684", false, busy, "", function() { nextRadio(""); }));
+      ar2.appendChild(btn("mw-button is-active", "\u25B6 \u5F00\u59CB\u7535\u53F0", busy||!query.trim(), "", searchRadio));
+      ar2.appendChild(btn("mw-button", "\u21BB \u6765\u70B9\u522B\u7684", busy, "", function() { nextRadio(query); }));
       sDiv.appendChild(ar2);
       rootDiv.appendChild(sDiv);
     }
@@ -830,7 +833,7 @@
       var gg = el("div", "mw-grid two");
       for (var gi = 0; gi < gameVibes.length; gi++) {
         var vibe = gameVibes[gi];
-        gg.appendChild(btn("mw-button" + (gameVibe===vibe.id?" is-active":""), "<span class=\"mw-icon\">" + vibe.icon + "</span>" + vibe.id, false, busy, vibe.hint, function(v) { return function() { gameVibe = v.id; render(); }; }(vibe)));
+        gg.appendChild(btn("mw-button" + (gameVibe===vibe.id?" is-active":""), "<span class=\"mw-icon\">" + vibe.icon + "</span>" + vibe.id, busy, vibe.hint, function(v) { return function() { gameVibe = v.id; render(); }; }(vibe)));
       }
       gc.appendChild(gg); gDiv.appendChild(gc);
 
@@ -838,12 +841,12 @@
       iw2.appendChild(el("div", "mw-input-label", "\uD83C\uDFAE \u73B0\u5728\u5728\u73A9\u4EC0\u4E48\uFF1F"));
       var inp2 = el("input", "mw-input"); inp2.value = gameName;
       inp2.oninput = function() { gameName = this.value; gameNameEdited = true; };
-      inp2.onblur = function() { gameNameEdited = true; };
+      inp2.onblur = function() { gameNameEdited = true; lsSet(LS_GAME_NAME, gameName); };
       iw2.appendChild(inp2); gDiv.appendChild(iw2);
 
       var ar3 = el("div", "mw-action-row");
-      ar3.appendChild(btn("mw-button is-active", "\u25B6 \u5F00\u59CB\u7535\u53F0", false, busy||!gameVibe, "", function() { startGameRadio("\u7535\u53F0\u542F\u52A8\u4E2D"); }));
-      ar3.appendChild(btn("mw-button", "\u21BB \u6765\u70B9\u522B\u7684", false, busy||!gameVibe, "", function() { startGameRadio("\u6362\u4E2A\u611F\u89C9"); }));
+      ar3.appendChild(btn("mw-button is-active", "\u25B6 \u5F00\u59CB\u7535\u53F0", busy||!gameVibe, "", function() { startGameRadio("\u7535\u53F0\u542F\u52A8\u4E2D"); }));
+      ar3.appendChild(btn("mw-button", "\u21BB \u6765\u70B9\u522B\u7684", busy||!gameVibe, "", function() { startGameRadio("\u6362\u4E2A\u611F\u89C9"); }));
       gDiv.appendChild(ar3);
       rootDiv.appendChild(gDiv);
     }
@@ -857,21 +860,21 @@
       iw3.appendChild(el("div", "mw-input-label", "\uD83C\uDFAE \u73B0\u5728\u5728\u73A9\u4EC0\u4E48\uFF1F"));
       var inp3 = el("input", "mw-input"); inp3.value = gameName;
       inp3.oninput = function() { gameName = this.value; gameNameEdited = false; };
-      inp3.onblur = function() { gameNameEdited = true; };
+      inp3.onblur = function() { gameNameEdited = true; lsSet(LS_GAME_NAME, gameName); };
       iw3.appendChild(inp3); setDiv.appendChild(iw3);
 
       var iw4 = el("div", "mw-input-wrap");
       iw4.appendChild(el("div", "mw-input-label", "API Base"));
       var inp4 = el("input", "mw-input"); inp4.value = apiBase;
-      inp4.oninput = function() { apiBase = this.value; };
+      inp4.oninput = function() { apiBase = this.value; lsSet("moodwave.switch.apiBase", apiBase); };
       iw4.appendChild(inp4); setDiv.appendChild(iw4);
 
-      setDiv.appendChild(btn("mw-button", "\u6D4B\u8BD5\u8FDE\u63A5", false, busy, "", function() {
+      setDiv.appendChild(btn("mw-button", "\u6D4B\u8BD5\u8FDE\u63A5", busy, "", function() {
         run("\u6D4B\u8BD5\u8FDE\u63A5", function(cb) { apiRequest("/api/now", null, cb); });
       }));
 
       var sp = el("div", "mw-spacer");
-      sp.appendChild(btn("mw-button" + (autoContinue?" is-active":""), (autoContinue?"\u2713 ":"") + "\u81EA\u52A8\u7EED\u64AD \u00B7 \u64AD\u5B8C\u81EA\u52A8\u6362\u4E0B\u4E00\u7EC4", false, false, "", function() { autoContinue = !autoContinue; render(); }));
+      sp.appendChild(btn("mw-button" + (autoContinue?" is-active":""), (autoContinue?"\u2713 ":"") + "\u81EA\u52A8\u7EED\u64AD \u00B7 \u64AD\u5B8C\u81EA\u52A8\u6362\u4E0B\u4E00\u7EC4", false, "", function() { autoContinue = !autoContinue; lsSet(LS_AUTO, autoContinue ? "1" : "0"); render(); }));
       setDiv.appendChild(sp);
       rootDiv.appendChild(setDiv);
     }
