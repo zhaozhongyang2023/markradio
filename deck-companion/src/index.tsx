@@ -251,11 +251,11 @@ function Content() {
   const [localProgressRatio, setLocalProgressRatio] = useState(serverProgressRatio);
   const progressAnchorRef = useRef({ ratio: 0, ts: 0 });
 
-  // 本地进度计时器：播放时每 250ms 递增，不发起网络请求
+  // 本地进度计时器：播放时每 250ms 递增，锚点仅在新歌/恢复播放时设定
   useEffect(() => {
     if (playing && track?.duration) {
-      setLocalProgressRatio(serverProgressRatio);
       progressAnchorRef.current = { ratio: serverProgressRatio, ts: Date.now() };
+      setLocalProgressRatio(serverProgressRatio);
       const timer = setInterval(() => {
         const elapsed = (Date.now() - progressAnchorRef.current.ts) / 1000;
         const duration = (track.duration || 180);
@@ -266,21 +266,10 @@ function Content() {
     } else {
       setLocalProgressRatio(serverProgressRatio);
     }
-  }, [playing, track?.id, serverProgressRatio]);
+  }, [playing, track?.id]);
 
   const progressRatio = playing ? localProgressRatio : serverProgressRatio;
 
-  // 轻量心跳：播放中每 15s 同步一次服务端进度，校正漂移
-  const [progressTick, setProgressTick] = useState(0);
-  useEffect(() => {
-    if (!playing) return;
-    const timer = setInterval(() => setProgressTick(t => t + 1), 15000);
-    return () => clearInterval(timer);
-  }, [playing]);
-  useEffect(() => {
-    if (!playing || progressTick === 0) return;
-    refresh().catch(() => {});
-  }, [progressTick]);
   const currentMood = (now.now?.mood || currentPlan?.mood || '').trim();
   const queue = currentPlan?.queue || [];
   const djLine = currentPlan?.tts?.text || currentPlan?.plan?.say || currentPlan?.plan?.reply || '';
@@ -1097,6 +1086,7 @@ function Content() {
           <PanelSectionRow>
             <AppButton disabled={busy} onClick={() => run('测试连接', refresh)}>测试连接</AppButton>
           </PanelSectionRow>
+          <div style={{ marginTop: 8 }} />
           <PanelSectionRow>
             <AppButton
               active={autoContinue}
