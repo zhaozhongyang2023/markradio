@@ -317,21 +317,30 @@
 
   // ─── state ───
   var apiBase = (function() {
+    try { var stored = localStorage.getItem("moodwave.switch.apiBase"); if (stored !== null) return stored; } catch(e) {}
     var p = window.location.port || "";
     if (p === "8765" || p === "38765") return "";
     return window.location.protocol + "//" + window.location.hostname + ":8765";
   })();
-  var page = "radio";
+  // -- localStorage helpers --
+  var LS_PAGE = "moodwave.switch.page";
+  var LS_GAME_NAME = "moodwave.switch.gameName";
+  var LS_MINIMAL = "moodwave.switch.minimalMode";
+  var LS_AUTO = "moodwave.switch.autoContinue";
+  function lsGet(k, d) { try { var v = localStorage.getItem(k); return v !== null ? v : d; } catch(e) { return d; } }
+  function lsSet(k, v) { try { localStorage.setItem(k, v); } catch(e) {} }
+
+  var page = lsGet(LS_PAGE, "radio");
   var now = {};
   var busy = false;
   var progress = 0;
   var statusText = "\u8FDE\u63A5\u4E2D";
   var query = searchExamples[0].id;
   var gameVibe = "\u63A2\u7D22\u5730\u56FE";
-  var gameName = "";
+  var gameName = lsGet(LS_GAME_NAME, "");
   var gameNameEdited = false;
-  var minimalMode = false;
-  var autoContinue = false;
+  var minimalMode = lsGet(LS_MINIMAL, "0") === "1";
+  var autoContinue = lsGet(LS_AUTO, "0") === "1";
   var localProgressRatio = 0;
   var progressAnchor = { ratio: 0, ts: 0 };
   var runTimer = null;
