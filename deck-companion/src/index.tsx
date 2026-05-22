@@ -187,6 +187,9 @@ function Content() {
       setStatus('离线: ' + (e?.message || String(e)).slice(0, 40));
     }
   }
+  const refreshRef = useRef(refresh);
+  refreshRef.current = refresh;
+
 
   async function switchMode(mode: Page) {
     if (mode === 'settings') { setPage('settings'); return; }
@@ -236,9 +239,9 @@ function Content() {
   }, []);
 
   useEffect(() => {
-    refresh();
-    const timer = setInterval(refresh, 5000);
-    const onVisible = () => { if (document.visibilityState === 'visible') refresh(); };
+    refreshRef.current();
+    const timer = setInterval(() => refreshRef.current(), 5000);
+    const onVisible = () => { if (document.visibilityState === 'visible') refreshRef.current(); };
     document.addEventListener('visibilitychange', onVisible);
     return () => {
       clearInterval(timer);
@@ -273,7 +276,7 @@ function Content() {
 
   const progressRatio = playing ? localProgressRatio : serverProgressRatio;
 
-  const currentMood = (now.now?.mood || currentPlan?.mood || '').trim();
+  const currentMood = (now.now?.mood || currentPlan?.mood || now.plans?.radio?.mood || '').trim();
   const queue = currentPlan?.queue || [];
   const djLine = currentPlan?.tts?.text || currentPlan?.plan?.say || currentPlan?.plan?.reply || '';
   const djForTrack = (() => {
@@ -320,10 +323,10 @@ function Content() {
     const mode = getActiveMode(now);
     if (mode === 'game') {
       await startGameRadio('换个感觉');
-    } else if (mode === 'radio') {
-      await nextRadio('');
-    } else {
+    } else if (mode === 'search') {
       await nextRadio(query);
+    } else {
+      await nextRadio('');
     }
   }
 
@@ -916,7 +919,7 @@ function Content() {
           {djForTrack ? (
             <div className="mw-minimal-quote mw-minimal-quote-track">{djForTrack}</div>
           ) : null}
-          <div className="mw-minimal-playing">📻 正在陪你</div>
+          <div className="mw-minimal-playing">{(() => { const m2 = getActiveMode(now); return m2 === 'game' ? '🎮 正在陪你' : '📻 正在陪你'; })()}</div>
           <div className="mw-minimal-track">{track.title || '未知歌曲'}{track.artist ? ' — ' + track.artist : ''}</div>
           {playing ? <div className="mw-minimal-progress"><div className="mw-minimal-progress-fill" style={{width: `${Math.round(progressRatio * 100)}%`}} /></div> : null}
           {(() => { const lyric = getCurrentLyric(track, progressRatio); return lyric ? <div className="mw-minimal-lyric">{lyric}</div> : null; })()}
@@ -1039,7 +1042,7 @@ function Content() {
           </PanelSectionRow>
           <div className="mw-action-row">
             <AppButton active disabled={busy || !query.trim()} onClick={searchRadio}>▶ 开始电台</AppButton>
-            <AppButton disabled={busy} onClick={nextRadio}>↻ 来点别的</AppButton>
+            <AppButton disabled={busy} onClick={() => nextRadio(query)}>↻ 来点别的</AppButton>
           </div>
         </div>
       )}
