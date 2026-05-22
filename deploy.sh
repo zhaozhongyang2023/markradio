@@ -123,7 +123,7 @@ deploy_to() {
   # 刷新 Decky 插件
   if [[ "$label" == *"Deck"* ]]; then
     echo "  [3b] 刷新 Decky 插件..."
-    remote "$user" "$host" "$pass"       "nohup sh -c 'echo $pass | sudo -S systemctl restart plugin_loader' > /tmp/plugin_restart.log 2>&1 &"
+    remote_sudo "$user" "$host" "$pass" "systemctl restart plugin_loader"
     sleep 2
     green "  ✓ plugin_loader 重启中"
 
@@ -155,7 +155,7 @@ green "  ✓ 构建完成"
 if [[ "$TARGET" == "all" || "$TARGET" == "deck" ]]; then
   echo "[0b] 构建 Decky 插件..."
   cd "$PROJECT_DIR/deck-companion"
-  npm run build --silent 2>/dev/null || yellow "  ⚠ deck-companion 构建失败"
+  npm run build --silent 2>/dev/null || { red "  ✗ deck-companion 构建失败"; exit 1; }
   cd "$PROJECT_DIR"
   green "  ✓ Decky 插件构建完成"
 fi
