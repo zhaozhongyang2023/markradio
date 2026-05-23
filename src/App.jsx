@@ -3246,7 +3246,7 @@ function seekTo(ratio) {
       {showDnaPanel ? (
         <div className="qr-backdrop" role="dialog" aria-modal="true" aria-label="让 AI DJ 更懂你的音乐世界">
           <div className="qr-card dna-card">
-            <h3>🎧 让 AI 更懂你</h3>
+            <h3>🎧 让 AI 更懂你 <small style="font-size:10px;color:rgba(0,0,0,0.3);font-weight:400">v4</small></h3>
             {!dnaResult ? (
               <>
                 {netease.loggedIn ? (
