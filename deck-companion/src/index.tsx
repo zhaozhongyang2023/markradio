@@ -290,7 +290,7 @@ function Content() {
   const queue = currentPlan?.queue || [];
   const djLine = currentPlan?.tts?.text || currentPlan?.plan?.say || currentPlan?.plan?.reply || '';
   const djForTrack = (() => {
-    const idx = queue.findIndex(t => t.id === track?.id || t.sourceId === track?.sourceId);
+    const idx = queue.findIndex(t => t.id === track?.id || (track?.sourceId && t.sourceId === track?.sourceId));
     if (idx >= 0 && currentPlan?.cardTts?.[idx]?.text) return currentPlan.cardTts[idx].text || '';
     return '';
   })();
@@ -1124,7 +1124,7 @@ function Content() {
           <div className="mw-card mw-card-accent">
             {djLine ? <div className="mw-dj">{djLine}</div> : null}
             {queue.map((item, index) => {
-              const isCurrent = track && (item.id === track.id || item.sourceId === track.sourceId);
+              const isCurrent = track && (item.id === track.id || (track.sourceId && item.sourceId === track.sourceId));
               return (
               <div className={`mw-song${isCurrent ? ' mw-song-active' : ''}`} key={item.id || index}>
                 <div className="mw-song-title">{item.title || '未知歌曲'}</div>

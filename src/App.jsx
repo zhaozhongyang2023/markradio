@@ -912,6 +912,7 @@ function V4RadioView({
 
 export default function App() {
   const [viewMode, setViewMode] = useState(() => (detectDeckRuntime() ? 'v4' : 'v3'));
+  const isDeckRef = useRef(detectDeckRuntime());
   const [state, setState] = useState(null);
   const [status, setStatus] = useState(null);
   const [selectedMood, setSelectedMood] = useState('平静');
@@ -3411,7 +3412,7 @@ function seekTo(ratio) {
   }
 
   return (
-    <main className={`shell${detectDeckRuntime() ? " is-deck" : ""}`}>
+    <main className={`shell${isDeckRef.current ? " is-deck" : ""}`}>
       <section className="stage" aria-label="MoodWave AI DJ 电台">
         <div className="aura" />
         <div className="phone">

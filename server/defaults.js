@@ -11,6 +11,8 @@ export const station = {
 export const demoTracks = [
   {
     id: 'demo-1',
+    source: 'demo',
+    sourceId: 'demo-1',
     title: 'Monday Night Exhale',
     artist: 'Bread',
     album: 'Private Memory',
@@ -21,6 +23,8 @@ export const demoTracks = [
   },
   {
     id: 'demo-2',
+    source: 'demo',
+    sourceId: 'demo-2',
     title: 'Sign of the Times',
     artist: 'Harry Styles',
     album: 'Memory Signal',
@@ -31,6 +35,8 @@ export const demoTracks = [
   },
   {
     id: 'demo-3',
+    source: 'demo',
+    sourceId: 'demo-3',
     title: 'If',
     artist: 'Bread',
     album: 'Soft Radio',
@@ -41,6 +47,8 @@ export const demoTracks = [
   },
   {
     id: 'demo-4',
+    source: 'demo',
+    sourceId: 'demo-4',
     title: '夜空中最亮的星',
     artist: '逃跑计划',
     album: 'Chinese Classics',
@@ -51,6 +59,8 @@ export const demoTracks = [
   },
   {
     id: 'demo-5',
+    source: 'demo',
+    sourceId: 'demo-5',
     title: '倔强',
     artist: '五月天',
     album: 'Release',
@@ -61,6 +71,8 @@ export const demoTracks = [
   },
   {
     id: 'demo-6',
+    source: 'demo',
+    sourceId: 'demo-6',
     title: 'Weightless',
     artist: 'Marconi Union',
     album: 'Calm',
