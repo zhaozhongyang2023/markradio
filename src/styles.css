@@ -2012,6 +2012,18 @@ p {
 .v4-shell.is-deck .v4-radio {
   max-width: 100%;
 }
+.is-deck .phone {
+  width: 560px;
+  max-width: 560px;
+  height: calc(100dvh - 36px);
+  min-height: 0;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 22px;
+  box-shadow: 0 0 44px rgba(0, 0, 0, 0.58);
+}
+.is-deck .stage {
+  padding: 18px;
+}
 
 @media (max-height: 800px) {
 
