@@ -3149,6 +3149,9 @@ p {
 /* ── Music DNA ── */
 .dna-card {
   max-width: 380px;
+  width: min(84vw, 380px);
+  background: #f5f3ec;
+  color: #111;
 }
 .dna-lib-info {
   margin: 0 0 10px;
