@@ -63,9 +63,9 @@ export async function getNeteaseLibraryCounts(store) {
     const uid = await ensureNeteaseProfile(store);
     if (!uid) return null;
     const [likedRes, playlistRes, albumRes] = await Promise.all([
-      callNetease('/likelist', { limit: 1 }, store).catch(() => null),
+      callNetease('/likelist', { limit: 500 }, store).catch(() => null),
       callNetease('/user/playlist', { uid }, store).catch(() => null),
-      callNetease('/album/sublist', { limit: 1 }, store).catch(() => null)
+      callNetease('/album/sublist', { limit: 100 }, store).catch(() => null)
     ]);
     return {
       likedCount: Array.isArray(likedRes?.ids) ? likedRes.ids.length : null,
