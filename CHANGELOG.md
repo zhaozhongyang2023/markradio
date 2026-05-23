@@ -1,5 +1,15 @@
 # Changelog
 
+## 2026-05-24（深夜）
+
+### Music DNA 加权搜索
+- 新增 `applyDnaWeight()` — 根据用户 Music DNA 的 `music_taste` 关键词给候选歌曲打分
+- 新增 `sortByDnaWeight()` — 符合口味的歌自动排到歌单前面
+- `confidence` 作为权重倍率：high=1.5x / medium=1.0x / low=0.5x
+- DNA 现在不仅分析，还直接影响选歌结果
+
+---
+
 ## 2026-05-24（晚间）
 
 ### DNA 面板
