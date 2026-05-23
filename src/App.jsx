@@ -3322,12 +3322,14 @@ function seekTo(ratio) {
                       <div className="dna-tags">{dnaResult.music_taste.map((s) => <span key={s} className="dna-tag">{s}</span>)}</div>
                     </div>
                   )}
-                  {dnaResult.game_vibes?.length > 0 && (
-                    <div className="dna-group">
-                      <span className="dna-label">游戏氛围</span>
+                  <div className="dna-group">
+                    <span className="dna-label">游戏氛围</span>
+                    {dnaResult.game_vibes?.length > 0 ? (
                       <div className="dna-tags">{dnaResult.game_vibes.map((s) => <span key={s} className="dna-tag">{s}</span>)}</div>
-                    </div>
-                  )}
+                    ) : (
+                      <span className="dna-empty-hint">🌙 暂无游戏记录</span>
+                    )}
+                  </div>
                   {(dnaResult.analyzed_tracks || dnaResult.analyzed_playlists) ? (
                     <div className="dna-stats">
                       已分析 {dnaResult.analyzed_tracks || 0} 首歌 · {dnaResult.analyzed_playlists || 0} 个歌单
