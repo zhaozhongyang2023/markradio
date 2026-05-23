@@ -2005,7 +2005,7 @@ p {
   margin-top: auto !important;
 }
 
-@media (max-height: 800px)
+@media (max-height: 800px) {
 
   .mood-strip button {
     min-width: 0;
