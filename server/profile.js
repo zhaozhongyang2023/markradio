@@ -1,5 +1,5 @@
 import { config } from './config.js';
-import { collectNeteaseLibrary } from './providers/netease.js';
+import { collectNeteaseLibrary, getNeteaseLibraryCounts } from './providers/netease.js';
 import { assertServiceAvailable, markServiceFailure, markServiceSuccess } from './circuit-breaker.js';
 
 import OpenAI from 'openai';
@@ -25,6 +25,94 @@ export function getMusicDNASummary(dna) {
   // 兼容旧版
   if (!parts.length && dna.favorite_styles?.length) parts.push(dna.favorite_styles.slice(0, 3).join(' / '));
   return parts.join(' · ') || '';
+}
+
+// ─── 行为信号累积 ───
+
+export function accumulateDnaSignal(store, type, value) {
+  if (!type || !value) return;
+  const v = String(value).trim();
+  if (!v) return;
+  const signals = store.get('dnaSignals') || [];
+  const existing = signals.find(s => s.type === type && s.value === v);
+  if (existing) {
+    existing.count = (existing.count || 1) + 1;
+    existing.lastAt = new Date().toISOString();
+  } else {
+    signals.push({ type, value: v, count: 1, lastAt: new Date().toISOString() });
+  }
+  // 上限 50 条，超出淘汰最旧（按 lastAt 排序）
+  if (signals.length > 50) {
+    signals.sort((a, b) => new Date(a.lastAt) - new Date(b.lastAt));
+    signals.splice(0, signals.length - 50);
+  }
+  store.set('dnaSignals', signals);
+}
+
+export function getDnaSignalsSummary(store) {
+  const signals = store.get('dnaSignals') || [];
+  if (!signals.length) return '';
+  const typeLabels = { mood: '心情', search: '搜索', gameVibe: '游戏氛围' };
+  const grouped = {};
+  for (const s of signals) {
+    const key = `${s.type}|${s.value}`;
+    if (!grouped[key]) grouped[key] = { type: s.type, value: s.value, count: 0 };
+    grouped[key].count += s.count || 1;
+  }
+  const sorted = Object.values(grouped).sort((a, b) => b.count - a.count).slice(0, 8);
+  if (!sorted.length) return '';
+  const lines = sorted.map(g => {
+    const label = typeLabels[g.type] || g.type;
+    return `${label}了"${g.value}"${g.count > 1 ? ' ×' + g.count : ''}`;
+  });
+  return '近期行为：' + lines.join('，') + '。';
+}
+
+// ─── 自动检测与更新 ───
+
+let _dnaRegenerating = false;
+
+export function maybeRegenerateDna(store) {
+  if (_dnaRegenerating) return;
+  _dnaRegenerating = true;
+
+  // 异步执行，fire-and-forget
+  (async () => {
+    try {
+      const existing = migrateDna(store.get('musicDna'));
+      let needRegen = false;
+
+      // 检查是否超过 6 小时
+      if (existing?.generated_at) {
+        const ageMs = Date.now() - new Date(existing.generated_at).getTime();
+        if (ageMs > 6 * 3600 * 1000) needRegen = true;
+      } else {
+        needRegen = true; // 从未生成过
+      }
+
+      // 检查网易云数据是否变化
+      if (!needRegen && existing?.source === 'ai_analysis') {
+        const counts = await getNeteaseLibraryCounts(store).catch(() => null);
+        if (counts) {
+          const prevTracks = existing.analyzed_tracks || 0;
+          const prevPlaylists = existing.analyzed_playlists || 0;
+          const prevAlbums = existing.analyzed_albums || 0;
+          if (counts.likedCount !== null && counts.likedCount !== prevTracks) needRegen = true;
+          if (counts.playlistCount !== null && counts.playlistCount !== prevPlaylists) needRegen = true;
+          if (counts.albumCount !== null && counts.albumCount !== prevAlbums) needRegen = true;
+        }
+      }
+
+      if (needRegen) {
+        const dna = await generateMusicDNA(store);
+        saveMusicDNA(store, dna);
+      }
+    } catch {
+      // 静默失败，不影响主流程
+    } finally {
+      _dnaRegenerating = false;
+    }
+  })();
 }
 
 export async function generateMusicDNA(store, preferences = '') {
@@ -80,7 +168,10 @@ ${neteaseData.playlistInsights?.length ? '歌单简介：' + neteaseData.playlis
 网易云数据：
 ${libraryInfo}
 
-用户新增偏好：${preferences || '无'}
+用户行为信号：
+${getDnaSignalsSummary(store) || '暂无近期行为信号。'}
+
+用户自述偏好：${preferences || '无'}
 
 请融合更新。新增偏好优先级更高，但保留之前合理判断。返回 JSON：
 {
@@ -90,6 +181,9 @@ ${libraryInfo}
 }`
     : `网易云数据：
 ${libraryInfo}
+
+用户行为信号：
+${getDnaSignalsSummary(store) || '暂无近期行为信号。'}
 
 用户自述偏好：${preferences || '无'}
 

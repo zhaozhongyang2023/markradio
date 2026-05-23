@@ -58,6 +58,25 @@ export async function getUserAlbums(store) {
   }));
 }
 
+export async function getNeteaseLibraryCounts(store) {
+  try {
+    const uid = await ensureNeteaseProfile(store);
+    if (!uid) return null;
+    const [likedRes, playlistRes, albumRes] = await Promise.all([
+      callNetease('/likelist', { limit: 1 }, store).catch(() => null),
+      callNetease('/user/playlist', { uid }, store).catch(() => null),
+      callNetease('/album/sublist', { limit: 1 }, store).catch(() => null)
+    ]);
+    return {
+      likedCount: Array.isArray(likedRes?.ids) ? likedRes.ids.length : null,
+      playlistCount: Array.isArray(playlistRes?.playlist) ? playlistRes.playlist.length : null,
+      albumCount: typeof albumRes?.total === 'number' ? albumRes.total : (Array.isArray(albumRes?.data) ? albumRes.data.length : null)
+    };
+  } catch {
+    return null;
+  }
+}
+
 export async function collectNeteaseLibrary(store) {
   const liked = await getLikedSongs(store).catch(() => []);
   const playlists = await getUserPlaylists(store).catch(() => []);

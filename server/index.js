@@ -19,7 +19,7 @@ import { castManager, getCastStatus } from './cast.js';
 import { buildCastUrl, resolveCastHost } from './cast-url.js';
 import { callNetease, checkNeteaseQr, createNeteaseQr, getNeteaseLoginStatus } from './netease-auth.js';
 import { getWeather } from './weather.js';
-import { loadMusicDNA, saveMusicDNA, generateMusicDNA, getMusicDNASummary } from './profile.js';
+import { loadMusicDNA, saveMusicDNA, generateMusicDNA, getMusicDNASummary, accumulateDnaSignal, maybeRegenerateDna } from './profile.js';
 import { collectNeteaseLibrary } from './providers/netease.js';
 
 const store = new StateStore();
@@ -566,6 +566,9 @@ app.post('/api/ai/radio', async (request) => {
   });
   broadcast('plan', plan);
   broadcast('now', publicNow());
+  // 信号记录 + 异步 DNA 检测
+  if (mood) accumulateDnaSignal(store, 'mood', mood);
+  maybeRegenerateDna(store);
   return {
     ok: true,
     dj_intro: plan.tts?.text || plan.plan?.say || '',
@@ -595,6 +598,9 @@ app.post('/api/ai/search', async (request) => {
   const planMessage = buildPlanMessage(plan);
   broadcast('plan', plan);
   broadcast('now', publicNow());
+  // 信号记录 + 异步 DNA 检测
+  if (query) accumulateDnaSignal(store, 'search', query);
+  maybeRegenerateDna(store);
   return {
     ok: true,
     reply: plan.plan?.reply || '今晚适合慢一点。',
@@ -664,6 +670,9 @@ app.post('/api/ai/game-radio', async (request) => {
   });
   broadcast('plan', plan);
   broadcast('now', publicNow());
+  // 信号记录 + 异步 DNA 检测
+  if (gameVibe) accumulateDnaSignal(store, 'gameVibe', gameVibe);
+  maybeRegenerateDna(store);
   return {
     ok: true,
     gameVibe,
@@ -1054,6 +1063,9 @@ await app.listen({ host: config.host, port: config.apiPort });
 
 // 启动时获取一次天气，确保极简视图立即可用
 getWeather().then(w => store.set('weather', w)).catch(() => {});
+
+// 启动后延迟检测 DNA 是否需要更新
+setTimeout(() => maybeRegenerateDna(store), 10000);
 
 // Warmup: generate initial plan in background so first page load is instant
 setTimeout(async () => {
