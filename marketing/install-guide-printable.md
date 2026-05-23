@@ -12,6 +12,15 @@
 - **DeepSeek API Key**（免费获取，见附赠教程）
 - 建议接 USB-C Hub + 键盘鼠标（触摸屏也能操作，只是慢一点）
 
+### ⚠️ 网络要求
+
+> Fish Audio 和 OpenWeather 是**海外服务**，国内网络环境下可能无法直接访问。
+> 如果计划使用这两个功能，Steam Deck 需要能够访问外网：
+
+- 路由器已配置科学上网（推荐，全家设备通用）
+- 或在 Steam Deck 桌面模式安装代理客户端（Clash / v2ray 等）
+- **DeepSeek 不需要外网**，国内网络直连可用
+
 
 ## 📡 API Key 注册教程（跟着做就行）
 
@@ -55,6 +64,8 @@
 
 给 DJ 配上真实人声朗读，不填就用文字版 DJ。
 
+> 🌐 **需要外网** — fish.audio 是海外服务，注册和使用都需要科学上网。
+
 1. 打开浏览器访问：
    **https://fish.audio**
 
@@ -84,6 +95,8 @@
 ### 三、OpenWeather API Key（可选 🌤️）
 
 让 DJ 感知天气，在开场白里聊聊今天的温度、刮风下雨。
+
+> 🌐 **需要外网** — openweathermap.org 是海外服务，注册需要科学上网。
 
 1. 打开浏览器访问：
    **https://openweathermap.org**
