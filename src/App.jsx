@@ -3293,30 +3293,41 @@ function seekTo(ratio) {
               </>
             ) : (
               <>
-                {prevDnaResult?.core_feelings?.length > 0 ? (
+                {prevDnaResult?.core_moods?.length > 0 ? (
                   <div className="dna-prev">
                     <span>📝 上次分析：</span>
-                    {prevDnaResult.core_feelings?.slice(0, 3).join(' / ')}&nbsp;&nbsp;·&nbsp;&nbsp;
-                    {(prevDnaResult.listening_state || prevDnaResult.preferred_scenes || []).slice(0, 2).join(' / ')}
+                    {prevDnaResult.core_moods?.slice(0, 3).join(' / ')}&nbsp;&nbsp;·&nbsp;&nbsp;
+                    {(prevDnaResult.listening_habits || prevDnaResult.listening_state || prevDnaResult.preferred_scenes || []).slice(0, 2).join(' / ')}
                   </div>
                 ) : null}
                 <div className="dna-result">
-                  {dnaResult.core_feelings?.length > 0 && (
+                  {dnaResult.confidence ? (
+                    <div className="dna-confidence">
+                      {dnaResult.confidence === 'high' ? '🟢 高置信' : dnaResult.confidence === 'medium' ? '🟡 学习中' : '⚪ 初识'}
+                    </div>
+                  ) : null}
+                  {dnaResult.core_moods?.length > 0 && (
                     <div className="dna-group">
-                      <span className="dna-label">核心情绪</span>
-                      <div className="dna-tags">{dnaResult.core_feelings.map((s) => <span key={s} className="dna-tag">{s}</span>)}</div>
+                      <span className="dna-label">情绪偏好</span>
+                      <div className="dna-tags">{dnaResult.core_moods.map((s) => <span key={s} className="dna-tag">{s}</span>)}</div>
                     </div>
                   )}
-                  {(dnaResult.listening_state?.length > 0 || dnaResult.preferred_scenes?.length > 0) && (
+                  {dnaResult.listening_habits?.length > 0 && (
                     <div className="dna-group">
                       <span className="dna-label">听歌习惯</span>
-                      <div className="dna-tags">{(dnaResult.listening_state || dnaResult.preferred_scenes || []).map((s) => <span key={s} className="dna-tag">{s}</span>)}</div>
+                      <div className="dna-tags">{dnaResult.listening_habits.map((s) => <span key={s} className="dna-tag">{s}</span>)}</div>
                     </div>
                   )}
-                  {(dnaResult.music_personality?.length > 0 || dnaResult.favorite_styles?.length > 0) && (
+                  {dnaResult.music_taste?.length > 0 && (
                     <div className="dna-group">
-                      <span className="dna-label">音乐气质</span>
-                      <div className="dna-tags">{(dnaResult.music_personality || dnaResult.favorite_styles || []).map((s) => <span key={s} className="dna-tag">{s}</span>)}</div>
+                      <span className="dna-label">音乐口味</span>
+                      <div className="dna-tags">{dnaResult.music_taste.map((s) => <span key={s} className="dna-tag">{s}</span>)}</div>
+                    </div>
+                  )}
+                  {dnaResult.game_vibes?.length > 0 && (
+                    <div className="dna-group">
+                      <span className="dna-label">游戏氛围</span>
+                      <div className="dna-tags">{dnaResult.game_vibes.map((s) => <span key={s} className="dna-tag">{s}</span>)}</div>
                     </div>
                   )}
                   {(dnaResult.analyzed_tracks || dnaResult.analyzed_playlists) ? (

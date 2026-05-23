@@ -3176,6 +3176,11 @@ p {
   color: #42d8b2;
   font-size: 13px;
 }
+.dna-confidence {
+  margin: 0 0 10px;
+  font-size: 13px;
+  font-weight: 600;
+}
 .dna-stats {
   color: rgba(0,0,0,0.35);
   font-size: 11px;
