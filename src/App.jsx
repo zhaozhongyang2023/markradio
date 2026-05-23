@@ -924,6 +924,7 @@ export default function App() {
   const [showDnaPanel, setShowDnaPanel] = useState(false);
   const [dnaGenerating, setDnaGenerating] = useState(false);
   const [dnaResult, setDnaResult] = useState(null);
+  const [prevDnaResult, setPrevDnaResult] = useState(null);
   const [dnaPreferences, setDnaPreferences] = useState('');
   const [dnaLibrary, setDnaLibrary] = useState({ likedCount: 0, playlistCount: 0 });
   const mountedRef = useRef(true);
@@ -3272,6 +3273,7 @@ function seekTo(ratio) {
                         if (!mountedRef.current) return;
                         setDnaLibrary(lib);
                       }
+                      setPrevDnaResult(dnaResult);
                       const res = await api.musicDnaGenerate(dnaPreferences);
                       if (!mountedRef.current) return;
                       if (res?.dna) {
@@ -3291,6 +3293,13 @@ function seekTo(ratio) {
               </>
             ) : (
               <>
+                {prevDnaResult?.core_feelings?.length > 0 ? (
+                  <div className="dna-prev">
+                    <span>📝 上次分析：</span>
+                    {prevDnaResult.core_feelings?.slice(0, 3).join(' / ')}&nbsp;&nbsp;·&nbsp;&nbsp;
+                    {(prevDnaResult.listening_state || prevDnaResult.preferred_scenes || []).slice(0, 2).join(' / ')}
+                  </div>
+                ) : null}
                 <div className="dna-result">
                   {dnaResult.core_feelings?.length > 0 && (
                     <div className="dna-group">
