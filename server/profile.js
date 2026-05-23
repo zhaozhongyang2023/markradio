@@ -1,5 +1,5 @@
 import { config } from './config.js';
-import { collectNeteaseLibrary } from './providers/netease.js';
+import { collectNeteaseLibrary, getNeteaseLibraryCounts } from './providers/netease.js';
 import { assertServiceAvailable, markServiceFailure, markServiceSuccess } from './circuit-breaker.js';
 
 import OpenAI from 'openai';
@@ -19,20 +19,114 @@ export function saveMusicDNA(store, dna) {
 export function getMusicDNASummary(dna) {
   if (!dna) return '';
   const parts = [];
-  if (dna.core_feelings?.length) parts.push(dna.core_feelings.slice(0, 3).join(' / '));
-  if (dna.listening_state?.length) parts.push(dna.listening_state.slice(0, 2).join(' / '));
-  if (dna.music_personality?.length) parts.push(dna.music_personality.slice(0, 2).join(' / '));
+  if (dna.core_moods?.length) parts.push(dna.core_moods.slice(0, 3).join(' / '));
+  if (dna.listening_habits?.length) parts.push(dna.listening_habits.slice(0, 2).join(' / '));
+  if (dna.music_taste?.length) parts.push(dna.music_taste.slice(0, 3).join(' / '));
+  if (dna.game_vibes?.length) parts.push(dna.game_vibes.slice(0, 2).join(' / '));
   // 兼容旧版
-  if (!parts.length && dna.favorite_styles?.length) parts.push(dna.favorite_styles.slice(0, 3).join(' / '));
+  if (!parts.length) {
+    if (dna.core_feelings?.length) parts.push(dna.core_feelings.slice(0, 3).join(' / '));
+    if (dna.favorite_styles?.length) parts.push(dna.favorite_styles.slice(0, 3).join(' / '));
+  }
   return parts.join(' · ') || '';
+}
+
+// ─── 行为信号累积 ───
+
+export function accumulateDnaSignal(store, type, value) {
+  if (!type || !value) return;
+  const v = String(value).trim();
+  if (!v) return;
+  const signals = store.get('dnaSignals') || [];
+  const existing = signals.find(s => s.type === type && s.value === v);
+  if (existing) {
+    existing.count = (existing.count || 1) + 1;
+    existing.lastAt = new Date().toISOString();
+  } else {
+    signals.push({ type, value: v, count: 1, lastAt: new Date().toISOString() });
+  }
+  // 上限 50 条，超出淘汰最旧（按 lastAt 排序）
+  if (signals.length > 50) {
+    signals.sort((a, b) => new Date(a.lastAt) - new Date(b.lastAt));
+    signals.splice(0, signals.length - 50);
+  }
+  store.set('dnaSignals', signals);
+}
+
+export function getDnaSignalsSummary(store) {
+  const signals = store.get('dnaSignals') || [];
+  if (!signals.length) return '';
+  const typeLabels = { mood: '心情', search: '搜索', gameVibe: '游戏氛围' };
+  const grouped = {};
+  for (const s of signals) {
+    const key = `${s.type}|${s.value}`;
+    if (!grouped[key]) grouped[key] = { type: s.type, value: s.value, count: 0 };
+    grouped[key].count += s.count || 1;
+  }
+  const sorted = Object.values(grouped).sort((a, b) => b.count - a.count).slice(0, 8);
+  if (!sorted.length) return '';
+  const lines = sorted.map(g => {
+    const label = typeLabels[g.type] || g.type;
+    return `${label}了"${g.value}"${g.count > 1 ? ' ×' + g.count : ''}`;
+  });
+  return '近期行为：' + lines.join('，') + '。';
+}
+
+// ─── 自动检测与更新 ───
+
+let _dnaRegenerating = false;
+
+export function maybeRegenerateDna(store) {
+  if (_dnaRegenerating) return;
+  _dnaRegenerating = true;
+
+  // 异步执行，fire-and-forget
+  (async () => {
+    try {
+      const existing = migrateDna(store.get('musicDna'));
+      let needRegen = false;
+
+      // 检查是否超过 6 小时
+      if (existing?.generated_at) {
+        const ageMs = Date.now() - new Date(existing.generated_at).getTime();
+        if (ageMs > 6 * 3600 * 1000) needRegen = true;
+      } else {
+        needRegen = true; // 从未生成过
+      }
+
+      // 检查网易云数据是否变化
+      if (!needRegen && existing?.source === 'ai_analysis') {
+        const counts = await getNeteaseLibraryCounts(store).catch(() => null);
+        if (counts) {
+          const prevTracks = existing.analyzed_tracks || 0;
+          const prevPlaylists = existing.analyzed_playlists || 0;
+          const prevAlbums = existing.analyzed_albums || 0;
+          if (counts.likedCount !== null && counts.likedCount !== prevTracks) needRegen = true;
+          if (counts.playlistCount !== null && counts.playlistCount !== prevPlaylists) needRegen = true;
+          if (counts.albumCount !== null && counts.albumCount !== prevAlbums) needRegen = true;
+        }
+      }
+
+      if (needRegen) {
+        const dna = await generateMusicDNA(store);
+        saveMusicDNA(store, dna);
+      }
+    } catch {
+      // 静默失败，不影响主流程
+    } finally {
+      _dnaRegenerating = false;
+    }
+  })();
 }
 
 export async function generateMusicDNA(store, preferences = '') {
   if (!config.aiApiKey) {
     return {
-      core_feelings: [],
-      listening_state: [],
-      music_personality: [],
+      core_moods: [],
+      listening_habits: [],
+      music_taste: [],
+      game_vibes: [],
+      confidence: 'low',
       source: 'empty',
       reason: '未配置 AI'
     };
@@ -60,44 +154,72 @@ ${neteaseData.playlistInsights?.length ? '歌单简介：' + neteaseData.playlis
   // 加载已有 DNA，用于叠加分析
   const existingDna = migrateDna(store.get('musicDna'));
 
-  const systemPrompt = `你是 MoodWave 的 AI DJ 音乐人格分析器。
-你不是在分析音乐标签，而是在理解用户是一个什么样的听歌者。
+  const systemPrompt = `你是 MoodWave 的 Music DNA 分析器。
+你的任务是根据用户的网易云音乐数据和行为信号，生成用户的音乐人格画像。
 
-分析维度：
-- core_feelings: 用户听歌时的核心情绪状态 2~4 个（如：怀旧、平静、一个人、深夜思绪）
-- listening_state: 用户听歌习惯和状态 2~4 个（如：喜欢长时间循环、喜欢跑图时听、深夜必戴耳机）
-- music_personality: 用户整体音乐气质 2~4 个（如：更偏安静温暖、偏爱器乐氛围、喜欢低频沉浸）
+返回 JSON，结构如下：
+{
+  "core_moods": ["情绪1", "情绪2", "情绪3"],
+  "listening_habits": ["习惯1", "习惯2", "习惯3"],
+  "music_taste": ["风格1", "风格2", "风格3", "风格4"],
+  "game_vibes": [],
+  "confidence": "medium"
+}
 
-不要输出音乐风格标签（如"LoFi""JRPG OST"），而是输出对用户的深层理解。
-返回纯 JSON，无 Markdown，无解释。`;
+分析规则：
+1. core_moods（3~4个）：从歌单和喜好歌中感知情绪氛围，不是风格名。例：安静向歌单 → ["治愈","安静"]
+2. listening_habits（3~4个）：从歌单名称、描述推断听歌场景。如歌单名"深夜专属" → 深夜听歌。
+3. music_taste（4~6个）：提取具体音乐风格名，不要解释。从歌单标签、曲库中归纳。
+4. game_vibes：从用户行为信号中提取 gameVibe 记录。格式"游戏→氛围"。无记录则返回 []。
+5. confidence：
+   - "high"：网易云50+喜欢、3+歌单、有行为信号
+   - "medium"：有网易云数据或行为信号
+   - "low"：只有Demo数据
+
+禁止输出 Markdown。纯 JSON。`;
 
   const userPrompt = existingDna?.source === 'ai_analysis'
     ? `之前对用户的理解：
-- 核心情绪：${existingDna.core_feelings?.join('、') || '无'}
-- 听歌状态：${existingDna.listening_state?.join('、') || '无'}
-- 音乐气质：${existingDna.music_personality?.join('、') || '无'}
+- 情绪偏好：${existingDna.core_moods?.join('、') || existingDna.core_feelings?.join('、') || '无'}
+- 听歌习惯：${existingDna.listening_habits?.join('、') || existingDna.listening_state?.join('、') || '无'}
+- 音乐口味：${existingDna.music_taste?.join('、') || existingDna.music_personality?.join('、') || '无'}
+- 游戏氛围：${existingDna.game_vibes?.join('、') || '无'}
 
 网易云数据：
 ${libraryInfo}
 
-用户新增偏好：${preferences || '无'}
+用户行为信号：
+${getDnaSignalsSummary(store) || '暂无近期行为信号。'}
 
-请融合更新。新增偏好优先级更高，但保留之前合理判断。返回 JSON：
+用户自述偏好：${preferences || '无'}
+
+请在之前分析的基础上增量更新，不要推倒重来。
+- 之前合理的维度词条尽量保留（除非新数据明显矛盾）
+- 行为信号中出现的新模式可以补充到对应维度
+- 最多增减 1~2 个词条，保持整体稳定
+返回 JSON：
 {
-  "core_feelings": ["", ""],
-  "listening_state": ["", ""],
-  "music_personality": ["", ""]
+  "core_moods": ["", ""],
+  "listening_habits": ["", ""],
+  "music_taste": ["", ""],
+  "game_vibes": [],
+  "confidence": "medium"
 }`
     : `网易云数据：
 ${libraryInfo}
+
+用户行为信号：
+${getDnaSignalsSummary(store) || '暂无近期行为信号。'}
 
 用户自述偏好：${preferences || '无'}
 
 请分析并返回 JSON：
 {
-  "core_feelings": ["", ""],
-  "listening_state": ["", ""],
-  "music_personality": ["", ""]
+  "core_moods": ["", ""],
+  "listening_habits": ["", ""],
+  "music_taste": ["", ""],
+  "game_vibes": [],
+  "confidence": "medium"
 }`;
 
   assertServiceAvailable(config.aiProvider);
@@ -121,9 +243,11 @@ ${libraryInfo}
     const text = completion.choices?.[0]?.message?.content || '{}';
     const parsed = JSON.parse(text);
     return {
-      core_feelings: Array.isArray(parsed.core_feelings) ? parsed.core_feelings.slice(0, 4) : [],
-      listening_state: Array.isArray(parsed.listening_state) ? parsed.listening_state.slice(0, 4) : [],
-      music_personality: Array.isArray(parsed.music_personality) ? parsed.music_personality.slice(0, 4) : [],
+      core_moods: Array.isArray(parsed.core_moods) ? parsed.core_moods.slice(0, 4) : [],
+      listening_habits: Array.isArray(parsed.listening_habits) ? parsed.listening_habits.slice(0, 4) : [],
+      music_taste: Array.isArray(parsed.music_taste) ? parsed.music_taste.slice(0, 6) : [],
+      game_vibes: Array.isArray(parsed.game_vibes) ? parsed.game_vibes.slice(0, 4) : [],
+      confidence: parsed.confidence || 'medium',
       source: 'ai_analysis',
       ...(neteaseData ? {
         analyzed_tracks: neteaseData.likedCount,
@@ -140,13 +264,15 @@ ${libraryInfo}
 // 迁移旧版 DNA → 新版结构（兼容存量数据）
 function migrateDna(raw) {
   if (!raw) return null;
-  // 已经是新版结构，直接返回
-  if (raw.listening_state || raw.music_personality) return raw;
-  // 旧版结构：favorite_styles / core_feelings / preferred_scenes
+  // 已经是 V2 新版结构，直接返回
+  if (raw.listening_habits || raw.music_taste || raw.game_vibes) return raw;
+  // V2 迁移 V1 → V2
   return {
-    core_feelings: raw.core_feelings || [],
-    listening_state: (raw.preferred_scenes || []),
-    music_personality: (raw.favorite_styles || []),
+    core_moods: raw.core_feelings || raw.core_moods || [],
+    listening_habits: raw.listening_state || raw.preferred_scenes || raw.listening_habits || [],
+    music_taste: raw.music_personality || raw.favorite_styles || raw.music_taste || [],
+    game_vibes: raw.game_vibes || [],
+    confidence: raw.confidence || 'medium',
     source: raw.source || 'migrated',
     analyzed_tracks: raw.analyzed_tracks,
     analyzed_playlists: raw.analyzed_playlists,

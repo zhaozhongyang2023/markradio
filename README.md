@@ -1,23 +1,23 @@
 <p align="center"><img src="public/icon-512.png" width="128" alt="MoodWave Logo" /></p>
 
-# 🎵 MoodWave V6 — AI DJ 电台
+# 🎵 MoodWave — AI DJ 电台
 
-> **不是播放器。是会越来越懂你的 AI DJ。**
+当你在 Steam Deck 里独自旅行时，
+有个 AI DJ 会一直陪着你。
 
-| 打 Boss，AI 配燃曲。 | 跑图时，AI 陪你慢慢走。 | 它会越用越懂你。 |
-|:--:|:--:|:--:|
+- 自动识别当前游戏
+- 自动切换氛围音乐
+- 深夜低语式 AI DJ
+- 不打扰你的沉浸感
 
----
+我的世界，你一直在。
+<p align="center"><img src="public/hero.png?1" width="800" alt="MoodWave Hero"></p>
 
 ## 它是什么
 
 说出你现在的状态——
 
 剩下的全部由 AI DJ 自动完成：**开场白、歌单、推荐理由、语音朗读、自动播放。**
-
-MoodWave 不是播放器。不是 AI 工具。不是搜索系统。
-
-它是 **AI DJ + 情绪电台 + 游戏陪伴**——克制、少语、有留白。陪伴感胜过信息量。
 
 | ✅ 这样说 | ❌ 不这样说 |
 |---------|---------|
@@ -40,7 +40,6 @@ MoodWave 不是播放器。不是 AI 工具。不是搜索系统。
 | AI 不懂你口味，推荐总是跑偏 | **Music DNA**，网易云扫码导入，AI 分析你长期音乐人格 |
 
 ---
-
 ## 🎧 Music DNA：让 AI DJ 越来越懂你
 
 MoodWave 可以从网易云喜欢的音乐和收藏歌单中分析你的音乐人格。
@@ -68,6 +67,8 @@ JRPG OST / LoFi / City Pop
 
 ## 核心体验
 
+<p align="center"><img src="public/ai-dj.png" width="700" alt="AI DJ 三大能力"></p>
+
 ### 📻 AI 电台 — 按心情开电台
 
 选一个心情（开心 / 平静 / 忧郁 / 悲伤 / 治愈 / 愤怒），AI DJ 自动生成：
@@ -79,20 +80,13 @@ JRPG OST / LoFi / City Pop
 
 ### 🎮 Game Radio — 游戏氛围电台
 
+<p align="center"><img src="public/game-radio.png" width="800" alt="Game Radio 游戏融合"></p>
+
 **不用切出游戏**，Decky 插件里一键开启。
 
-游戏模式下，插件渲染**极简世界卡片**——天气 ☁️ + 游戏名 🎮 + 心情 😌 + AI 生成的 vibe 文案，不抢注意力。
+游戏模式下，插件渲染**极简世界卡片**——天气 ☁️ + 游戏名 🎮 + 心情 😌 + 一句温柔的独白，不抢注意力。
 
-| 氛围 | AI DJ 会这样说 | 适合 |
-|:--|:--|:--|
-| 🗡️ Boss 战 | "今晚燃一点。" | 老头环、只狼、巫师3 战斗 |
-| 🗺️ 探索地图 | "慢慢走。" | 巫师3 威伦骑马、塞尔达旷野 |
-| 🌙 雨夜跑图 | "外面下雨，慢慢来。" | 艾尔登法环雨夜、JRPG 长途跋涉 |
-| 🏎️ 赛车竞速 | "速度别停。" | 马车8、Forza |
-| 🌾 种田放松 | "别太累了。" | 星露谷、牧场物语 |
-| 📺 模拟器怀旧 | "像小时候一样。" | GBA、PSP 模拟器 |
-
-> 输入游戏名（如「巫师3」），AI 自动感知**游戏世界氛围**——中世纪篝火 → 民谣感、赛博霓虹 → Synthwave。
+> 你在玩什么，它知道。**中世纪篝火 → 民谣感、赛博霓虹 → Synthwave。**
 
 ### 🔍 AI 寻歌 — 自然语言找歌
 
@@ -104,6 +98,7 @@ JRPG OST / LoFi / City Pop
 "来点 90 年代港乐"
 "像小时候网吧一样"
 ```
+<p align="center"><img src="public/companion.png" width="700" alt="极简陪伴模式"></p>
 
 ---
 
@@ -118,40 +113,27 @@ JRPG OST / LoFi / City Pop
 
 ---
 
-## 技术亮点
+<details>
+<summary>🧠 技术亮点（好奇就看看）</summary>
 
-| 亮点 | 说明 |
-|------|------|
-| 🧠 **AI DJ 灵魂系统** | 克制少语人格 + 世界连续性 + 情绪势能追踪——像一个活在你时空里的 DJ |
-| 🌍 **游戏世界感** | 12 款游戏世界 DNA 映射（巫师3→中世纪篝火、赛博朋克→霓虹都市孤独） |
-| 🖼️ **极简世界卡片** | 游戏模式 Decky 插件渲染天气+游戏名+心情+vibe，不抢游戏注意力 |
-| 🧬 **Music DNA 升级** | 三维音乐人格：核心情绪 / 聆听状态 / 音乐性格，比标签更深入 |
-| 🌤️ **情绪势能追踪** | 记录近期情绪倾向 + 情绪动量，避免连续推荐同质化 |
-| 🎭 **世界连续性** | DJ 活在真实时空里——知道外面下雨、今天是节气、上次你听的最后几首 |
-| 🔊 **Fish Audio TTS** | DJ 语音朗读，温柔克制的声线，不是冷冰冰的播音腔 |
-| 🔗 **网易云深度集成** | 扫码登录，读取红心、歌单、日推、私人 FM |
-| 📡 **DLNA/UPnP 投播** | Streaming 到客厅音箱 / 树莓派 DAC |
-| 🛡️ **熔断器保护** | 所有外部 API 有自动降级，单点故障不影响使用 |
+- 🧠 **AI DJ 灵魂系统** — 克制、少语，像一个活在你时空里的 DJ
+- 🌍 **游戏世界感** — 在巫师3里像中世纪篝火，在赛博朋克里像霓虹都市
+- 🖼️ **极简世界卡片** — 天气 + 游戏名 + 心情 + 一句温柔的独白，不抢注意力
+- 🧬 **Music DNA** — 三维音乐人格：核心情绪 / 聆听状态 / 音乐性格
+- 🌤️ **情绪势能追踪** — 记得你上次听的是什么，不会让你腻
+- 🎭 **世界连续性** — 知道外面下雨、今天是节气、你上次听的最后几首
+- 🔊 **DJ 语音朗读** — 温柔克制的声线，不是冷冰冰的播音腔
+- 🔗 **网易云深度集成** — 扫码登录，红心、歌单、日推都认
+- 📡 **投到客厅音箱** — DLNA/UPnP 投播到树莓派 DAC，全家人一起听
+- 🛡️ **自己扛住** — 外部服务挂了自动降级，不影响你用
 
-### AI DJ 灵魂系统（核心壁垒）
-
-```text
-┌──────────────────────────────┐
-│ ① 人格层：克制少语 DJ          │  → 陪伴感 > 信息量，40% 场景不输出文案
-├──────────────────────────────┤
-│ ② 世界层：真实时空感知          │  → 城市、天气、时间、节气、节日、上次世界状态
-├──────────────────────────────┤
-│ ③ 用户层：长期理解 + 近期势能    │  → Music DNA + 情绪倾向 + 情绪动量
-├──────────────────────────────┤
-│ ④ 游戏层：世界感映射            │  → 12 款游戏 DNA → 音乐方向自动适配 + vibe 文案
-├──────────────────────────────┤
-│ ⑤ 输出层：自然语言硬规则        │  → 15-30 字，禁止客服腔/工具腔/算法腔
-└──────────────────────────────┘
-```
+</details>
 
 ---
 
 ## 快速开始
+
+<p align="center"><img src="public/web-radio.png" width="600" alt="Web Radio 界面"></p>
 
 ### Steam Deck 一键安装
 
@@ -164,21 +146,6 @@ bash scripts/install-steamdeck.sh --repo https://github.com/zhaozhongyang2023/ma
 安装后，扫码登录网易云 → AI 自动生成你的 Music DNA → 电台变得越来越懂你。
 
 详细教程 → [INSTALL.md](./INSTALL.md)（零基础可操作，全程复制粘贴）
-
-### 配置
-
-支持 `.env`（树莓派/开发）或 `~/.config/moodwave/config.env`（Steam Deck）。
-
-| 变量 | 必填 | 说明 |
-|------|------|------|
-| `AI_PROVIDER` | ✅ | deepseek / openai / qwen / gemini / custom |
-| `AI_API_KEY` | ✅ | AI 平台 API Key（DeepSeek 免费注册） |
-| `AI_BASE_URL` | - | 自定义 API 地址 |
-| `AI_MODEL` | - | 模型名（自动匹配平台） |
-| `FISH_AUDIO_API_KEY` | - | Fish Audio 语音朗读 |
-| `NETEASE_API_BASE` | - | 网易云 API 地址（Music DNA 需要） |
-| `OPENWEATHER_API_KEY` | - | 天气 API（不填默认晴天） |
-| `MUSIC_DIR` | - | 本地音乐目录 |
 
 ### 树莓派部署
 
@@ -211,6 +178,9 @@ npm run dev:web    # 终端 2 → http://localhost:8080
 
 ---
 
+<details>
+<summary>📡 API（开发者点击展开）</summary>
+
 ## API
 
 兼容 V3/V4/V5 旧接口：
@@ -236,6 +206,22 @@ POST   /api/profile/music-dna/save     # 手动保存 Music DNA
 POST   /api/profile/music-dna/reset    # 重置 Music DNA
 ```
 
+</details>
+
+## 配置
+
+支持 `.env`（树莓派/开发）或 `~/.config/moodwave/config.env`（Steam Deck）。
+
+| 变量 | 必填 | 说明 |
+|------|------|------|
+| `AI_PROVIDER` | ✅ | deepseek / openai / qwen / gemini / custom |
+| `AI_API_KEY` | ✅ | AI 平台 API Key（DeepSeek 免费注册） |
+| `AI_BASE_URL` | - | 自定义 API 地址 |
+| `AI_MODEL` | - | 模型名（自动匹配平台） |
+| `FISH_AUDIO_API_KEY` | - | Fish Audio 语音朗读 |
+| `NETEASE_API_BASE` | - | 网易云 API 地址（Music DNA 需要） |
+| `OPENWEATHER_API_KEY` | - | 天气 API（不填默认晴天） |
+| `MUSIC_DIR` | - | 本地音乐目录 |
 ---
 
 ## 安全
@@ -247,12 +233,17 @@ POST   /api/profile/music-dna/reset    # 重置 Music DNA
 
 ---
 
+<details>
+<summary>📦 发布（开发者点击展开）</summary>
+
 ## 发布
 
 ```bash
 node scripts/package-steamdeck.mjs   # → release/
 npm test                              # 29 tests
 ```
+
+</details>
 
 ---
 

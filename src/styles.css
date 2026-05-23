@@ -1955,6 +1955,57 @@ p {
     margin-top: 8px;
     padding: 6px 12px;
   }
+}
+
+/* ── Steam Deck V3 布局优化 ── */
+.is-deck .hero-panel {
+  flex: 0 0 clamp(100px, 16dvh, 140px) !important;
+  min-height: 100px !important;
+  padding: 4px 24px 0 !important;
+}
+
+.is-deck .aura {
+  opacity: 0.5;
+}
+
+.is-deck .spectrum-bars {
+  height: 180px !important;
+  margin: 0 10px -14px !important;
+}
+
+.is-deck .card {
+  margin: 0 10px 10px !important;
+  padding: 16px 20px 18px !important;
+  border-radius: 20px !important;
+  flex: 1 1 auto !important;
+  max-height: none !important;
+}
+
+.is-deck .dj-feed {
+  flex: 1 1 280px !important;
+  min-height: 220px !important;
+  max-height: none !important;
+}
+
+.is-deck .brand-lockup h1 {
+  font-size: 26px !important;
+}
+
+.is-deck .avatar {
+  width: 28px !important;
+  height: 28px !important;
+}
+
+.is-deck .bottom-player {
+  position: relative !important;
+  right: auto !important;
+  bottom: auto !important;
+  left: auto !important;
+  padding: 10px 0 4px !important;
+  margin-top: auto !important;
+}
+
+@media (max-height: 800px)
 
   .mood-strip button {
     min-width: 0;
@@ -3084,6 +3135,18 @@ p {
   color: rgba(0,0,0,0.5);
   font-size: 12px;
 }
+.dna-prev {
+  margin: 0 0 8px;
+  padding: 6px 8px;
+  border-radius: 6px;
+  background: rgba(0,0,0,0.04);
+  color: rgba(0,0,0,0.45);
+  font-size: 11px;
+  line-height: 1.4;
+}
+.dna-prev span {
+  font-weight: 600;
+}
 .dna-input {
   width: 100%;
   padding: 10px;
@@ -3164,6 +3227,11 @@ p {
   color: #42d8b2;
   font-size: 13px;
 }
+.dna-confidence {
+  margin: 0 0 10px;
+  font-size: 13px;
+  font-weight: 600;
+}
 .dna-stats {
   color: rgba(0,0,0,0.35);
   font-size: 11px;
@@ -3171,3 +3239,23 @@ p {
   border-top: 1px solid rgba(0,0,0,0.06);
 }
 
+
+/* ===== Steam Deck 专属优化 (1280x800 @1x) ===== */
+@media (width: 1280px) and (height: 800px) and (resolution: 1dppx) {
+  .hero-panel {
+    flex: 0 0 clamp(100px, 12dvh, 140px);
+    min-height: 100px;
+  }
+  .spectrum-bars {
+    height: 52px;
+    margin: 0 -8px -12px;
+  }
+  .card {
+    padding: 14px 22px 56px;
+  }
+  .pixel-pulse-canvas {
+    left: 12px;
+    right: 12px;
+    width: auto;
+  }
+}

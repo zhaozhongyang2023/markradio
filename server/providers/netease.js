@@ -1,4 +1,17 @@
-import { callNetease } from '../netease-auth.js';
+import { callNetease, getNeteaseLoginStatus } from '../netease-auth.js';
+
+async function ensureNeteaseProfile(store) {
+  const auth = store.get('neteaseAuth');
+  if (!auth?.cookie || auth.profile?.userId) return auth?.profile?.userId || null;
+  try {
+    const status = await getNeteaseLoginStatus(store);
+    if (status.loggedIn && status.profile) {
+      store.set('neteaseAuth', { ...auth, profile: status.profile });
+      return status.profile.userId;
+    }
+  } catch { /* 静默失败，不影响主流程 */ }
+  return null;
+}
 
 export async function getLikedSongs(store, limit = 500) {
   const res = await callNetease('/likelist', { limit }, store);
@@ -6,7 +19,8 @@ export async function getLikedSongs(store, limit = 500) {
 }
 
 export async function getUserPlaylists(store) {
-  const res = await callNetease('/user/playlist', { uid: store.get('neteaseAuth')?.profile?.userId || '' }, store);
+  const uid = await ensureNeteaseProfile(store);
+  const res = await callNetease('/user/playlist', { uid: uid || '' }, store);
   return (res?.playlist || []).map((pl) => ({
     id: String(pl.id),
     name: pl.name,
@@ -42,6 +56,25 @@ export async function getUserAlbums(store) {
     artist: (a.artists || []).map((ar) => ar.name).join('/') || a.artist?.name || '',
     size: a.size || 0
   }));
+}
+
+export async function getNeteaseLibraryCounts(store) {
+  try {
+    const uid = await ensureNeteaseProfile(store);
+    if (!uid) return null;
+    const [likedRes, playlistRes, albumRes] = await Promise.all([
+      callNetease('/likelist', { limit: 500 }, store).catch(() => null),
+      callNetease('/user/playlist', { uid }, store).catch(() => null),
+      callNetease('/album/sublist', { limit: 100 }, store).catch(() => null)
+    ]);
+    return {
+      likedCount: Array.isArray(likedRes?.ids) ? likedRes.ids.length : null,
+      playlistCount: Array.isArray(playlistRes?.playlist) ? playlistRes.playlist.length : null,
+      albumCount: typeof albumRes?.total === 'number' ? albumRes.total : (Array.isArray(albumRes?.data) ? albumRes.data.length : null)
+    };
+  } catch {
+    return null;
+  }
 }
 
 export async function collectNeteaseLibrary(store) {

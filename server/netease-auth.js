@@ -4,7 +4,7 @@ export function getNeteaseCookie(store) {
   return store.get('neteaseAuth')?.cookie || '';
 }
 
-export async function callNetease(endpoint, params = {}, store = null) {
+export async function callNetease(endpoint, params = {}, store = null, timeoutMs = 5000) {
   if (!config.neteaseApiBase) throw new Error('NETEASE_API_BASE not configured');
   const url = new URL(endpoint.replace(/^\//, ''), `${config.neteaseApiBase.replace(/\/$/, '')}/`);
   for (const [key, value] of Object.entries(params)) {
@@ -12,7 +12,7 @@ export async function callNetease(endpoint, params = {}, store = null) {
   }
   const cookie = store ? getNeteaseCookie(store) : '';
   if (cookie && !url.searchParams.has('cookie')) url.searchParams.set('cookie', cookie);
-  const response = await fetch(url, { signal: AbortSignal.timeout(5000) });
+  const response = await fetch(url, { signal: AbortSignal.timeout(timeoutMs) });
   if (!response.ok) throw new Error(`Netease ${endpoint} ${response.status}`);
   return response.json();
 }
@@ -30,7 +30,7 @@ export async function createNeteaseQr() {
 }
 
 export async function checkNeteaseQr(store, key) {
-  const result = await callNetease('login/qr/check', { key, timestamp: Date.now() });
+  const result = await callNetease('login/qr/check', { key, timestamp: Date.now() }, null, 30000);
   if (result.code === 803 && result.cookie) {
     const auth = {
       cookie: result.cookie,

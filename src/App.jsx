@@ -912,6 +912,7 @@ function V4RadioView({
 
 export default function App() {
   const [viewMode, setViewMode] = useState(() => (detectDeckRuntime() ? 'v4' : 'v3'));
+  const isDeckRef = useRef(detectDeckRuntime());
   const [state, setState] = useState(null);
   const [status, setStatus] = useState(null);
   const [selectedMood, setSelectedMood] = useState('平静');
@@ -920,9 +921,11 @@ export default function App() {
   const [netease, setNetease] = useState({ loggedIn: false, profile: null });
   const [qr, setQr] = useState(null);
   const [qrMessage, setQrMessage] = useState('');
+  const qrPollingRef = useRef(false);
   const [showDnaPanel, setShowDnaPanel] = useState(false);
   const [dnaGenerating, setDnaGenerating] = useState(false);
   const [dnaResult, setDnaResult] = useState(null);
+  const [prevDnaResult, setPrevDnaResult] = useState(null);
   const [dnaPreferences, setDnaPreferences] = useState('');
   const [dnaLibrary, setDnaLibrary] = useState({ likedCount: 0, playlistCount: 0 });
   const mountedRef = useRef(true);
@@ -3156,24 +3159,30 @@ function seekTo(ratio) {
     if (!qr?.key) return undefined;
     let stopped = false;
     const timer = setInterval(async () => {
-      const result = await api.neteaseQrCheck(qr.key).catch(() => null);
-      if (!result || stopped) return;
-      setQrMessage(result.message || '');
-      if (result.loggedIn) {
-        stopped = true;
-        clearInterval(timer);
-        const statusData = await api.neteaseStatus();
-        setNetease(statusData);
-        setQr(null);
-        setQrMessage('网易云已登录');
-        await refreshPlan(selectedMood, false);
+      if (qrPollingRef.current) return;
+      qrPollingRef.current = true;
+      try {
+        const result = await api.neteaseQrCheck(qr.key).catch(() => null);
+        if (!result || stopped) return;
+        setQrMessage(result.message || '');
+        if (result.loggedIn) {
+          stopped = true;
+          clearInterval(timer);
+          const statusData = await api.neteaseStatus();
+          setNetease(statusData);
+          setQr(null);
+          setQrMessage('网易云已登录');
+          await refreshPlan(selectedMood, false);
+        }
+        if (result.code === 800) {
+          stopped = true;
+          clearInterval(timer);
+          setQrMessage('二维码已过期，请重新生成');
+        }
+      } finally {
+        qrPollingRef.current = false;
       }
-      if (result.code === 800) {
-        stopped = true;
-        clearInterval(timer);
-        setQrMessage('二维码已过期，请重新生成');
-      }
-    }, 2200);
+    }, 3000);
     return () => {
       stopped = true;
       clearInterval(timer);
@@ -3265,6 +3274,7 @@ function seekTo(ratio) {
                         if (!mountedRef.current) return;
                         setDnaLibrary(lib);
                       }
+                      setPrevDnaResult(dnaResult);
                       const res = await api.musicDnaGenerate(dnaPreferences);
                       if (!mountedRef.current) return;
                       if (res?.dna) {
@@ -3284,23 +3294,41 @@ function seekTo(ratio) {
               </>
             ) : (
               <>
+                {prevDnaResult?.core_moods?.length > 0 ? (
+                  <div className="dna-prev">
+                    <span>📝 上次分析：</span>
+                    {prevDnaResult.core_moods?.slice(0, 3).join(' / ')}&nbsp;&nbsp;·&nbsp;&nbsp;
+                    {(prevDnaResult.listening_habits || prevDnaResult.listening_state || prevDnaResult.preferred_scenes || []).slice(0, 2).join(' / ')}
+                  </div>
+                ) : null}
                 <div className="dna-result">
-                  {dnaResult.core_feelings?.length > 0 && (
+                  {dnaResult.confidence ? (
+                    <div className="dna-confidence">
+                      {dnaResult.confidence === 'high' ? '🟢 高置信' : dnaResult.confidence === 'medium' ? '🟡 学习中' : '⚪ 初识'}
+                    </div>
+                  ) : null}
+                  {dnaResult.core_moods?.length > 0 && (
                     <div className="dna-group">
-                      <span className="dna-label">核心情绪</span>
-                      <div className="dna-tags">{dnaResult.core_feelings.map((s) => <span key={s} className="dna-tag">{s}</span>)}</div>
+                      <span className="dna-label">情绪偏好</span>
+                      <div className="dna-tags">{dnaResult.core_moods.map((s) => <span key={s} className="dna-tag">{s}</span>)}</div>
                     </div>
                   )}
-                  {(dnaResult.listening_state?.length > 0 || dnaResult.preferred_scenes?.length > 0) && (
+                  {dnaResult.listening_habits?.length > 0 && (
                     <div className="dna-group">
                       <span className="dna-label">听歌习惯</span>
-                      <div className="dna-tags">{(dnaResult.listening_state || dnaResult.preferred_scenes || []).map((s) => <span key={s} className="dna-tag">{s}</span>)}</div>
+                      <div className="dna-tags">{dnaResult.listening_habits.map((s) => <span key={s} className="dna-tag">{s}</span>)}</div>
                     </div>
                   )}
-                  {(dnaResult.music_personality?.length > 0 || dnaResult.favorite_styles?.length > 0) && (
+                  {dnaResult.music_taste?.length > 0 && (
                     <div className="dna-group">
-                      <span className="dna-label">音乐气质</span>
-                      <div className="dna-tags">{(dnaResult.music_personality || dnaResult.favorite_styles || []).map((s) => <span key={s} className="dna-tag">{s}</span>)}</div>
+                      <span className="dna-label">音乐口味</span>
+                      <div className="dna-tags">{dnaResult.music_taste.map((s) => <span key={s} className="dna-tag">{s}</span>)}</div>
+                    </div>
+                  )}
+                  {dnaResult.game_vibes?.length > 0 && (
+                    <div className="dna-group">
+                      <span className="dna-label">游戏氛围</span>
+                      <div className="dna-tags">{dnaResult.game_vibes.map((s) => <span key={s} className="dna-tag">{s}</span>)}</div>
                     </div>
                   )}
                   {(dnaResult.analyzed_tracks || dnaResult.analyzed_playlists) ? (
@@ -3384,7 +3412,7 @@ function seekTo(ratio) {
   }
 
   return (
-    <main className="shell">
+    <main className={`shell${isDeckRef.current ? " is-deck" : ""}`}>
       <section className="stage" aria-label="MoodWave AI DJ 电台">
         <div className="aura" />
         <div className="phone">

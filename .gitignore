@@ -32,3 +32,9 @@ data/
 # SSH keys (accidental)
 Zzywo5201314*
 backup/
+
+!public/hero.png
+!public/game-radio.png
+!public/ai-dj.png
+!public/companion.png
+!public/web-radio.pngmarketing/
