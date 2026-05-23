@@ -1,4 +1,17 @@
-import { callNetease } from '../netease-auth.js';
+import { callNetease, getNeteaseLoginStatus } from '../netease-auth.js';
+
+async function ensureNeteaseProfile(store) {
+  const auth = store.get('neteaseAuth');
+  if (!auth?.cookie || auth.profile?.userId) return auth?.profile?.userId || null;
+  try {
+    const status = await getNeteaseLoginStatus(store);
+    if (status.loggedIn && status.profile) {
+      store.set('neteaseAuth', { ...auth, profile: status.profile });
+      return status.profile.userId;
+    }
+  } catch { /* 静默失败，不影响主流程 */ }
+  return null;
+}
 
 export async function getLikedSongs(store, limit = 500) {
   const res = await callNetease('/likelist', { limit }, store);
@@ -6,7 +19,8 @@ export async function getLikedSongs(store, limit = 500) {
 }
 
 export async function getUserPlaylists(store) {
-  const res = await callNetease('/user/playlist', { uid: store.get('neteaseAuth')?.profile?.userId || '' }, store);
+  const uid = await ensureNeteaseProfile(store);
+  const res = await callNetease('/user/playlist', { uid: uid || '' }, store);
   return (res?.playlist || []).map((pl) => ({
     id: String(pl.id),
     name: pl.name,
