@@ -3263,4 +3263,12 @@ p {
     right: 12px;
     width: auto;
   }
+  .v4-shell {
+    max-width: 560px;
+    margin-left: auto;
+    margin-right: auto;
+  }
+  .v4-radio {
+    max-width: 100%;
+  }
 }
