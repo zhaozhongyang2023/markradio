@@ -3307,3 +3307,75 @@ p {
     width: auto;
   }
 }
+
+/* ─── DNA 面板美化 ─── */
+
+/* 置信度进度条 */
+.dna-confidence-bar {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 6px;
+}
+.dna-bar-seg {
+  flex: 1;
+  height: 6px;
+  border-radius: 3px;
+  background: rgba(0,0,0,0.08);
+  transition: background 0.5s ease;
+}
+.dna-bar-seg.on {
+  background: linear-gradient(90deg, #42d8b2, #2ba88a);
+  box-shadow: 0 0 6px rgba(66,216,178,0.3);
+}
+.dna-confidence-label {
+  color: rgba(0,0,0,0.45);
+  font-size: 11px;
+}
+
+/* 分维度 tag 配色 */
+.dna-tag-mood {
+  background: rgba(232,146,92,0.15) !important;
+  color: #d47840 !important;
+}
+.dna-tag-habit {
+  background: rgba(139,123,247,0.15) !important;
+  color: #6e5ce6 !important;
+}
+.dna-tag-taste {
+  background: rgba(66,216,178,0.15) !important;
+  color: #42d8b2 !important;
+}
+.dna-tag-game {
+  background: rgba(91,141,239,0.15) !important;
+  color: #4a7de0 !important;
+}
+
+/* Loading 旋转动画 */
+.dna-spin {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  border: 2px solid rgba(0,0,0,0.15);
+  border-top-color: #42d8b2;
+  border-radius: 50%;
+  animation: dna-spin 0.8s linear infinite;
+  vertical-align: -2px;
+  margin-right: 6px;
+}
+@keyframes dna-spin {
+  to { transform: rotate(360deg); }
+}
+
+/* 上次分析摘要高亮 */
+.dna-prev {
+  border-left: 3px solid #42d8b2 !important;
+  padding-left: 10px !important;
+}
+
+/* 数据统计卡片 */
+.dna-stats {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-wrap: wrap;
+}

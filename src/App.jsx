@@ -3246,7 +3246,7 @@ function seekTo(ratio) {
       {showDnaPanel ? (
         <div className="qr-backdrop" role="dialog" aria-modal="true" aria-label="让 AI DJ 更懂你的音乐世界">
           <div className="qr-card dna-card">
-            <h3>🎧 让 AI 更懂你</h3>
+            <h3>🧬 你的音乐 DNA</h3>
             {!dnaResult ? (
               <>
                 {netease.loggedIn ? (
@@ -3287,7 +3287,7 @@ function seekTo(ratio) {
                     setDnaGenerating(false);
                   }}
                 >
-                  {dnaGenerating ? 'AI 正在分析…' : '让 AI DJ 更懂我'}
+                  {dnaGenerating ? <><span className='dna-spin' /> AI 正在解读你的音乐世界…</> : '🧬 分析我的音乐 DNA'}
                 </button>
               </>
             ) : (
@@ -3302,39 +3302,49 @@ function seekTo(ratio) {
                 <div className="dna-result">
                   {dnaResult.confidence ? (
                     <div className="dna-confidence">
-                      {dnaResult.confidence === 'high' ? '🟢 高置信' : dnaResult.confidence === 'medium' ? '🟡 学习中' : '⚪ 初识'}
+                      <div className="dna-confidence-bar">
+                        <span className={`dna-bar-seg ${dnaResult.confidence === 'low' || dnaResult.confidence === 'medium' || dnaResult.confidence === 'high' ? 'on' : ''}`} />
+                        <span className={`dna-bar-seg ${dnaResult.confidence === 'medium' || dnaResult.confidence === 'high' ? 'on' : ''}`} />
+                        <span className={`dna-bar-seg ${dnaResult.confidence === 'high' ? 'on' : ''}`} />
+                      </div>
+                      <span className="dna-confidence-label">
+                        {dnaResult.confidence === 'high' ? '已经很了解你了' : dnaResult.confidence === 'medium' ? '正在了解你…' : '刚开始认识你'}
+                      </span>
                     </div>
                   ) : null}
                   {dnaResult.core_moods?.length > 0 && (
                     <div className="dna-group">
-                      <span className="dna-label">情绪偏好</span>
-                      <div className="dna-tags">{dnaResult.core_moods.map((s) => <span key={s} className="dna-tag">{s}</span>)}</div>
+                      <span className="dna-label">🌊 情绪色彩</span>
+                      <div className="dna-tags">{dnaResult.core_moods.map((s) => <span key={s} className="dna-tag dna-tag-mood">{s}</span>)}</div>
                     </div>
                   )}
                   {dnaResult.listening_habits?.length > 0 && (
                     <div className="dna-group">
-                      <span className="dna-label">听歌习惯</span>
-                      <div className="dna-tags">{dnaResult.listening_habits.map((s) => <span key={s} className="dna-tag">{s}</span>)}</div>
+                      <span className="dna-label">🌙 听歌时光</span>
+                      <div className="dna-tags">{dnaResult.listening_habits.map((s) => <span key={s} className="dna-tag dna-tag-habit">{s}</span>)}</div>
                     </div>
                   )}
                   {dnaResult.music_taste?.length > 0 && (
                     <div className="dna-group">
-                      <span className="dna-label">音乐口味</span>
-                      <div className="dna-tags">{dnaResult.music_taste.map((s) => <span key={s} className="dna-tag">{s}</span>)}</div>
+                      <span className="dna-label">🎸 音乐基因</span>
+                      <div className="dna-tags">{dnaResult.music_taste.map((s) => <span key={s} className="dna-tag dna-tag-taste">{s}</span>)}</div>
                     </div>
                   )}
                   <div className="dna-group">
-                    <span className="dna-label">游戏氛围</span>
+                    <span className="dna-label">🎮 游戏共振</span>
                     {dnaResult.game_vibes?.length > 0 ? (
-                      <div className="dna-tags">{dnaResult.game_vibes.map((s) => <span key={s} className="dna-tag">{s}</span>)}</div>
+                      <div className="dna-tags">{dnaResult.game_vibes.map((s) => <span key={s} className="dna-tag dna-tag-game">{s}</span>)}</div>
                     ) : (
                       <span className="dna-empty-hint">🌙 暂无游戏记录</span>
                     )}
                   </div>
                   {(dnaResult.analyzed_tracks || dnaResult.analyzed_playlists) ? (
                     <div className="dna-stats">
-                      已分析 {dnaResult.analyzed_tracks || 0} 首歌 · {dnaResult.analyzed_playlists || 0} 个歌单
-                      {dnaResult.analyzed_albums ? <> · {dnaResult.analyzed_albums} 张专辑</> : null}
+                      <span>📊</span>
+                      <span>{dnaResult.analyzed_tracks || 0} 首歌</span>
+                      <span>·</span>
+                      <span>{dnaResult.analyzed_playlists || 0} 个歌单</span>
+                      {dnaResult.analyzed_albums ? <><span>·</span><span>{dnaResult.analyzed_albums} 张专辑</span></> : null}
                     </div>
                   ) : null}
                 </div>

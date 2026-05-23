@@ -336,3 +336,34 @@ export function buildDemoQueue(tracks, limit = 4) {
     url: track.url || null
   }));
 }
+
+// ─── Music DNA 加权搜索 ───
+
+export function applyDnaWeight(candidates, dna) {
+  if (!dna?.music_taste?.length) return candidates;
+  const tasteKeywords = dna.music_taste.map(t => t.toLowerCase());
+
+  return candidates.map(track => {
+    if (!track) return track;
+    let boost = 0;
+    const text = [
+      track.title || '',
+      track.artist || '',
+      track.album || ''
+    ].join(' ').toLowerCase();
+
+    for (const kw of tasteKeywords) {
+      if (text.includes(kw)) boost += 0.3;
+    }
+
+    const multiplier = dna.confidence === 'high' ? 1.5
+                     : dna.confidence === 'medium' ? 1.0
+                     : 0.5;
+
+    return { ...track, dnaScore: boost * multiplier };
+  });
+}
+
+export function sortByDnaWeight(tracks) {
+  return [...tracks].sort((a, b) => (b.dnaScore || 0) - (a.dnaScore || 0));
+}

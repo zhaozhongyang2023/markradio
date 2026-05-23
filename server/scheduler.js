@@ -1,5 +1,5 @@
 import { buildDjContext, buildMessages } from './context.js';
-import { buildQueue, detectLanguageIntent, extractRequestedSongs, getCandidateTracks, trackMatchesLanguage, trackMatchesRequestedTitle } from './music.js';
+import { buildQueue, detectLanguageIntent, extractRequestedSongs, getCandidateTracks, trackMatchesLanguage, trackMatchesRequestedTitle, applyDnaWeight, sortByDnaWeight } from './music.js';
 import { MAX_AI_PLAN_TRACKS, demoPlan, generateDjPlan } from './openai.js';
 import { synthesizeVoice } from './voice.js';
 import { getWeather } from './weather.js';
@@ -57,7 +57,13 @@ export async function createRadioPlan({ store, mood: requestedMood = null, nowPl
     ? (currentPlan?.queue || []).filter((track) => trackMatchesLanguage(track, languageIntent))
     : currentPlan?.queue || [];
   const freshCandidates = await getCandidateTracks({ store, mood, userRequest });
-  const candidates = mergeCandidateTracks(currentQueue, freshCandidates);
+  let candidates = mergeCandidateTracks(currentQueue, freshCandidates);
+
+  // Music DNA 加权：把符合用户口味的歌排前面
+  if (musicDna?.music_taste?.length) {
+    candidates = sortByDnaWeight(applyDnaWeight(candidates, musicDna));
+  }
+
   const context = buildDjContext({
     taste,
     mood,
