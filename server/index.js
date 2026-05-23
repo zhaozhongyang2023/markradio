@@ -632,6 +632,9 @@ app.post('/api/ai/next-radio', async (request) => {
   });
   broadcast('plan', plan);
   broadcast('now', publicNow());
+  // 信号记录 + 异步 DNA 检测
+  if (scene && scene !== '换个氛围') accumulateDnaSignal(store, 'search', scene);
+  maybeRegenerateDna(store);
   return {
     ok: true,
     dj_intro: plan.tts?.text || plan.plan?.say || '',
