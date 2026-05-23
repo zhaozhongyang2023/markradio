@@ -920,6 +920,7 @@ export default function App() {
   const [netease, setNetease] = useState({ loggedIn: false, profile: null });
   const [qr, setQr] = useState(null);
   const [qrMessage, setQrMessage] = useState('');
+  const qrPollingRef = useRef(false);
   const [showDnaPanel, setShowDnaPanel] = useState(false);
   const [dnaGenerating, setDnaGenerating] = useState(false);
   const [dnaResult, setDnaResult] = useState(null);
@@ -3156,24 +3157,30 @@ function seekTo(ratio) {
     if (!qr?.key) return undefined;
     let stopped = false;
     const timer = setInterval(async () => {
-      const result = await api.neteaseQrCheck(qr.key).catch(() => null);
-      if (!result || stopped) return;
-      setQrMessage(result.message || '');
-      if (result.loggedIn) {
-        stopped = true;
-        clearInterval(timer);
-        const statusData = await api.neteaseStatus();
-        setNetease(statusData);
-        setQr(null);
-        setQrMessage('网易云已登录');
-        await refreshPlan(selectedMood, false);
+      if (qrPollingRef.current) return;
+      qrPollingRef.current = true;
+      try {
+        const result = await api.neteaseQrCheck(qr.key).catch(() => null);
+        if (!result || stopped) return;
+        setQrMessage(result.message || '');
+        if (result.loggedIn) {
+          stopped = true;
+          clearInterval(timer);
+          const statusData = await api.neteaseStatus();
+          setNetease(statusData);
+          setQr(null);
+          setQrMessage('网易云已登录');
+          await refreshPlan(selectedMood, false);
+        }
+        if (result.code === 800) {
+          stopped = true;
+          clearInterval(timer);
+          setQrMessage('二维码已过期，请重新生成');
+        }
+      } finally {
+        qrPollingRef.current = false;
       }
-      if (result.code === 800) {
-        stopped = true;
-        clearInterval(timer);
-        setQrMessage('二维码已过期，请重新生成');
-      }
-    }, 2200);
+    }, 3000);
     return () => {
       stopped = true;
       clearInterval(timer);
