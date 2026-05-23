@@ -1021,12 +1021,17 @@ if (fs.existsSync(distDir)) {
 
   await webApp.register(fastifyStatic, {
     root: distDir,
-    prefix: '/'
+    prefix: '/',
+    maxAge: 0
   });
   webApp.get("/switch", async (_request, reply) => {
+    reply.header('Cache-Control', 'no-cache, no-store, must-revalidate');
     return reply.sendFile("index.html", { root: switchCompanionSrcDir });
   });
-  webApp.setNotFoundHandler((request, reply) => reply.sendFile('index.html'));
+  webApp.setNotFoundHandler((request, reply) => {
+    reply.header('Cache-Control', 'no-cache, no-store, must-revalidate');
+    return reply.sendFile('index.html');
+  });
   await webApp.listen({ host: config.host, port: config.webPort });
 } else {
   app.log.warn('dist directory not found; web server was not started');
