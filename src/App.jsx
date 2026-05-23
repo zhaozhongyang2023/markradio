@@ -1670,7 +1670,6 @@ export default function App() {
         if (audio.src !== trackUrl) { audio.src = trackUrl; audio.load(); }
         audio.volume = 0;
         audio.muted = false;
-        try { await audio.play(); } catch { /* 静音预热; runCardIntro 中会重试 */ }
       }
       audio.onended = handleEnded;
       const needsIntro = !options.skipIntro && introDoneFor !== track.id;
@@ -1819,7 +1818,7 @@ export default function App() {
     // 轮询 plan 更新（TTS 异步生成中）
     const polled = await new Promise((resolve) => {
       const start = Date.now();
-      const maxWait = 30000; // 最多等 30 秒
+      const maxWait = 8000; // 最多等 8 秒
       const check = () => {
         if (!isPlaybackRunCurrent(runId)) { resolve(''); return; }
         if (planDjUrlRef.current && planRef.current?.tts?.text === readingText) {
@@ -1852,7 +1851,7 @@ export default function App() {
     // 轮询 cardTts 更新
     const polled = await new Promise((resolve) => {
       const start = Date.now();
-      const maxWait = 30000;
+      const maxWait = 8000;
       const check = async () => {
         try {
           const now = await api.now();
@@ -2448,8 +2447,6 @@ export default function App() {
     try {
       const currentIndex = queue.findIndex((item) => item.id === track.id);
       if (currentIndex >= 0 && currentIndex < queue.length - 1) {
-        const nextState = await api.playback('next').catch(() => null);
-        if (nextState?.now) setState(nextState);
         autoplayOptionsRef.current = { skipIntro: false, skipStationIntro: true };
         triggerPixelPulse();
         setAutoplayToken((value) => value + 1);

@@ -519,7 +519,7 @@ async function applyPlaybackAction(action, body = {}) {
   }
   if (action === 'prev' && state.plan?.queue?.length) {
     const currentIndex = state.plan.queue.findIndex((track) => track.id === now.track?.id);
-    const previousIndex = currentIndex > 0 ? currentIndex - 1 : 0;
+    const previousIndex = currentIndex > 0 ? currentIndex - 1 : -1;
     const previousTrack = state.plan.queue[previousIndex];
     if (previousTrack) {
       now.track = previousTrack;
