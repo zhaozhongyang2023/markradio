@@ -3411,7 +3411,7 @@ function seekTo(ratio) {
   }
 
   return (
-    <main className="shell">
+    <main className={`shell${detectDeckRuntime() ? " is-deck" : ""}`}>
       <section className="stage" aria-label="MoodWave AI DJ 电台">
         <div className="aura" />
         <div className="phone">
