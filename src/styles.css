@@ -2004,6 +2004,14 @@ p {
   padding: 10px 0 4px !important;
   margin-top: auto !important;
 }
+.is-deck .v4-shell {
+  max-width: 560px;
+  margin-left: auto;
+  margin-right: auto;
+}
+.is-deck .v4-radio {
+  max-width: 100%;
+}
 
 @media (max-height: 800px) {
 
@@ -3262,13 +3270,5 @@ p {
     left: 12px;
     right: 12px;
     width: auto;
-  }
-  .v4-shell {
-    max-width: 560px;
-    margin-left: auto;
-    margin-right: auto;
-  }
-  .v4-radio {
-    max-width: 100%;
   }
 }
