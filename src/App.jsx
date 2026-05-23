@@ -615,6 +615,7 @@ function QueuePreview({ queue, currentId, onRefresh, busy }) {
 
 function V4RadioView({
   audioNodes,
+  isDeck,
   beginTrackSeek,
   busy,
   castState,
@@ -728,7 +729,7 @@ function V4RadioView({
   };
 
   return (
-    <main className={`v4-shell${lowPowerMode ? ' low-power' : ''}`}>
+    <main className={`v4-shell${isDeck ? ' is-deck' : ''}${lowPowerMode ? ' low-power' : ''}`}>
       <section className={`v4-radio${lowPowerMode ? ' low-power' : ''}${isPlaying || reading || casting ? ' is-active' : ''}`} aria-label="MoodWave V5 Deck 模式">
         <canvas className="pixel-pulse-canvas" ref={pulseCanvasRef} aria-hidden="true" />
         {audioNodes}
@@ -3363,6 +3364,7 @@ function seekTo(ratio) {
       <>
         <V4RadioView
           audioNodes={audioNodes}
+          isDeck={isDeckRef.current}
           beginTrackSeek={beginTrackSeek}
           busy={busy}
           castState={castState}
