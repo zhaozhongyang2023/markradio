@@ -2004,12 +2004,12 @@ p {
   padding: 10px 0 4px !important;
   margin-top: auto !important;
 }
-.is-deck .v4-shell {
+.v4-shell.is-deck {
   max-width: 560px;
   margin-left: auto;
   margin-right: auto;
 }
-.is-deck .v4-radio {
+.v4-shell.is-deck .v4-radio {
   max-width: 100%;
 }
 
