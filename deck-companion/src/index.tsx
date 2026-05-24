@@ -179,9 +179,6 @@ function Content() {
   const [minimalMode, setMinimalMode] = useState(() => localStorage.getItem(MINIMAL_KEY) === '1');
   const [autoContinue, setAutoContinue] = useState(() => localStorage.getItem(AUTO_CONTINUE_KEY) === '1');
 
-  // 持久化选中的游戏氛围和搜索词
-  useEffect(() => { localStorage.setItem(GAME_VIBE_KEY, gameVibe); }, [gameVibe]);
-  useEffect(() => { localStorage.setItem(QUERY_KEY, query); }, [query]);
 
   async function refresh() {
     try {
@@ -1042,7 +1039,7 @@ function Content() {
                   active={query === example.id}
                   disabled={busy}
                   title={example.id}
-                  onClick={() => setQuery(example.id)}
+                  onClick={() => { setQuery(example.id); localStorage.setItem(QUERY_KEY, example.id); }}
                 >
                   <span className="mw-icon">{example.icon}</span>{example.id}
                 </AppButton>
@@ -1053,7 +1050,7 @@ function Content() {
             <TextField
               label="🎧 想听什么？"
               value={query}
-              onChange={(event: ChangeEvent<HTMLInputElement>) => setQuery(event.target.value)}
+              onChange={(event: ChangeEvent<HTMLInputElement>) => { setQuery(event.target.value); localStorage.setItem(QUERY_KEY, event.target.value); }}
             />
           </PanelSectionRow>
           <div className="mw-action-row">
@@ -1074,7 +1071,7 @@ function Content() {
                   active={gameVibe === vibe.id}
                   disabled={busy}
                   title={vibe.hint}
-                  onClick={() => setGameVibe(vibe.id)}
+                  onClick={() => { setGameVibe(vibe.id); localStorage.setItem(GAME_VIBE_KEY, vibe.id); }}
                 >
                   <span className="mw-icon">{vibe.icon}</span>{vibe.id}
                 </AppButton>
