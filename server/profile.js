@@ -132,10 +132,10 @@ export function maybeRegenerateDna(store) {
         const totalSignals = signals.reduce((sum, s) => sum + (s.count || 1), 0);
         if (dna.confidence === "medium" && totalSignals >= 30) {
           dna.confidence = "high";
-          saveMusicDNA(store, dna);
+          store.set("musicDna", { ...dna, generated_at: new Date().toISOString() });
         } else if (dna.confidence === "low" && totalSignals >= 15) {
           dna.confidence = "medium";
-          saveMusicDNA(store, dna);
+          store.set("musicDna", { ...dna, generated_at: new Date().toISOString() });
         }
       }
     } catch {

@@ -371,8 +371,8 @@ export function applyDnaWeight(candidates, dna) {
       track.album || ''
     ].join(' ').toLowerCase();
 
+    const words = segmentWords(text);
     for (const kw of tasteKeywords) {
-      const words = segmentWords(text);
       if (words.includes(kw)) boost += 0.3;
     }
 
