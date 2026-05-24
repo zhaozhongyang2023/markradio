@@ -22,6 +22,18 @@
 
 ---
 
+## 2026-05-24（凌晨）
+
+### Music DNA
+- `buildDnaBlock` 旧字段 → V2 新字段同步
+- `saveQuery` 重构，替换内联 localStorage 写入
+
+### Deck 插件
+- 插件状态丢失修复：gameVibe / query 持久化到 localStorage
+- useEffect → 同步 localStorage 写入，防状态重置
+
+---
+
 ## 2026-05-24
 
 ### Music DNA v2
