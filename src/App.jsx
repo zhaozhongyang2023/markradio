@@ -1591,6 +1591,8 @@ export default function App() {
     if (refreshingRef.current) return;
     refreshingRef.current = true;
     setBusy(true);
+    // 在用户手势内解锁移动端音频（避免 ~9s async 后自动播放被拒）
+    unlockMobileAudio();
     triggerPixelPulse();
     try {
       await pausePlayback();
@@ -2472,6 +2474,7 @@ export default function App() {
 
   async function nextTrack() {
     if (refreshingRef.current || busy) return;
+    unlockMobileAudio();
     triggerPixelPulse();
     cancelPlaybackFlow();
     const currentIndex = queue.findIndex((item) => item.id === track.id);
@@ -2490,6 +2493,7 @@ export default function App() {
     if (refreshingRef.current || busy || pendingPlay) return;
     const currentIndex = queue.findIndex((item) => item.id === track.id);
     if (currentIndex < 0) return;
+    unlockMobileAudio();
     triggerPixelPulse();
     cancelPlaybackFlow();
     setIntroDoneFor(null);
