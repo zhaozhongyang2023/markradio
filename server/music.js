@@ -163,7 +163,7 @@ export function extractRequestedSongs(text = '') {
     titles.push(match[1]);
   }
 
-  const directPattern = /(?:想听|要听|播放|放一下|放一首|放|来一首|点一首|点播|听一下|找一下)[:：\s]*(?:一首|歌曲|歌)?\s*([^，。！？,.!?；;\n]{2,60}?)(?:这首歌|这首|这歌|这首歌曲|$|[，。！？,.!?；;])/g;
+  const directPattern = /(?:想听|要听|播放|放一下|放一首|放|来一首|来首|来个|来一个|加首|加个|换首|换个|切到|点一首|点播|听一下|找一下)[:：\s]*(?:一首|歌曲|歌)?\s*([^，。！？,.!?；;\n]{2,60}?)(?:这首歌|这首|这歌|这首歌曲|$|[，。！？,.!?；;])/g;
   for (const match of value.matchAll(directPattern)) {
     titles.push(match[1]);
   }
