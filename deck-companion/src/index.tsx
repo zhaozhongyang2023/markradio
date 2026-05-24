@@ -8,6 +8,8 @@ const DEFAULT_API_BASE = 'http://127.0.0.1:38765';
 const CONFIG_VERSION = 7;
 const API_BASE_KEY = 'moodwave.deck.apiBase';
 const GAME_NAME_KEY = 'moodwave.deck.gameName';
+const GAME_VIBE_KEY = 'moodwave.deck.gameVibe';
+const QUERY_KEY = 'moodwave.deck.query';
 const MINIMAL_KEY = 'moodwave.deck.minimalMode';
 const AUTO_CONTINUE_KEY = 'moodwave.deck.autoContinue';
 const PAGE_KEY = 'moodwave.deck.page';
@@ -170,12 +172,16 @@ function Content() {
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState('连接中');
   const [progress, setProgress] = useState(0);
-  const [query, setQuery] = useState(searchExamples[0].id);
-  const [gameVibe, setGameVibe] = useState('探索地图');
+  const [query, setQuery] = useState(() => localStorage.getItem(QUERY_KEY) || searchExamples[0].id);
+  const [gameVibe, setGameVibe] = useState(() => localStorage.getItem(GAME_VIBE_KEY) || '探索地图');
   const [gameName, setGameName] = useState(() => localStorage.getItem(GAME_NAME_KEY) || '');
   const gameNameEditedRef = useRef(false);  // 用户手动编辑后不再自动覆盖
   const [minimalMode, setMinimalMode] = useState(() => localStorage.getItem(MINIMAL_KEY) === '1');
   const [autoContinue, setAutoContinue] = useState(() => localStorage.getItem(AUTO_CONTINUE_KEY) === '1');
+
+  // 持久化选中的游戏氛围和搜索词
+  useEffect(() => { localStorage.setItem(GAME_VIBE_KEY, gameVibe); }, [gameVibe]);
+  useEffect(() => { localStorage.setItem(QUERY_KEY, query); }, [query]);
 
   async function refresh() {
     try {
