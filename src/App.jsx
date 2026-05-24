@@ -2472,11 +2472,14 @@ export default function App() {
   async function advanceEndedTrack() {
     if (refreshingRef.current || busy) return;
     triggerPixelPulse();
+    cancelPlaybackFlow();
     try {
       const currentIndex = queue.findIndex((item) => item.id === track.id);
       if (currentIndex >= 0 && currentIndex < queue.length - 1) {
+        await pauseCastOnly();
+        const nextState = await api.playback('next').catch(() => null);
+        if (nextState?.now) setState(nextState);
         autoplayOptionsRef.current = { skipIntro: false, skipStationIntro: true };
-        triggerPixelPulse();
         setAutoplayToken((value) => value + 1);
         return;
       }
