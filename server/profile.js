@@ -12,6 +12,22 @@ export function loadMusicDNA(store) {
 }
 
 export function saveMusicDNA(store, dna) {
+  // 历史归档：保存旧 DNA 到时间轴（最多 10 条）
+  const old = migrateDna(store.get("musicDna"));
+  if (old && old.core_moods?.length) {
+    const history = store.get("musicDnaHistory") || [];
+    history.push({
+      generated_at: old.generated_at || new Date().toISOString(),
+      core_moods: old.core_moods || [],
+      listening_habits: old.listening_habits || old.listening_state || old.preferred_scenes || [],
+      music_taste: old.music_taste || old.music_personality || old.favorite_styles || [],
+      game_vibes: old.game_vibes || [],
+      confidence: old.confidence || "low",
+    });
+    if (history.length > 10) history.shift();
+    store.set("musicDnaHistory", history);
+  }
+
   store.set('musicDna', { ...dna, generated_at: new Date().toISOString() });
   return dna;
 }
@@ -110,6 +126,17 @@ export function maybeRegenerateDna(store) {
       if (needRegen) {
         const dna = await generateMusicDNA(store);
         saveMusicDNA(store, dna);
+
+        // 行为信号足够多 → 自动提级
+        const signals = store.get("dnaSignals") || [];
+        const totalSignals = signals.reduce((sum, s) => sum + (s.count || 1), 0);
+        if (dna.confidence === "medium" && totalSignals >= 30) {
+          dna.confidence = "high";
+          saveMusicDNA(store, dna);
+        } else if (dna.confidence === "low" && totalSignals >= 15) {
+          dna.confidence = "medium";
+          saveMusicDNA(store, dna);
+        }
       }
     } catch {
       // 静默失败，不影响主流程

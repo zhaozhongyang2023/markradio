@@ -929,6 +929,8 @@ export default function App() {
   const [prevDnaResult, setPrevDnaResult] = useState(null);
   const [dnaPreferences, setDnaPreferences] = useState('');
   const [dnaLibrary, setDnaLibrary] = useState({ likedCount: 0, playlistCount: 0 });
+  const [dnaHistory, setDnaHistory] = useState([]);
+  const [showDnaHistory, setShowDnaHistory] = useState(false);
   const mountedRef = useRef(true);
   useEffect(() => () => { mountedRef.current = false; }, []);
   const [castDevices, setCastDevices] = useState([]);
@@ -1182,6 +1184,7 @@ export default function App() {
       setNetease(neteaseData);
       // Load Music DNA on mount
       api.musicDna().then((res) => { if (res?.dna) setDnaResult(res.dna); }).catch(() => {});
+      api.musicDnaHistory().then((res) => { if (res?.history) setDnaHistory(res.history); }).catch(() => {});
       const initialMood = nowData.now?.mood || '平静';
       setSelectedMood(initialMood);
       if (!nowData.plan?.queue?.length && !nowData.now?.track) {
@@ -3382,6 +3385,63 @@ function seekTo(ratio) {
                     </div>
                   ) : null}
                 </div>
+                {dnaHistory.length > 0 ? (
+                  <>
+                    <button
+                      className="dna-history-toggle"
+                      onClick={() => setShowDnaHistory(!showDnaHistory)}
+                    >
+                      {showDnaHistory ? "▾" : "▸"} 口味变化时间轴 ({dnaHistory.length})
+                    </button>
+                    {showDnaHistory ? (
+                      <div className="dna-timeline">
+                        {dnaHistory.slice().reverse().map((entry, idx) => {
+                          const prev = idx < dnaHistory.length - 1 ? dnaHistory.slice().reverse()[idx + 1] : null;
+                          const newMoods = prev ? entry.core_moods.filter(m => !prev.core_moods.includes(m)) : entry.core_moods;
+                          const goneMoods = prev ? prev.core_moods.filter(m => !entry.core_moods.includes(m)) : [];
+                          const newTastes = prev ? entry.music_taste.filter(m => !prev.music_taste.includes(m)) : [];
+                          const goneTastes = prev ? prev.music_taste.filter(m => !entry.music_taste.includes(m)) : [];
+                          return (
+                            <div key={entry.generated_at || idx} className="dna-timeline-node">
+                              <div className="dna-timeline-dot" />
+                              <div className="dna-timeline-content">
+                                <div className="dna-timeline-date">{new Date(entry.generated_at).toLocaleDateString("zh-CN", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}</div>
+                                <div className="dna-timeline-tags">
+                                  <span className="dna-timeline-label">🌊</span>
+                                  {entry.core_moods?.map(m => {
+                                    const isNew = newMoods.includes(m);
+                                    const isGone = goneMoods.includes(m);
+                                    return <span key={m} className={`dna-tag dna-tag-mood dna-tag-sm${isNew ? " dna-diff-new" : ""}${isGone ? " dna-diff-gone" : ""}`}>{m}{isNew ? " +" : ""}{isGone ? " -" : ""}</span>;
+                                  })}
+                                </div>
+                                {entry.music_taste?.length > 0 ? (
+                                  <div className="dna-timeline-tags">
+                                    <span className="dna-timeline-label">🎸</span>
+                                    {entry.music_taste.slice(0, 4).map(t => {
+                                      const isNewTaste = newTastes.includes(t);
+                                      const isGoneTaste = goneTastes.includes(t);
+                                      return <span key={t} className={`dna-tag dna-tag-taste dna-tag-sm${isNewTaste ? " dna-diff-new" : ""}${isGoneTaste ? " dna-diff-gone" : ""}`}>{t}{isNewTaste ? " +" : ""}{isGoneTaste ? " -" : ""}</span>;
+                                    })}
+                                    {entry.music_taste.length > 4 ? <span className="dna-tag-more">+{entry.music_taste.length - 4}</span> : null}
+                                  </div>
+                                ) : null}
+                                <div className="dna-timeline-confidence">
+                                  信心：
+                                  <span className={`dna-confidence-pill dna-pill-${entry.confidence || "low"}`}>{entry.confidence === "high" ? "●●●" : entry.confidence === "medium" ? "●●○" : "●○○"}</span>
+                                  {prev ? (
+                                    entry.confidence !== prev.confidence ? (
+                                      <span className="dna-confidence-arrow">{entry.confidence === "high" ? "↑" : "↓"}</span>
+                                    ) : null
+                                  ) : <span className="dna-confidence-arrow dna-arrow-new">NEW</span>}
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    ) : null}
+                  </>
+                ) : null}
                 <button className="dna-btn" onClick={async () => { await api.musicDnaReset(); setDnaResult(null); setDnaPreferences(''); }}>再了解我一些</button>
               </>
             )}

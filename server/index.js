@@ -326,6 +326,11 @@ app.post('/api/profile/music-dna/reset', async () => {
   return { ok: true };
 });
 
+
+app.get("/api/profile/music-dna/history", async () => {
+  const history = store.get("musicDnaHistory") || [];
+  return { history };
+});
 app.post('/api/netease/qr/create', async () => createNeteaseQr());
 
 app.post('/api/netease/qr/check', async (request) => {
