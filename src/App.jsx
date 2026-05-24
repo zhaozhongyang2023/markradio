@@ -3401,6 +3401,10 @@ function seekTo(ratio) {
                           const goneMoods = prev ? prev.core_moods.filter(m => !entry.core_moods.includes(m)) : [];
                           const newTastes = prev ? entry.music_taste.filter(m => !prev.music_taste.includes(m)) : [];
                           const goneTastes = prev ? prev.music_taste.filter(m => !entry.music_taste.includes(m)) : [];
+                          const newHabits = prev ? entry.listening_habits.filter(h => !(prev.listening_habits||[]).includes(h)) : [];
+                          const goneHabits = prev ? (prev.listening_habits||[]).filter(h => !(entry.listening_habits||[]).includes(h)) : [];
+                          const newGames = prev ? (entry.game_vibes||[]).filter(g => !(prev.game_vibes||[]).includes(g)) : [];
+                          const goneGames = prev ? (prev.game_vibes||[]).filter(g => !(entry.game_vibes||[]).includes(g)) : [];
                           return (
                             <div key={entry.generated_at || idx} className="dna-timeline-node">
                               <div className="dna-timeline-dot" />
