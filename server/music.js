@@ -165,7 +165,7 @@ export function extractRequestedSongs(text = '') {
 
   const directPattern = /(?:想听|要听|播放|放一下|放一首|放|来一首|来首|来个|来一个|加首|加个|换首|换个|切到|点一首|点播|听一下|找一下)[:：\s]*(?:一首|歌曲|歌)?\s*([^，。！？,.!?；;\n]{2,60}?)(?:这首歌|这首|这歌|这首歌曲|$|[，。！？,.!?；;])/g;
 
-  const fuzzyPattern = /(?:有没有|有没|来点|放点|整点|来些)s*([^，。！？,.!?；;\n]{2,30}?)(?:的歌|那种感觉|那样的|这种风格|类型的|风格的|的歌吗|的吗)/g;
+  const fuzzyPattern = /(?:有没有|有没|来点|放点|整点|来些)\s*([^，。！？,.!?；;\n]{2,30}?)(?:的歌|那种感觉|那样的|这种风格|类型的|风格的|的歌吗|的吗)/g;
   for (const match of value.matchAll(fuzzyPattern)) {
     titles.push(match[1]);
   }
@@ -348,8 +348,6 @@ export function buildDemoQueue(tracks, limit = 4) {
 
 // ─── Music DNA 加权搜索 ───
 
-export function applyDnaWeight(candidates, dna) {
-
 // ─── 分词工具（中文精确匹配）───
 function segmentWords(text) {
   try {
@@ -357,6 +355,10 @@ function segmentWords(text) {
     return [...seg.segment(text)].map(s => s.segment);
   } catch { return text.split(/\s+/); }
 }
+
+// ─── Music DNA 加权搜索 ───
+
+export function applyDnaWeight(candidates, dna) {
   if (!dna?.music_taste?.length) return candidates;
   const tasteKeywords = dna.music_taste.map(t => t.toLowerCase());
 
