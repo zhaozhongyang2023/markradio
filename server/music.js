@@ -203,10 +203,14 @@ function languageScore(track, languageIntent) {
 function requestedSongScore(track, requestedTitle) {
   const wanted = normalizeTitle(requestedTitle);
   const title = normalizeTitle(track?.title || '');
-  if (!wanted || !title) return 0;
+  const artist = normalizeTitle(track?.artist || '');
+  if (!wanted || (!title && !artist)) return 0;
   if (title === wanted) return 3;
   if (title.startsWith(wanted)) return 2;
   if (title.includes(wanted) || wanted.includes(title)) return 1;
+  // 艺人名匹配：用户说"想听许巍"，匹配到 artist="许巍" 的歌
+  if (artist === wanted) return 2;
+  if (artist.includes(wanted) || wanted.includes(artist)) return 1;
   return 0;
 }
 
