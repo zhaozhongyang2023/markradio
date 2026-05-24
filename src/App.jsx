@@ -2332,12 +2332,21 @@ export default function App() {
       }
     }
 
-    const played = await (
+    let played = await (
       startMediaElementDjNow(introUrl, readingText, runId)
       || playLocalDjClip(introUrl, readingText, runId)
     );
     if (!played && isPlaybackRunCurrent(runId)) {
-      // 播放失败，用 readTextSegment 保持视觉进度
+      // 播放失败 → 等待 800ms 后重试 1 次（给 AudioContext / buffer 更多准备时间）
+      await new Promise((resolve) => setTimeout(resolve, 800));
+      if (!isPlaybackRunCurrent(runId)) return;
+      played = await (
+        startMediaElementDjNow(introUrl, readingText, runId)
+        || playLocalDjClip(introUrl, readingText, runId)
+      );
+    }
+    if (!played && isPlaybackRunCurrent(runId)) {
+      // 重试仍失败，用 readTextSegment 保持视觉进度（兜底）
       await readTextSegment(readingText, { runId });
     }
   }

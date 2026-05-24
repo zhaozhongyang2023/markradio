@@ -121,9 +121,10 @@ export async function createRadioPlan({ store, mood: requestedMood = null, nowPl
   const queue = await buildQueue(queueTracks, store, queueLimit);
   const ttsText = buildIntroText({ plan, specialDates, track: queue[0] });
   const planId = `plan-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
-  // 主导读 TTS：始终同步生成（1 次 Fish Audio 调用 ~2s，确保客户端播放时已就绪）
-  const tts = await buildTts({ store, text: ttsText, mood, voiceStyle: plan.voiceStyle, nonce: planId })
-    .catch((error) => ({ ok: false, pending: false, url: null, message: error.message, text: ttsText }));
+  // 主导读 TTS：deferTts 时异步生成，立即返回 pending 态
+  const tts = deferTts
+    ? { ok: false, pending: true, url: null, text: ttsText }
+    : await buildTts({ store, text: ttsText, mood, voiceStyle: plan.voiceStyle, nonce: planId });
 
   const cardTts = deferTts
     ? queue.map((track, index) => ({
@@ -161,7 +162,14 @@ export async function createRadioPlan({ store, mood: requestedMood = null, nowPl
   store.set('plan-' + mode, todayPlan);
   if (queue[0]) store.set('now', { mode, track: queue[0], progress: 0, playing: false, speaking: Boolean(tts.ok), mood });
   if (deferTts) {
-    // 主导读 TTS 已同步生成，这里只异步生成卡引导读
+    // 主导读 TTS 优先异步生成（确保 WebSocket 推送后客户端可播放）
+    await buildTts({ store, text: ttsText, mood, voiceStyle: plan.voiceStyle, nonce: planId })
+      .then((result) => updatePlanTts({ store, planId: todayPlan.id, tts: result, onTtsReady }))
+      .catch((error) => updatePlanTts({
+        store, planId: todayPlan.id,
+        tts: { ok: false, pending: false, url: null, message: error.message, text: ttsText },
+        onTtsReady
+      }));
     // 每首歌导读卡片 TTS（并行生成）
     queue.slice(0, TTS_PRELOAD_LIMIT).forEach((track, i) => {
       const text = track?.reason;
