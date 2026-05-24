@@ -1684,6 +1684,22 @@ export default function App() {
       if (needsIntro) {
         // Phase 1: Pre-intro (first play only) — pause music, read pre-intro DJ text
         if (shouldReadStationIntro) {
+          // 等待 TTS URL 就绪（warmup 还没完成时轮询最多 2s，避免 runPreIntro 中降级无声）
+          const introTextForUrl = planRef.current?.tts?.text || introText;
+          if (introTextForUrl && !planDjUrlRef.current && planRef.current?.tts?.text === introTextForUrl) {
+            await new Promise((resolve) => {
+              const start = Date.now();
+              const check = () => {
+                if (!isPlaybackRunCurrent(runId) || Date.now() - start > 2000 || (planDjUrlRef.current && planRef.current?.tts?.text === introTextForUrl)) {
+                  resolve();
+                  return;
+                }
+                setTimeout(check, 100);
+              };
+              check();
+            });
+            if (!isPlaybackRunCurrent(runId)) return;
+          }
           await runPreIntro(runId);
           if (!isPlaybackRunCurrent(runId)) return;
         }
