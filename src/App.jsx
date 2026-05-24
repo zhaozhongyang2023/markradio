@@ -3429,6 +3429,27 @@ function seekTo(ratio) {
                                     {entry.music_taste.length > 4 ? <span className="dna-tag-more">+{entry.music_taste.length - 4}</span> : null}
                                   </div>
                                 ) : null}
+                                {entry.listening_habits?.length > 0 ? (
+                                  <div className="dna-timeline-tags">
+                                    <span className="dna-timeline-label">🌙</span>
+                                    {entry.listening_habits.slice(0, 3).map(h => {
+                                      const isNewHabit = newHabits.includes(h);
+                                      const isGoneHabit = goneHabits.includes(h);
+                                      return <span key={h} className={`dna-tag dna-tag-habit dna-tag-sm${isNewHabit ? " dna-diff-new" : ""}${isGoneHabit ? " dna-diff-gone" : ""}`}>{h}{isNewHabit ? " +" : ""}{isGoneHabit ? " -" : ""}</span>;
+                                    })}
+                                    {entry.listening_habits.length > 3 ? <span className="dna-tag-more">+{entry.listening_habits.length - 3}</span> : null}
+                                  </div>
+                                ) : null}
+                                {entry.game_vibes?.length > 0 ? (
+                                  <div className="dna-timeline-tags">
+                                    <span className="dna-timeline-label">🎮</span>
+                                    {entry.game_vibes.map(g => {
+                                      const isNewGame = newGames.includes(g);
+                                      const isGoneGame = goneGames.includes(g);
+                                      return <span key={g} className={`dna-tag dna-tag-game dna-tag-sm${isNewGame ? " dna-diff-new" : ""}${isGoneGame ? " dna-diff-gone" : ""}`}>{g}{isNewGame ? " +" : ""}{isGoneGame ? " -" : ""}</span>;
+                                    })}
+                                  </div>
+                                ) : null}
                                 <div className="dna-timeline-confidence">
                                   信心：
                                   <span className={`dna-confidence-pill dna-pill-${entry.confidence || "low"}`}>{entry.confidence === "high" ? "●●●" : entry.confidence === "medium" ? "●●○" : "●○○"}</span>
