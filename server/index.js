@@ -679,7 +679,10 @@ app.post('/api/ai/game-radio', async (request) => {
   broadcast('plan', plan);
   broadcast('now', publicNow());
   // 信号记录 + 异步 DNA 检测
-  if (gameVibe) accumulateDnaSignal(store, 'gameVibe', gameVibe);
+  if (gameVibe) {
+    const gameSignal = gameName ? `${gameName}→${gameVibe}` : gameVibe;
+    accumulateDnaSignal(store, "gameVibe", gameSignal);
+  }
   maybeRegenerateDna(store);
   return {
     ok: true,
