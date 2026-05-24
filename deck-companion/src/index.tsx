@@ -306,7 +306,11 @@ function Content() {
     localStorage.setItem(GAME_NAME_KEY, v);
   }
 
-  function saveApiBase(value: string) {
+
+  function saveQuery(value: string) {
+    setQuery(value);
+    localStorage.setItem(QUERY_KEY, value);
+  }  function saveApiBase(value: string) {
     const next = normalizeBase(value);
     setApiBase(next);
     localStorage.setItem(API_BASE_KEY, next);
@@ -1039,7 +1043,7 @@ function Content() {
                   active={query === example.id}
                   disabled={busy}
                   title={example.id}
-                  onClick={() => { setQuery(example.id); localStorage.setItem(QUERY_KEY, example.id); }}
+                  onClick={() => saveQuery(example.id)}
                 >
                   <span className="mw-icon">{example.icon}</span>{example.id}
                 </AppButton>
@@ -1050,7 +1054,7 @@ function Content() {
             <TextField
               label="🎧 想听什么？"
               value={query}
-              onChange={(event: ChangeEvent<HTMLInputElement>) => { setQuery(event.target.value); localStorage.setItem(QUERY_KEY, event.target.value); }}
+              onChange={(event: ChangeEvent<HTMLInputElement>) => saveQuery(event.target.value)}
             />
           </PanelSectionRow>
           <div className="mw-action-row">
