@@ -3044,6 +3044,8 @@ function seekTo(ratio) {
     setChatInput('');
     setChatBusy(true);
     setSpeechMessage('');
+    // 在用户手势内解锁移动端音频（避免 9s async 后自动播放被拒）
+    unlockMobileAudio();
     setChatMessages((items) => [
       ...items,
       {
