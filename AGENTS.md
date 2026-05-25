@@ -289,38 +289,6 @@ curl http://192.168.2.33:80/switch
 | 树莓派 | `192.168.2.33` | — | — |
 | 路由器(旁路) | `192.168.3.254` | `92:23:b4:1f:cb:6c` | OpenWrt |
 
-### WiFi 稳定性修复（5 层）
-
-| 层 | 文件 | 作用 |
-|---|---|---|
-| mac80211 | `/etc/NetworkManager/dispatcher.d/99-wifi-powersave-off` | 连接时 `iw power_save off` |
-| rtw88 驱动 | `/etc/modprobe.d/rtw88.conf` | `disable_lps_deep=Y disable_aspm=Y` |
-| PCIe ASPM | `/etc/systemd/system/disable-wifi-aspm.service` | 启动时设 `pcie_aspm=performance` |
-| 睡眠唤醒 | `/etc/systemd/system/moodwave-wifi-resume.service` | 唤醒后等待 wlan0 就绪(120s) + 重连(60s) |
-| NM 连接 | NancyOpenWrt 配置 | 手动 IP + may-fail=no |
-
-一键修复：`bash ~/moodwave/scripts/fix-wifi-steamdeck.sh [--dry-run]`
-
-### 验证命令
-
-```bash
-# 电源管理
-iw dev wlan0 get power_save                                       # off
-
-# rtw88 驱动
-cat /sys/module/rtw88_core/parameters/disable_lps_deep            # Y
-cat /sys/module/rtw88_pci/parameters/disable_aspm                  # Y
-
-# PCIe ASPM
-cat /sys/module/pcie_aspm/parameters/policy                        # [performance]
-
-# 唤醒日志
-sudo journalctl -t moodwave-wifi-resume --no-pager -n 10
-```
-
-## 部署流程（开发/测试完成后必做）
-
-```bash
 # 1. 提交代码
 git add -A
 git commit -m '描述改动'
