@@ -1,5 +1,5 @@
 import { buildDjContext, buildMessages } from './context.js';
-import { buildQueue, detectLanguageIntent, extractRequestedSongs, getCandidateTracks, trackMatchesLanguage, trackMatchesRequestedTitle } from './music.js';
+import { buildQueue, detectLanguageIntent, extractRequestedSongs, getCandidateTracks, trackMatchesLanguage, trackMatchesRequestedTitle, applyDnaWeight, sortByDnaWeight } from './music.js';
 import { MAX_AI_PLAN_TRACKS, demoPlan, generateDjPlan } from './openai.js';
 import { synthesizeVoice } from './voice.js';
 import { getWeather } from './weather.js';
@@ -57,7 +57,13 @@ export async function createRadioPlan({ store, mood: requestedMood = null, nowPl
     ? (currentPlan?.queue || []).filter((track) => trackMatchesLanguage(track, languageIntent))
     : currentPlan?.queue || [];
   const freshCandidates = await getCandidateTracks({ store, mood, userRequest });
-  const candidates = mergeCandidateTracks(currentQueue, freshCandidates);
+  let candidates = mergeCandidateTracks(currentQueue, freshCandidates);
+
+  // Music DNA 加权：把符合用户口味的歌排前面
+  if (musicDna?.music_taste?.length) {
+    candidates = sortByDnaWeight(applyDnaWeight(candidates, musicDna));
+  }
+
   const context = buildDjContext({
     taste,
     mood,
@@ -156,7 +162,7 @@ export async function createRadioPlan({ store, mood: requestedMood = null, nowPl
   store.set('plan-' + mode, todayPlan);
   if (queue[0]) store.set('now', { mode, track: queue[0], progress: 0, playing: false, speaking: Boolean(tts.ok), mood });
   if (deferTts) {
-    // 主导读 TTS 优先同步生成（确保用户点播放时已就绪）
+    // 主导读 TTS 优先异步生成（确保 WebSocket 推送后客户端可播放）
     await buildTts({ store, text: ttsText, mood, voiceStyle: plan.voiceStyle, nonce: planId })
       .then((result) => updatePlanTts({ store, planId: todayPlan.id, tts: result, onTtsReady }))
       .catch((error) => updatePlanTts({
@@ -164,7 +170,7 @@ export async function createRadioPlan({ store, mood: requestedMood = null, nowPl
         tts: { ok: false, pending: false, url: null, message: error.message, text: ttsText },
         onTtsReady
       }));
-    // 每首歌导读卡片 TTS（主导读就绪后再并行生成）
+    // 每首歌导读卡片 TTS（并行生成）
     queue.slice(0, TTS_PRELOAD_LIMIT).forEach((track, i) => {
       const text = track?.reason;
       if (!text) return;

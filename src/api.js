@@ -85,6 +85,7 @@ export const api = {
       method: 'POST',
       body: JSON.stringify({})
     }),
+  musicDnaHistory: () => request("/api/profile/music-dna/history"),
   castDevices: () => request('/api/cast/devices'),
   castConnect: (host, port) =>
     request('/api/cast/connect', {

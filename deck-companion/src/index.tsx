@@ -8,6 +8,8 @@ const DEFAULT_API_BASE = 'http://127.0.0.1:38765';
 const CONFIG_VERSION = 7;
 const API_BASE_KEY = 'moodwave.deck.apiBase';
 const GAME_NAME_KEY = 'moodwave.deck.gameName';
+const GAME_VIBE_KEY = 'moodwave.deck.gameVibe';
+const QUERY_KEY = 'moodwave.deck.query';
 const MINIMAL_KEY = 'moodwave.deck.minimalMode';
 const AUTO_CONTINUE_KEY = 'moodwave.deck.autoContinue';
 const PAGE_KEY = 'moodwave.deck.page';
@@ -170,12 +172,13 @@ function Content() {
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState('连接中');
   const [progress, setProgress] = useState(0);
-  const [query, setQuery] = useState(searchExamples[0].id);
-  const [gameVibe, setGameVibe] = useState('探索地图');
+  const [query, setQuery] = useState(() => localStorage.getItem(QUERY_KEY) || searchExamples[0].id);
+  const [gameVibe, setGameVibe] = useState(() => localStorage.getItem(GAME_VIBE_KEY) || '探索地图');
   const [gameName, setGameName] = useState(() => localStorage.getItem(GAME_NAME_KEY) || '');
   const gameNameEditedRef = useRef(false);  // 用户手动编辑后不再自动覆盖
   const [minimalMode, setMinimalMode] = useState(() => localStorage.getItem(MINIMAL_KEY) === '1');
   const [autoContinue, setAutoContinue] = useState(() => localStorage.getItem(AUTO_CONTINUE_KEY) === '1');
+
 
   async function refresh() {
     try {
@@ -303,7 +306,11 @@ function Content() {
     localStorage.setItem(GAME_NAME_KEY, v);
   }
 
-  function saveApiBase(value: string) {
+
+  function saveQuery(value: string) {
+    setQuery(value);
+    localStorage.setItem(QUERY_KEY, value);
+  }  function saveApiBase(value: string) {
     const next = normalizeBase(value);
     setApiBase(next);
     localStorage.setItem(API_BASE_KEY, next);
@@ -1036,7 +1043,7 @@ function Content() {
                   active={query === example.id}
                   disabled={busy}
                   title={example.id}
-                  onClick={() => setQuery(example.id)}
+                  onClick={() => saveQuery(example.id)}
                 >
                   <span className="mw-icon">{example.icon}</span>{example.id}
                 </AppButton>
@@ -1047,7 +1054,7 @@ function Content() {
             <TextField
               label="🎧 想听什么？"
               value={query}
-              onChange={(event: ChangeEvent<HTMLInputElement>) => setQuery(event.target.value)}
+              onChange={(event: ChangeEvent<HTMLInputElement>) => saveQuery(event.target.value)}
             />
           </PanelSectionRow>
           <div className="mw-action-row">
@@ -1068,7 +1075,7 @@ function Content() {
                   active={gameVibe === vibe.id}
                   disabled={busy}
                   title={vibe.hint}
-                  onClick={() => setGameVibe(vibe.id)}
+                  onClick={() => { setGameVibe(vibe.id); localStorage.setItem(GAME_VIBE_KEY, vibe.id); }}
                 >
                   <span className="mw-icon">{vibe.icon}</span>{vibe.id}
                 </AppButton>

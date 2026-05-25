@@ -38,3 +38,4 @@ backup/
 !public/ai-dj.png
 !public/companion.png
 !public/web-radio.pngmarketing/
+scripts/stream-bilibili.sh

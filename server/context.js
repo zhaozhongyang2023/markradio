@@ -137,12 +137,13 @@ export function buildMessages(context) {
 function buildDnaBlock(dna) {
   if (!dna) return '';
   const lines = [];
-  const fe = dna.core_feelings || [];
-  const ls = dna.listening_state || [];
-  const mp = dna.music_personality || [];
-  if (fe.length) lines.push('核心情绪：' + fe.join('、'));
-  if (ls.length) lines.push('听歌状态：' + ls.join('、'));
-  if (mp.length) lines.push('音乐人格：' + mp.join('、'));
+  const fe = dna.core_moods || dna.core_feelings || [];
+  const ls = dna.listening_habits || dna.listening_state || [];
+  const mp = dna.music_taste || dna.music_personality || [];
+  if (fe.length) lines.push('情绪偏好：' + fe.join('、'));
+  if (ls.length) lines.push('听歌习惯：' + ls.join('、'));
+  if (mp.length) lines.push('音乐口味：' + mp.join('、'));
+  if (dna.game_vibes?.length) lines.push('游戏氛围：' + dna.game_vibes.join('、'));
   if (!lines.length) {
     const fs = dna.favorite_styles || [];
     const ps = dna.preferred_scenes || [];

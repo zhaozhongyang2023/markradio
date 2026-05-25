@@ -326,6 +326,11 @@ app.post('/api/profile/music-dna/reset', async () => {
   return { ok: true };
 });
 
+
+app.get("/api/profile/music-dna/history", async () => {
+  const history = store.get("musicDnaHistory") || [];
+  return { history };
+});
 app.post('/api/netease/qr/create', async () => createNeteaseQr());
 
 app.post('/api/netease/qr/check', async (request) => {
@@ -674,7 +679,10 @@ app.post('/api/ai/game-radio', async (request) => {
   broadcast('plan', plan);
   broadcast('now', publicNow());
   // 信号记录 + 异步 DNA 检测
-  if (gameVibe) accumulateDnaSignal(store, 'gameVibe', gameVibe);
+  if (gameVibe) {
+    const gameSignal = gameName ? `${gameName}→${gameVibe}` : gameVibe;
+    accumulateDnaSignal(store, "gameVibe", gameSignal);
+  }
   maybeRegenerateDna(store);
   return {
     ok: true,

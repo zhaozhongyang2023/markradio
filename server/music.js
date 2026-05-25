@@ -163,7 +163,12 @@ export function extractRequestedSongs(text = '') {
     titles.push(match[1]);
   }
 
-  const directPattern = /(?:想听|要听|播放|放一下|放一首|放|来一首|点一首|点播|听一下|找一下)[:：\s]*(?:一首|歌曲|歌)?\s*([^，。！？,.!?；;\n]{2,60}?)(?:这首歌|这首|这歌|这首歌曲|$|[，。！？,.!?；;])/g;
+  const directPattern = /(?:想听|要听|播放|放一下|放一首|放|来一首|来首|来个|来一个|加首|加个|换首|换个|切到|点一首|点播|听一下|找一下)[:：\s]*(?:一首|歌曲|歌)?\s*([^，。！？,.!?；;\n]{2,60}?)(?:这首歌|这首|这歌|这首歌曲|$|[，。！？,.!?；;])/g;
+
+  const fuzzyPattern = /(?:有没有|有没|来点|放点|整点|来些)\s*([^，。！？,.!?；;\n]{2,30}?)(?:的歌|那种感觉|那样的|这种风格|类型的|风格的|的歌吗|的吗)/g;
+  for (const match of value.matchAll(fuzzyPattern)) {
+    titles.push(match[1]);
+  }
   for (const match of value.matchAll(directPattern)) {
     titles.push(match[1]);
   }
@@ -203,10 +208,14 @@ function languageScore(track, languageIntent) {
 function requestedSongScore(track, requestedTitle) {
   const wanted = normalizeTitle(requestedTitle);
   const title = normalizeTitle(track?.title || '');
-  if (!wanted || !title) return 0;
+  const artist = normalizeTitle(track?.artist || '');
+  if (!wanted || (!title && !artist)) return 0;
   if (title === wanted) return 3;
   if (title.startsWith(wanted)) return 2;
   if (title.includes(wanted) || wanted.includes(title)) return 1;
+  // 艺人名匹配：用户说"想听许巍"，匹配到 artist="许巍" 的歌
+  if (artist === wanted) return 2;
+  if (artist.includes(wanted) || wanted.includes(artist)) return 1;
   return 0;
 }
 
@@ -335,4 +344,46 @@ export function buildDemoQueue(tracks, limit = 4) {
     queueIndex: index,
     url: track.url || null
   }));
+}
+
+// ─── Music DNA 加权搜索 ───
+
+// ─── 分词工具（中文精确匹配）───
+function segmentWords(text) {
+  try {
+    const seg = new Intl.Segmenter("zh-Hans", { granularity: "word" });
+    return [...seg.segment(text)].map(s => s.segment);
+  } catch { return text.split(/\s+/); }
+}
+
+// ─── Music DNA 加权搜索 ───
+
+export function applyDnaWeight(candidates, dna) {
+  if (!dna?.music_taste?.length) return candidates;
+  const tasteKeywords = dna.music_taste.map(t => t.toLowerCase());
+
+  return candidates.map(track => {
+    if (!track) return track;
+    let boost = 0;
+    const text = [
+      track.title || '',
+      track.artist || '',
+      track.album || ''
+    ].join(' ').toLowerCase();
+
+    const words = segmentWords(text);
+    for (const kw of tasteKeywords) {
+      if (words.includes(kw)) boost += 0.3;
+    }
+
+    const multiplier = dna.confidence === 'high' ? 1.5
+                     : dna.confidence === 'medium' ? 1.0
+                     : 0.5;
+
+    return { ...track, dnaScore: boost * multiplier };
+  });
+}
+
+export function sortByDnaWeight(tracks) {
+  return [...tracks].sort((a, b) => (b.dnaScore || 0) - (a.dnaScore || 0));
 }

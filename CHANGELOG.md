@@ -1,5 +1,67 @@
 # Changelog
 
+## 2026-05-24（深夜）
+
+### Music DNA 加权搜索
+- 新增 `applyDnaWeight()` — 根据用户 Music DNA 的 `music_taste` 关键词给候选歌曲打分
+- 新增 `sortByDnaWeight()` — 符合口味的歌自动排到歌单前面
+- `confidence` 作为权重倍率：high=1.5x / medium=1.0x / low=0.5x
+- DNA 现在不仅分析，还直接影响选歌结果
+
+---
+
+## 2026-05-24（晚间）
+
+### DNA 面板
+- 修复 DNA 面板黑屏：显式设置卡片背景色和宽度
+- DNA 面板标题加版本号 v4，用于验证部署
+
+### 修复
+- 补回 Deck V3/V4 is-deck CSS 布局规则
+- 回滚缓存控制改动（onSend hook 导致页面错误）
+
+---
+
+## 2026-05-24（下午）
+
+### Music DNA 四合一（P1~P4）
+
+**P1 — 中文分词精确匹配**
+- `Intl.Segmenter` 分词替代 `String.includes`，关键词匹配更精准
+- "想听City Pop" 不再误匹配到 "City Pop 2024年鉴"
+
+**P2 — 置信度自动提级**
+- 行为信号 ≥30 → confidence 自动升 "high"
+- 行为信号 ≥15 → confidence 自动升 "medium"
+- 无需手动操作，数据够了就升级
+
+**P3 — 模糊搜索扩展**
+- 新增 "有没有XX的歌" "放点XX那种感觉的" "整点XX" 等模糊查歌
+- `fuzzyPattern` 正则覆盖更多口语化表达
+
+**P4 — DNA 历史时间轴**
+- 每次重新生成 DNA 时自动归档旧版（最多 10 条）
+- 前端折叠面板展示 DNA 变更历史
+- Diff 高亮标注维度变化
+
+### 修复
+- `segmentWords` 函数体移到顶层，修复 P1 闭包性能问题
+- 正则 `\s` 恢复
+
+---
+
+## 2026-05-24（凌晨）
+
+### Music DNA
+- `buildDnaBlock` 旧字段 → V2 新字段同步
+- `saveQuery` 重构，替换内联 localStorage 写入
+
+### Deck 插件
+- 插件状态丢失修复：gameVibe / query 持久化到 localStorage
+- useEffect → 同步 localStorage 写入，防状态重置
+
+---
+
 ## 2026-05-24
 
 ### Music DNA v2
