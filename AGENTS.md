@@ -317,3 +317,32 @@ cat /sys/module/pcie_aspm/parameters/policy                        # [performanc
 # 唤醒日志
 sudo journalctl -t moodwave-wifi-resume --no-pager -n 10
 ```
+
+## 部署流程（开发/测试完成后必做）
+
+```bash
+# 1. 提交代码
+git add -A
+git commit -m '描述改动'
+
+# 2. 一键部署到两台机器
+bash deploy.sh
+
+# 3. 如果 deploy.sh 部分失败，手动补：
+#    Deck:
+#    rsync -avz --delete --exclude='node_modules' --exclude='.git' --exclude='.env' \
+#      --exclude='data' --exclude='moodwave.log' --exclude='moodwave.pid' \
+#      ./ deck@192.168.3.121:/home/deck/moodwave/
+#    ssh deck@192.168.3.121 'cd ~/moodwave && bash scripts/moodwave.sh stop && bash scripts/moodwave.sh server'
+
+# 4. Deck 游戏模式：重启 Steam 加载最新 Decky 插件
+```
+
+### 部署验证
+
+| 机器 | 命令 |
+|------|------|
+| 树莓派 | `curl http://192.168.2.33:8765/api/health` |
+| Steam Deck | `curl http://192.168.3.121:38765/api/health` |
+
+期望：`{"ok":true,"name":"MoodWave","mode":"steamdeck"}`（或 `standard`）
