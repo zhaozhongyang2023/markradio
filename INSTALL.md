@@ -529,49 +529,6 @@ bash ~/moodwave/scripts/uninstall-steamdeck.sh
 ---
 
 
-## Steam Deck WiFi 稳定性修复
-
-Steam Deck 的 RTL8822CE 无线网卡在以下场景容易断连：
-
-- 睡眠唤醒后无法恢复网络
-- 游戏模式长时间运行 WiFi 掉线
-- 手动 IP 下 DHCP 超时断连
-
-### 一键修复
-
-```bash
-cd ~/moodwave && bash scripts/fix-wifi-steamdeck.sh
-```
-
-修改后**重启** Steam Deck 生效。
-
-### 修改了什么
-
-| 层 | 方式 | 作用 |
-|---|---|---|
-| mac80211 | NM dispatcher 脚本 | 连接建立时 `iw power_save off` |
-| rtw88 驱动 | modprobe.d 配置 | 关闭驱动层深度睡眠 + PCI ASPM |
-| PCIe ASPM | systemd 服务 | 全局 ASPM → performance |
-| 睡眠唤醒 | systemd 服务 | 唤醒后强制 WiFi 重连 |
-| NM 连接 | nmcli 配置 | 禁 DHCP + 禁自动 DNS + 优先级 100 |
-
-### 手动验证
-
-```bash
-# 电源管理状态
-iw dev wlan0 get power_save          # 应为 off
-
-# rtw88 驱动参数
-cat /sys/module/rtw88_core/parameters/disable_lps_deep  # 应为 Y
-cat /sys/module/rtw88_pci/parameters/disable_aspm        # 应为 Y
-
-# ASPM 策略
-cat /sys/module/pcie_aspm/parameters/policy  # 应包含 [performance]
-
-# NM 连接配置
-nmcli -f ipv4.dhcp-send-hostname,ipv4.ignore-auto-dns,connection.autoconnect-priority con show 'NancyOpenWrt'
-```
-
 ## 文件位置速查
 
 | 东西 | 路径 |
