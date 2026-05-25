@@ -370,3 +370,19 @@ bash deploy.sh
 - 局域网 192.168.x.x/10.x/172.16.x 直连
 - 关闭后路由自动恢复，无残留
 - MoodWave 无需额外配置
+
+## Steam Deck WiFi 最终结论（2026-05-25）
+
+**根因：蓝牙干扰**，非软件问题。已回滚所有 WiFi 修复。
+
+### 已回滚的修改
+- `/etc/NetworkManager/dispatcher.d/99-wifi-powersave-off` ✅ 已删除
+- `/etc/modprobe.d/rtw88.conf` ✅ 已删除
+- `/etc/systemd/system/disable-wifi-aspm.service` ✅ 已删除
+- `/etc/systemd/system/moodwave-wifi-resume.service` ✅ 已删除
+- `/usr/local/bin/moodwave-wifi-resume.sh` ✅ 已删除
+- NancyOpenWrt 恢复默认 DHCP 配置 ✅
+
+### 保留
+- Mihomo 代理（独立安装，不受影响）
+- MoodWave 服务
