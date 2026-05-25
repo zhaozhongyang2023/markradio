@@ -83,7 +83,8 @@ export async function generateDjPlan({ messages, fallbackTracks, mood }) {
   return plan;
 }
 
-export function demoPlan(fallbackTracks, mood, reason = 'Demo 模式') {
+export function demoPlan(fallbackTracks, mood, reason = '') {
+  if (reason) console.warn('[demoPlan] 降级原因：' + reason);
   const first = fallbackTracks[0];
   const title = first?.title || '这首歌';
   const artist = first?.artist || '';
@@ -92,7 +93,7 @@ export function demoPlan(fallbackTracks, mood, reason = 'Demo 模式') {
     say: `今晚适合安静一点。从${artist ? artist + '的' : ''}《${title}》开始。`,
     play: fallbackTracks.slice(0, 5).map((track) => track.id),
     trackReasons: first ? { [first.id]: `${artist ? artist + '的' : ''}《${title}》，适合戴耳机慢慢听。` } : {},
-    reason,
+    reason: `${artist ? artist + '的' : ''}《${title}》，来自此刻的心境。`,
     segue: '下一首，把声音再放低一点。',
     mood,
     tags: [mood, 'MoodWave', '深夜电台'],

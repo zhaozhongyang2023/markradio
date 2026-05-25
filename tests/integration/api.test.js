@@ -1,0 +1,177 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { spawn } from 'node:child_process';
+import http from 'node:http';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const projectRoot = path.resolve(__dirname, '../..');
+const serverEntry = path.join(projectRoot, 'server', 'index.js');
+
+const TEST_API_PORT = 19876;
+const TEST_WEB_PORT = 19880;
+
+function request(method, urlPath, body) {
+  return new Promise((resolve, reject) => {
+    const options = {
+      method,
+      headers: body ? { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(JSON.stringify(body)) } : {},
+      timeout: 5000
+    };
+    const req = http.request(`http://127.0.0.1:${TEST_API_PORT}${urlPath}`, options, (res) => {
+      let data = '';
+      res.on('data', (chunk) => data += chunk);
+      res.on('end', () => {
+        try { resolve({ status: res.statusCode, body: JSON.parse(data), raw: data }); }
+        catch { resolve({ status: res.statusCode, body: null, raw: data }); }
+      });
+    });
+    req.on('error', reject);
+    req.on('timeout', () => { req.destroy(); reject(new Error('timeout')); });
+    if (body) req.write(JSON.stringify(body));
+    req.end();
+  });
+}
+
+const api = { get: (p) => request('GET', p), post: (p, b) => request('POST', p, b), put: (p, b) => request('PUT', p, b) };
+
+async function waitForServer(maxRetries = 30) {
+  for (let i = 0; i < maxRetries; i++) {
+    try { const r = await api.get('/api/health'); if (r.status === 200 && r.body) return; }
+    catch {}
+    await new Promise(r => setTimeout(r, 300));
+  }
+  throw new Error('Server did not start');
+}
+
+let server;
+
+test.before(async () => {
+  return new Promise((resolve, reject) => {
+    server = spawn('node', [serverEntry], {
+      cwd: projectRoot,
+      env: {
+        ...process.env,
+        MOODWAVE_API_PORT: String(TEST_API_PORT), MOODWAVE_WEB_PORT: String(TEST_WEB_PORT),
+        MOODWAVE_HOST: '127.0.0.1', APP_MODE: 'standard',
+        MARKRADIO_API_PORT: '', MARKRADIO_WEB_PORT: '', MARKRADIO_HOST: '', MARKRADIO_WEB_ORIGIN: '',
+        NODE_ENV: 'test'
+      },
+      stdio: ['ignore', 'pipe', 'pipe']
+    });
+    let started = false;
+    const timeout = setTimeout(() => { if (!started) reject(new Error('start timeout')); }, 20000);
+    const onData = (data) => {
+      const text = data.toString();
+      if (text.includes(String(TEST_API_PORT)) || text.includes('listening')) {
+        started = true; clearTimeout(timeout);
+        setTimeout(async () => { try { await waitForServer(); resolve(); } catch (e) { reject(e); } }, 1000);
+      }
+    };
+    server.stdout.on('data', onData); server.stderr.on('data', onData);
+    server.on('error', (err) => { clearTimeout(timeout); reject(err); });
+    server.on('exit', (code) => { if (!started) { clearTimeout(timeout); reject(new Error(`exited ${code}`)); } });
+  });
+});
+
+test.after(() => { if (server) server.kill('SIGTERM'); });
+
+test('GET /api/health', async () => {
+  const { status, body } = await api.get('/api/health');
+  assert.equal(status, 200);
+  assert.equal(body.ok, true);
+  assert.equal(body.name, 'MoodWave');
+});
+
+test('GET /api/status', async () => {
+  const { status, body } = await api.get('/api/status');
+  assert.equal(status, 200);
+  assert.ok('app' in body);
+  assert.ok('station' in body);
+  assert.ok('ai' in body);
+  assert.ok('voice' in body);
+  assert.ok('music' in body);
+  assert.ok('features' in body);
+});
+
+test('GET /api/mood', async () => {
+  const { status, body } = await api.get('/api/mood');
+  assert.equal(status, 200);
+  assert.ok(body.current);
+  assert.ok(Array.isArray(body.moods));
+});
+
+test('PUT /api/mood', async () => {
+  const { status, body } = await api.put('/api/mood', { mood: '开心' });
+  assert.equal(status, 200);
+  assert.equal(body.current, '开心');
+  await api.put('/api/mood', { mood: '平静' });
+});
+
+test('GET /api/now', async () => {
+  const { status, body } = await api.get('/api/now');
+  assert.equal(status, 200);
+  assert.ok(typeof body === 'object');
+});
+
+test('GET /api/taste', async () => {
+  const { status, body } = await api.get('/api/taste');
+  assert.equal(status, 200);
+  assert.ok(body.taste);
+  assert.ok(body.routines);
+});
+
+test('PUT /api/taste', async () => {
+  const { status, body } = await api.put('/api/taste', { taste: '摇滚', routines: '夜', moodRules: '开' });
+  assert.equal(status, 200);
+  assert.equal(body.taste, '摇滚');
+});
+
+test('GET /api/voice', async () => {
+  const { status, body } = await api.get('/api/voice');
+  assert.equal(status, 200);
+  assert.ok('provider' in body);
+  assert.ok('style' in body);
+});
+
+test('GET /api/special-dates', async () => {
+  const { status, body } = await api.get('/api/special-dates');
+  assert.equal(status, 200);
+  assert.ok(Array.isArray(body.dates));
+});
+
+test('GET /api/plan/today', async () => {
+  const { status } = await api.get('/api/plan/today');
+  assert.ok(status === 200 || status === 204);
+});
+
+test('GET /api/profile/music-dna', async () => {
+  const { status, body } = await api.get('/api/profile/music-dna');
+  assert.equal(status, 200);
+  assert.ok('dna' in body);
+});
+
+test('GET /api/profile/music-dna/history', async () => {
+  const { status, body } = await api.get('/api/profile/music-dna/history');
+  assert.equal(status, 200);
+  assert.ok(Array.isArray(body.history));
+});
+
+test('POST /api/switch-mode', async () => {
+  const { status, body } = await api.post('/api/switch-mode', { mode: 'radio' });
+  assert.equal(status, 200);
+  assert.ok(body.ok);
+  assert.ok('now' in body);
+});
+
+test('WebSocket /ws/stream upgrades', async () => {
+  return new Promise((resolve, reject) => {
+    const req = http.request(`http://127.0.0.1:${TEST_API_PORT}/ws/stream`, {
+      headers: { Upgrade: 'websocket', Connection: 'Upgrade', 'Sec-WebSocket-Version': '13', 'Sec-WebSocket-Key': 'dGhlIHNhbXBsZSBub25jZQ==' }
+    });
+    req.on('upgrade', (res, socket) => { assert.equal(res.statusCode, 101); socket.end(); resolve(); });
+    req.on('error', reject); req.end();
+    setTimeout(() => reject(new Error('WS timeout')), 5000);
+  });
+});

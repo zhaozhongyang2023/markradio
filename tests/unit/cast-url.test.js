@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { buildCastUrl, resolveCastHost } from '../server/cast-url.js';
+import { buildCastUrl, resolveCastHost } from '../../server/cast-url.js';
 
 test('buildCastUrl exposes relative media paths on the API host', () => {
   const url = buildCastUrl('/media/audio?id=123', {

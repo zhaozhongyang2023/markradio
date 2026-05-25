@@ -527,4 +527,16 @@ echo "    查看状态:  systemctl --user status moodwave.service"
 echo "    重启服务:  systemctl --user restart moodwave.service"
 echo "    查看日志:  journalctl --user -u moodwave.service -f"
 echo "    卸载重装:  bash ${APP_PREFIX}/scripts/uninstall-steamdeck.sh"
+
+# ═══════════════════════════════════════════
+# 提示：WiFi 稳定性修复
+# ═══════════════════════════════════════════
+echo ""
+say "Steam Deck 的 RTL8822CE 网卡可能存在 WiFi 掉线问题。"
+echo "  如需修复，运行："
+echo ""
+echo "    ${BOLD}bash ${APP_PREFIX}/scripts/fix-wifi-steamdeck.sh${RESET}"
+echo ""
+echo "  修复后重启 Steam Deck 生效。"
+echo ""
 echo ""
