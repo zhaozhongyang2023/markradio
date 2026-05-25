@@ -346,3 +346,27 @@ bash deploy.sh
 | Steam Deck | `curl http://192.168.3.121:38765/api/health` |
 
 期望：`{"ok":true,"name":"MoodWave","mode":"steamdeck"}`（或 `standard`）
+
+## Steam Deck Mihomo 代理
+
+### 开关
+| 命令 | 作用 |
+|------|------|
+| `proxy-on` | 开启全系统代理 |
+| `proxy-off` | 关闭全系统代理 |
+| `proxy-status` | 查看代理状态 |
+| `sudo systemctl start/stop mihomo` | 同上 |
+
+### 文件位置
+| 文件 | 说明 |
+|------|------|
+| `/usr/local/bin/mihomo` | 主程序 |
+| `/etc/mihomo/config.yaml` | TUN 模式配置 + 订阅 |
+| `/etc/systemd/system/mihomo.service` | 系统服务（默认不自启） |
+| `~/Desktop/Proxy.desktop` | 桌面开关快捷方式 |
+
+### 影响
+- TUN 模式透明代理全系统流量
+- 局域网 192.168.x.x/10.x/172.16.x 直连
+- 关闭后路由自动恢复，无残留
+- MoodWave 无需额外配置

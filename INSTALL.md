@@ -328,6 +328,27 @@ cat /sys/module/pcie_aspm/parameters/policy  # 应包含 [performance]
 # NM 连接配置
 nmcli -f ipv4.dhcp-send-hostname,ipv4.ignore-auto-dns,connection.autoconnect-priority con show 'NancyOpenWrt'
 ```
+
+## Steam Deck Mihomo 代理
+
+### 开关
+| 命令 | 作用 |
+|------|------|
+| `proxy-on` | 开启全系统代理 |
+| `proxy-off` | 关闭全系统代理 |
+| `proxy-status` | 查看代理状态 |
+
+### 安装（首次）
+```bash
+cd ~/moodwave && bash scripts/setup-mihomo.sh
+```
+
+### 影响
+- TUN 模式透明代理，全系统流量经代理
+- 局域网 192.168.x.x/10.x/172.16.x 直连
+- 默认不开机自启，需要时手动 `proxy-on`
+- 游戏模式下同样可用（linger 已启用）
+- MoodWave 无需额外配置
 ## 文件位置速查
 
 | 东西 | 路径 |
