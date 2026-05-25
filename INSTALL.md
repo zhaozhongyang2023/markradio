@@ -21,6 +21,249 @@
 按住 **电源键** → 选择「**切换至桌面模式**」
 
 ---
+## （可选）Steam Deck 安装代理 — 提升 API 稳定性
+
+> 🟢 **绝大多数用户不需要此步骤**。MoodWave 的 DeepSeek、Fish Audio 等 API 在国内可直接访问。
+>
+> 仅当你遇到以下情况才需要：
+> - AI 生成 DJ 开场白经常失败
+> - Music DNA 分析超时
+> - 已确认是网络访问 API 不稳定
+
+### 什么是代理
+
+代理是一个网络中转工具，让你的 Steam Deck 更稳定地访问海外 API。**关闭后不影响任何功能**，跟没装一样。
+
+### 准备工作
+
+你需要一个 **Clash 订阅链接**（也叫"机场"）。如果你已经有梯子，找你的服务商要一个 Clash 订阅地址，类似：
+```
+https://xxx.xxx.com/link/xxxxxxxx
+```
+
+### 安装步骤
+
+#### 1. 下载 mihomo（Clash 客户端）
+
+打开终端（Konsole），逐行执行：
+
+```bash
+# 下载
+curl -sL https://github.com/MetaCubeX/mihomo/releases/latest/download/mihomo-linux-amd64.gz -o /tmp/mihomo.gz
+
+# 解压并安装
+gunzip -f /tmp/mihomo.gz
+sudo mv /tmp/mihomo /usr/local/bin/mihomo
+sudo chmod 755 /usr/local/bin/mihomo
+```
+
+#### 2. 创建配置文件
+
+把下面的 `YOUR_SUBSCRIPTION_URL` 替换成你的订阅链接，然后整段复制到终端执行：
+
+```bash
+sudo mkdir -p /etc/mihomo
+
+sudo tee /etc/mihomo/config.yaml > /dev/null << 'YAML'
+mixed-port: 7890
+allow-lan: false
+mode: rule
+log-level: warning
+
+proxy-providers:
+  sub:
+    type: http
+    url: "YOUR_SUBSCRIPTION_URL"
+    interval: 3600
+    path: ./providers/sub.yaml
+    health-check:
+      enable: true
+      url: https://www.gstatic.com/generate_204
+      interval: 300
+
+proxy-groups:
+  - name: PROXY
+    type: select
+    use:
+      - sub
+
+tun:
+  enable: true
+  stack: system
+  dns-hijack:
+    - any:53
+  auto-route: true
+  auto-detect-interface: true
+
+dns:
+  enable: true
+  listen: 0.0.0.0:5353
+  ipv6: false
+  enhanced-mode: fake-ip
+  fake-ip-range: 198.18.0.1/16
+  nameserver:
+    - https://doh.pub/dns-query
+    - https://dns.alidns.com/dns-query
+  fallback:
+    - https://8.8.8.8/dns-query
+    - https://1.1.1.1/dns-query
+
+rules:
+  - IP-CIDR,192.168.0.0/16,DIRECT
+  - IP-CIDR,10.0.0.0/8,DIRECT
+  - IP-CIDR,172.16.0.0/12,DIRECT
+  - IP-CIDR,127.0.0.0/8,DIRECT
+  - MATCH,PROXY
+YAML
+```
+
+> ⚠️ **必须替换** `YOUR_SUBSCRIPTION_URL` 为你的真实订阅地址。
+
+#### 3. 创建系统服务
+
+```bash
+sudo tee /etc/systemd/system/mihomo.service > /dev/null << 'EOF'
+[Unit]
+Description=Mihomo TUN Proxy
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/mihomo -d /etc/mihomo
+Restart=on-failure
+RestartSec=5
+LimitNOFILE=65536
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+sudo systemctl daemon-reload
+```
+
+#### 4. 配置免密码开关
+
+```bash
+# polkit 规则（桌面免密码）
+sudo tee /etc/polkit-1/rules.d/50-mihomo.rules > /dev/null << 'JS'
+polkit.addRule(function(action, subject) {
+    if (action.id == "org.freedesktop.systemd1.manage-units" &&
+        subject.user == "deck") {
+        return polkit.Result.YES;
+    }
+});
+JS
+
+# 创建开关命令
+sudo tee /usr/local/bin/proxy-on > /dev/null << 'SH'
+#!/bin/bash
+systemctl start mihomo && echo "✓ 代理已开启" || echo "✗ 开启失败"
+SH
+sudo chmod 755 /usr/local/bin/proxy-on
+
+sudo tee /usr/local/bin/proxy-off > /dev/null << 'SH'
+#!/bin/bash
+systemctl stop mihomo && echo "✓ 代理已关闭" || echo "✗ 关闭失败"
+SH
+sudo chmod 755 /usr/local/bin/proxy-off
+
+sudo tee /usr/local/bin/proxy-status > /dev/null << 'SH'
+#!/bin/bash
+systemctl status mihomo --no-pager
+SH
+sudo chmod 755 /usr/local/bin/proxy-status
+
+# 桌面开关图标
+cat > ~/Desktop/Proxy.desktop << 'END'
+[Desktop Entry]
+Type=Application
+Name=Proxy
+Comment=一键开关代理
+Exec=/home/deck/.local/bin/proxy-dialog
+Icon=network-vpn
+Terminal=false
+Categories=Network;
+END
+chmod +x ~/Desktop/Proxy.desktop
+```
+
+#### 5. 创建桌面弹窗脚本
+
+```bash
+mkdir -p ~/.local/bin
+
+cat > ~/.local/bin/proxy-dialog << 'SCRIPT'
+#!/bin/bash
+STATUS=$(systemctl is-active mihomo)
+if [ "$STATUS" = "active" ]; then
+    TEXT="🟢 代理已开启"
+    BTN_ON="保持开启"
+    BTN_OFF="关闭代理"
+else
+    TEXT="🔴 代理已关闭"
+    BTN_ON="开启代理"
+    BTN_OFF="保持关闭"
+fi
+
+CHOICE=$(kdialog --title "Mihomo 代理" --radiolist "$TEXT" \
+    on  "$BTN_ON"  on \
+    off "$BTN_OFF" off 2>/dev/null)
+
+case "$CHOICE" in
+    on)  systemctl start mihomo
+         kdialog --title "代理" --passivepopup "代理已开启" 3 ;;
+    off) systemctl stop mihomo
+         kdialog --title "代理" --passivepopup "代理已关闭" 3 ;;
+esac
+SCRIPT
+chmod +x ~/.local/bin/proxy-dialog
+```
+
+### 使用方法
+
+| 方式 | 操作 |
+|------|------|
+| 桌面双击 | 点 **Proxy** 图标 → 弹出窗口选开/关 |
+| 终端命令 | `proxy-on` 开 / `proxy-off` 关 / `proxy-status` 查看 |
+
+### 验证
+
+```bash
+# 先开启代理
+proxy-on
+
+# 测试外网（应返回 200）
+curl -sI --max-time 10 https://www.google.com | head -1
+
+# 确认局域网不受影响（MoodWave 应正常）
+curl http://127.0.0.1:38765/api/health
+
+# 关闭代理
+proxy-off
+```
+
+### 影响说明
+
+- **开机不自启**：重启后代理默认关闭，需要时手动开
+- **全系统透明代理**：开启时所有流量走代理
+- **局域网不受影响**：192.168.x.x 等内网地址永远直连
+- **游戏模式可用**：切换到游戏模式后代理保持运行
+- **关闭 = 不存在**：关闭后路由、DNS 完全恢复原状，无任何残留
+
+### 卸载代理
+
+```bash
+sudo systemctl stop mihomo
+sudo systemctl disable mihomo 2>/dev/null
+sudo rm -f /usr/local/bin/mihomo
+sudo rm -f /usr/local/bin/proxy-on /usr/local/bin/proxy-off /usr/local/bin/proxy-status
+sudo rm -f /etc/systemd/system/mihomo.service
+sudo rm -f /etc/polkit-1/rules.d/50-mihomo.rules
+sudo rm -rf /etc/mihomo
+rm -f ~/Desktop/Proxy.desktop ~/.local/bin/proxy-dialog
+sudo systemctl daemon-reload
+```
 
 ## 第一步：设置 sudo 密码（首次需要）
 
@@ -329,249 +572,6 @@ cat /sys/module/pcie_aspm/parameters/policy  # 应包含 [performance]
 nmcli -f ipv4.dhcp-send-hostname,ipv4.ignore-auto-dns,connection.autoconnect-priority con show 'NancyOpenWrt'
 ```
 
-## （可选）Steam Deck 安装代理 — 提升 API 稳定性
-
-> 🟢 **绝大多数用户不需要此步骤**。MoodWave 的 DeepSeek、Fish Audio 等 API 在国内可直接访问。
->
-> 仅当你遇到以下情况才需要：
-> - AI 生成 DJ 开场白经常失败
-> - Music DNA 分析超时
-> - 已确认是网络访问 API 不稳定
-
-### 什么是代理
-
-代理是一个网络中转工具，让你的 Steam Deck 更稳定地访问海外 API。**关闭后不影响任何功能**，跟没装一样。
-
-### 准备工作
-
-你需要一个 **Clash 订阅链接**（也叫"机场"）。如果你已经有梯子，找你的服务商要一个 Clash 订阅地址，类似：
-```
-https://xxx.xxx.com/link/xxxxxxxx
-```
-
-### 安装步骤
-
-#### 1. 下载 mihomo（Clash 客户端）
-
-打开终端（Konsole），逐行执行：
-
-```bash
-# 下载
-curl -sL https://github.com/MetaCubeX/mihomo/releases/latest/download/mihomo-linux-amd64.gz -o /tmp/mihomo.gz
-
-# 解压并安装
-gunzip -f /tmp/mihomo.gz
-sudo mv /tmp/mihomo /usr/local/bin/mihomo
-sudo chmod 755 /usr/local/bin/mihomo
-```
-
-#### 2. 创建配置文件
-
-把下面的 `YOUR_SUBSCRIPTION_URL` 替换成你的订阅链接，然后整段复制到终端执行：
-
-```bash
-sudo mkdir -p /etc/mihomo
-
-sudo tee /etc/mihomo/config.yaml > /dev/null << 'YAML'
-mixed-port: 7890
-allow-lan: false
-mode: rule
-log-level: warning
-
-proxy-providers:
-  sub:
-    type: http
-    url: "YOUR_SUBSCRIPTION_URL"
-    interval: 3600
-    path: ./providers/sub.yaml
-    health-check:
-      enable: true
-      url: https://www.gstatic.com/generate_204
-      interval: 300
-
-proxy-groups:
-  - name: PROXY
-    type: select
-    use:
-      - sub
-
-tun:
-  enable: true
-  stack: system
-  dns-hijack:
-    - any:53
-  auto-route: true
-  auto-detect-interface: true
-
-dns:
-  enable: true
-  listen: 0.0.0.0:5353
-  ipv6: false
-  enhanced-mode: fake-ip
-  fake-ip-range: 198.18.0.1/16
-  nameserver:
-    - https://doh.pub/dns-query
-    - https://dns.alidns.com/dns-query
-  fallback:
-    - https://8.8.8.8/dns-query
-    - https://1.1.1.1/dns-query
-
-rules:
-  - IP-CIDR,192.168.0.0/16,DIRECT
-  - IP-CIDR,10.0.0.0/8,DIRECT
-  - IP-CIDR,172.16.0.0/12,DIRECT
-  - IP-CIDR,127.0.0.0/8,DIRECT
-  - MATCH,PROXY
-YAML
-```
-
-> ⚠️ **必须替换** `YOUR_SUBSCRIPTION_URL` 为你的真实订阅地址。
-
-#### 3. 创建系统服务
-
-```bash
-sudo tee /etc/systemd/system/mihomo.service > /dev/null << 'EOF'
-[Unit]
-Description=Mihomo TUN Proxy
-After=network-online.target
-Wants=network-online.target
-
-[Service]
-Type=simple
-ExecStart=/usr/local/bin/mihomo -d /etc/mihomo
-Restart=on-failure
-RestartSec=5
-LimitNOFILE=65536
-
-[Install]
-WantedBy=multi-user.target
-EOF
-
-sudo systemctl daemon-reload
-```
-
-#### 4. 配置免密码开关
-
-```bash
-# polkit 规则（桌面免密码）
-sudo tee /etc/polkit-1/rules.d/50-mihomo.rules > /dev/null << 'JS'
-polkit.addRule(function(action, subject) {
-    if (action.id == "org.freedesktop.systemd1.manage-units" &&
-        subject.user == "deck") {
-        return polkit.Result.YES;
-    }
-});
-JS
-
-# 创建开关命令
-sudo tee /usr/local/bin/proxy-on > /dev/null << 'SH'
-#!/bin/bash
-systemctl start mihomo && echo "✓ 代理已开启" || echo "✗ 开启失败"
-SH
-sudo chmod 755 /usr/local/bin/proxy-on
-
-sudo tee /usr/local/bin/proxy-off > /dev/null << 'SH'
-#!/bin/bash
-systemctl stop mihomo && echo "✓ 代理已关闭" || echo "✗ 关闭失败"
-SH
-sudo chmod 755 /usr/local/bin/proxy-off
-
-sudo tee /usr/local/bin/proxy-status > /dev/null << 'SH'
-#!/bin/bash
-systemctl status mihomo --no-pager
-SH
-sudo chmod 755 /usr/local/bin/proxy-status
-
-# 桌面开关图标
-cat > ~/Desktop/Proxy.desktop << 'END'
-[Desktop Entry]
-Type=Application
-Name=Proxy
-Comment=一键开关代理
-Exec=/home/deck/.local/bin/proxy-dialog
-Icon=network-vpn
-Terminal=false
-Categories=Network;
-END
-chmod +x ~/Desktop/Proxy.desktop
-```
-
-#### 5. 创建桌面弹窗脚本
-
-```bash
-mkdir -p ~/.local/bin
-
-cat > ~/.local/bin/proxy-dialog << 'SCRIPT'
-#!/bin/bash
-STATUS=$(systemctl is-active mihomo)
-if [ "$STATUS" = "active" ]; then
-    TEXT="🟢 代理已开启"
-    BTN_ON="保持开启"
-    BTN_OFF="关闭代理"
-else
-    TEXT="🔴 代理已关闭"
-    BTN_ON="开启代理"
-    BTN_OFF="保持关闭"
-fi
-
-CHOICE=$(kdialog --title "Mihomo 代理" --radiolist "$TEXT" \
-    on  "$BTN_ON"  on \
-    off "$BTN_OFF" off 2>/dev/null)
-
-case "$CHOICE" in
-    on)  systemctl start mihomo
-         kdialog --title "代理" --passivepopup "代理已开启" 3 ;;
-    off) systemctl stop mihomo
-         kdialog --title "代理" --passivepopup "代理已关闭" 3 ;;
-esac
-SCRIPT
-chmod +x ~/.local/bin/proxy-dialog
-```
-
-### 使用方法
-
-| 方式 | 操作 |
-|------|------|
-| 桌面双击 | 点 **Proxy** 图标 → 弹出窗口选开/关 |
-| 终端命令 | `proxy-on` 开 / `proxy-off` 关 / `proxy-status` 查看 |
-
-### 验证
-
-```bash
-# 先开启代理
-proxy-on
-
-# 测试外网（应返回 200）
-curl -sI --max-time 10 https://www.google.com | head -1
-
-# 确认局域网不受影响（MoodWave 应正常）
-curl http://127.0.0.1:38765/api/health
-
-# 关闭代理
-proxy-off
-```
-
-### 影响说明
-
-- **开机不自启**：重启后代理默认关闭，需要时手动开
-- **全系统透明代理**：开启时所有流量走代理
-- **局域网不受影响**：192.168.x.x 等内网地址永远直连
-- **游戏模式可用**：切换到游戏模式后代理保持运行
-- **关闭 = 不存在**：关闭后路由、DNS 完全恢复原状，无任何残留
-
-### 卸载代理
-
-```bash
-sudo systemctl stop mihomo
-sudo systemctl disable mihomo 2>/dev/null
-sudo rm -f /usr/local/bin/mihomo
-sudo rm -f /usr/local/bin/proxy-on /usr/local/bin/proxy-off /usr/local/bin/proxy-status
-sudo rm -f /etc/systemd/system/mihomo.service
-sudo rm -f /etc/polkit-1/rules.d/50-mihomo.rules
-sudo rm -rf /etc/mihomo
-rm -f ~/Desktop/Proxy.desktop ~/.local/bin/proxy-dialog
-sudo systemctl daemon-reload
-```
 ## 文件位置速查
 
 | 东西 | 路径 |
