@@ -1903,13 +1903,13 @@ p {
   }
 
   .v4-shell:not(.is-deck) .v4-radio {
-    width: min(520px, calc(100vw - 36px));
-    max-width: 520px;
+    width: min(480px, calc(100vw - 36px));
+    max-width: 480px;
   }
 
   .phone {
-    width: min(520px, calc(100vw - 36px));
-    max-width: 520px;
+    width: min(480px, calc(100vw - 36px));
+    max-width: 480px;
     height: min(860px, calc(100dvh - 36px));
     min-height: 0;
     border: 1px solid rgba(255, 255, 255, 0.1);
@@ -2111,8 +2111,8 @@ p {
   }
 
   .v4-shell:not(.is-deck) .v4-radio {
-    width: min(520px, calc(100vw - 36px));
-    max-width: 520px;
+    width: min(480px, calc(100vw - 36px));
+    max-width: 480px;
   }
 
   .v4-player-strip,
