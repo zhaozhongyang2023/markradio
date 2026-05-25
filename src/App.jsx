@@ -336,9 +336,10 @@ function drawPixelDigit(ctx, ox, oy, ch) {
   ctx.shadowBlur = 0;
 }
 
-function PixelClockCanvas({ hours, minutes, lowPower = false }) {
+function PixelClockCanvas({ hours, minutes, lowPower = false, containerRef = null }) {
   const canvasRef = useRef(null);
   const [tick, setTick] = useState(0);
+  const [box, setBox] = useState({ width: 0, height: 0 });
 
   useEffect(() => {
     const id = setInterval(() => setTick(t => t + 1), lowPower ? 30000 : 500);
@@ -347,13 +348,63 @@ function PixelClockCanvas({ hours, minutes, lowPower = false }) {
 
   useEffect(() => {
     const canvas = canvasRef.current;
+    const target = containerRef?.current || canvas?.parentElement;
+    if (!target) return undefined;
+
+    let raf = 0;
+    const updateBox = () => {
+      const rect = target.getBoundingClientRect();
+      const next = {
+        width: Math.round(rect.width),
+        height: Math.round(rect.height)
+      };
+      setBox(prev => (
+        prev.width === next.width && prev.height === next.height ? prev : next
+      ));
+    };
+    const scheduleUpdate = () => {
+      cancelAnimationFrame(raf);
+      raf = requestAnimationFrame(updateBox);
+    };
+
+    updateBox();
+    window.addEventListener('resize', scheduleUpdate);
+    let observer = null;
+    if (typeof ResizeObserver !== 'undefined') {
+      observer = new ResizeObserver(scheduleUpdate);
+      observer.observe(target);
+    }
+
+    return () => {
+      cancelAnimationFrame(raf);
+      window.removeEventListener('resize', scheduleUpdate);
+      observer?.disconnect();
+    };
+  }, [containerRef]);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
     if (!canvas) return;
     const dpr = Math.min(window.devicePixelRatio || 1, 1.5);
     const { cell, canvasW, canvasH } = PX;
     const baseW = canvasW * cell;
     const baseH = canvasH * cell;
-    const fitW = Math.max(260, Math.min(window.innerWidth - 48, baseW));
-    const scale = Math.min(1, fitW / baseW);
+    const host = containerRef?.current || canvas.parentElement;
+    const hostStyle = host ? window.getComputedStyle(host) : null;
+    const padX = hostStyle ? parseFloat(hostStyle.paddingLeft || '0') + parseFloat(hostStyle.paddingRight || '0') : 0;
+    const padY = hostStyle ? parseFloat(hostStyle.paddingTop || '0') + parseFloat(hostStyle.paddingBottom || '0') : 0;
+    const gap = hostStyle ? parseFloat(hostStyle.rowGap || hostStyle.gap || '0') || 0 : 0;
+    const siblingHeight = host
+      ? Array.from(host.children).reduce((total, child) => (
+          child === canvas ? total : total + child.getBoundingClientRect().height
+        ), 0)
+      : 0;
+    const gapHeight = host ? gap * Math.max(0, host.children.length - 1) : 0;
+    const availableW = box.width > 0 ? box.width - padX : Math.min(window.innerWidth - 48, baseW);
+    const availableH = box.height > 0 ? box.height - padY - siblingHeight - gapHeight : baseH;
+    const fitW = Math.max(1, Math.min(baseW, availableW));
+    const fitH = Math.max(1, Math.min(baseH, availableH));
+    const scale = Math.min(1, fitW / baseW, fitH / baseH);
     const logicalW = Math.round(baseW * scale);
     const logicalH = Math.round(baseH * scale);
     canvas.width = Math.round(logicalW * dpr);
@@ -403,7 +454,7 @@ function PixelClockCanvas({ hours, minutes, lowPower = false }) {
     ctx.fillRect(colonX * cell, colCY + 4 * cell, PX.size, PX.size);
     ctx.shadowBlur = 0;
     ctx.globalAlpha = 1;
-  }, [hours, minutes, lowPower, tick]);
+  }, [hours, minutes, lowPower, tick, box, containerRef]);
 
   return <canvas ref={canvasRef} className="pixel-clock-canvas" aria-hidden="true" />;
 }
@@ -671,6 +722,7 @@ function V4RadioView({
 
   const eqRef = useRef(null);
   const eqSpansRef = useRef(null);
+  const clockPanelRef = useRef(null);
   useEffect(() => {
     if (!eqRef.current) return;
     eqSpansRef.current = Array.from(eqRef.current.querySelectorAll('span'));
@@ -749,8 +801,8 @@ function V4RadioView({
           </div>
         </header>
 
-        <section className="v4-clock-panel">
-          <PixelClockCanvas hours={clock.getHours()} minutes={clock.getMinutes()} />
+        <section className="v4-clock-panel" ref={clockPanelRef}>
+          <PixelClockCanvas hours={clock.getHours()} minutes={clock.getMinutes()} containerRef={clockPanelRef} />
           <p>{weekdays[clock.getDay()]}</p>
           <small>{clock.getDate()} · {months[clock.getMonth()].toUpperCase()} · {clock.getFullYear()}</small>
           <div className={servicesOk ? 'v4-onair' : 'v4-onair idle'}>
