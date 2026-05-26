@@ -664,6 +664,12 @@ function Content() {
           font-weight: 600;
           letter-spacing: .02em;
         }
+        .mw-weather-line {
+          text-align: center;
+          color: rgba(255,255,255,.48);
+          font-size: 10px;
+          margin-bottom: 2px;
+        }
         .mw-minimal-logo {
           position: absolute;
           top: 8px;
@@ -1232,6 +1238,8 @@ function Content() {
           {playing && track ? <button className="mw-minimal-toggle" onClick={() => { setMinimalMode(true); localStorage.setItem(MINIMAL_KEY, '1'); }} title="极简模式">◁ 极简</button> : null}
         </div>
 
+      {now.weather ? <div className="mw-weather-line">{cityLabel(now.weather.city || '') || '本地'} · {now.weather.condition || '未知'}{now.weather.temperature != null ? ' ' + Math.round(now.weather.temperature) + '°C' : ''}</div> : null}
+
       <div className="mw-brand-bar">
         <img src={`data:image/png;base64,${ICON_BASE64}`} alt="MoodWave" />
         <span>MoodWave · AI DJ</span>
@@ -1341,7 +1349,7 @@ function Content() {
 
       {page === 'game' && (
         <div>
-          <div className="mw-section-title"><span>▣</span>现在想怎么玩？</div>
+          <div className="mw-section-title"><span>▣</span>选个游戏氛围</div>
           {gamePreset?.preset && (
             <div className="mw-section-hint">
               {gamePreset.preset.displayName}
@@ -1395,7 +1403,7 @@ function Content() {
             />
           </PanelSectionRow>
           <PanelSectionRow>
-            <AppButton disabled={busy} onClick={() => run('测试连接', refresh)}>测试连接</AppButton>
+            <AppButton disabled={busy} onClick={() => run('重连', refresh)}>重连</AppButton>
           </PanelSectionRow>
           <div style={{ marginTop: 8 }} />
           <PanelSectionRow>
