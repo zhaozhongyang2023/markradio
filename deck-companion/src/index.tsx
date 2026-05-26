@@ -404,7 +404,7 @@ function Content() {
     const startTs = Date.now();
     const timer = setInterval(() => {
       const elapsed = (Date.now() - startTs) / 1000;
-      setProgress(Math.min(90, 5 + elapsed * 10.6));
+      setProgress(Math.min(90, Math.round(5 + elapsed * 10.6)));
     }, 200);
     runTimerRef.current = timer;
     try {
