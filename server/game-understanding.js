@@ -19,6 +19,10 @@ const GAME_WORLDS = {
   '女神异闻录': { world: ['都市', '青春', '怪盗', '爵士'], music: ['爵士', 'City Pop', '轻快', '都市感'] },
   '荒野大镖客': { world: ['西部', '荒野', '孤独', '旅程'], music: ['民谣', '低频', '氛围', '西部感'] },
   'rdr2': { world: ['西部', '荒野', '孤独', '旅程'], music: ['民谣', '低频', '氛围', '西部感'] },
+  '刺客信条·影': { world: ['战国日本', '忍者潜行', '武士对决', '雨夜'], music: ['和风暗色', '低频', '太鼓', '氛围'] },
+  '刺客信条影': { world: ['战国日本', '忍者潜行', '武士对决', '雨夜'], music: ['和风暗色', '低频', '太鼓', '氛围'] },
+  'assassins creed shadows': { world: ['战国日本', '忍者潜行', '武士对决', '雨夜'], music: ['和风暗色', '低频', '太鼓', '氛围'] },
+  'ac shadows': { world: ['战国日本', '忍者潜行', '武士对决', '雨夜'], music: ['和风暗色', '低频', '太鼓', '氛围'] },
 };
 
 // 关键词匹配
@@ -47,7 +51,29 @@ export function getVibeDNA(vibe) {
   return null;
 }
 
-export function buildGameContext(gameName, gameVibe) {
+export function buildGameContext(gameName, gameVibe, presetContext = null) {
+  if (presetContext?.presetName || presetContext?.sceneLabel) {
+    const musicDirection = presetContext.musicDirection?.length
+      ? presetContext.musicDirection
+      : [];
+    const vibeParts = [
+      ...(presetContext.gameWorld || []),
+      presetContext.sceneVibe || ''
+    ].filter(Boolean);
+    return {
+      game_name: gameName || presetContext.presetName || '',
+      game_state: presetContext.sceneLabel || gameVibe || '',
+      game_vibe: vibeParts.join('、'),
+      music_direction: musicDirection,
+      dj_persona: presetContext.djPersona || '',
+      scene_id: presetContext.sceneId || '',
+      scene_label: presetContext.sceneLabel || '',
+      scene_vibe: presetContext.sceneVibe || '',
+      matched_weather: presetContext.matchedWeather || '',
+      matched_time: presetContext.matchedTime || '',
+      sample_lines: presetContext.sampleLines || []
+    };
+  }
   const gameDna = getGameDNA(gameName);
   const vibeDna = getVibeDNA(gameVibe);
   if (!gameDna && !vibeDna) {

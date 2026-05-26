@@ -30,6 +30,40 @@ const CAST_LEASE_TTL_MS = 15 * 60 * 1000;
 const CAST_HEARTBEAT_INTERVAL_MS = 30 * 1000;
 const CAST_PLAYBACK_LEASE_BUFFER_MS = 2 * 60 * 1000;
 const SILENT_AUDIO_URL = 'data:audio/wav;base64,UklGRigAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQQAAAAAAA==';
+const WEB_GAME_PRESET_KEY = 'moodwave.web.gamePresetId';
+const GAME_PRESET_SAMPLE = {
+  id: 'elden-ring-night',
+  displayName: '艾尔登法环 · 夜巡包',
+  gameNames: ['艾尔登法环', 'Elden Ring', 'ELDEN RING'],
+  world: ['交界地', '黑暗奇幻', '篝火', '孤独探索'],
+  djPersona: '像一位低声陪你跑图的夜巡电台 DJ。话少，沉稳，不打扰战斗。',
+  musicDirection: ['低频', '暗色氛围', '史诗感', '慢速鼓点'],
+  defaultScene: 'night-explore',
+  scenes: [
+    {
+      id: 'night-explore',
+      label: '夜晚跑图',
+      icon: '☾',
+      mood: '平静',
+      vibe: '篝火还远，先慢慢走。',
+      musicDirection: ['低频', '暗色 LoFi', '长时间循环'],
+      weather: ['clear', 'fog', 'cloudy'],
+      time: ['evening', 'night'],
+      sampleLines: ['先别急，路还很长。', '篝火还远，慢慢来。']
+    },
+    {
+      id: 'boss-door',
+      label: '雾门前',
+      icon: '⚔',
+      mood: '愤怒',
+      vibe: '进去之前，先把呼吸压稳。',
+      musicDirection: ['史诗', '低频', '压迫感'],
+      weather: ['clear', 'fog'],
+      time: ['afternoon', 'evening', 'night'],
+      sampleLines: ['门后很安静。', '这一把，慢一点也没关系。']
+    }
+  ]
+};
 
 function detectLowPowerRuntime() {
   if (typeof navigator === 'undefined') return false;
@@ -336,9 +370,10 @@ function drawPixelDigit(ctx, ox, oy, ch) {
   ctx.shadowBlur = 0;
 }
 
-function PixelClockCanvas({ hours, minutes, lowPower = false }) {
+function PixelClockCanvas({ hours, minutes, lowPower = false, containerRef = null }) {
   const canvasRef = useRef(null);
   const [tick, setTick] = useState(0);
+  const [box, setBox] = useState({ width: 0, height: 0 });
 
   useEffect(() => {
     const id = setInterval(() => setTick(t => t + 1), lowPower ? 30000 : 500);
@@ -347,13 +382,63 @@ function PixelClockCanvas({ hours, minutes, lowPower = false }) {
 
   useEffect(() => {
     const canvas = canvasRef.current;
+    const target = containerRef?.current || canvas?.parentElement;
+    if (!target) return undefined;
+
+    let raf = 0;
+    const updateBox = () => {
+      const rect = target.getBoundingClientRect();
+      const next = {
+        width: Math.round(rect.width),
+        height: Math.round(rect.height)
+      };
+      setBox(prev => (
+        prev.width === next.width && prev.height === next.height ? prev : next
+      ));
+    };
+    const scheduleUpdate = () => {
+      cancelAnimationFrame(raf);
+      raf = requestAnimationFrame(updateBox);
+    };
+
+    updateBox();
+    window.addEventListener('resize', scheduleUpdate);
+    let observer = null;
+    if (typeof ResizeObserver !== 'undefined') {
+      observer = new ResizeObserver(scheduleUpdate);
+      observer.observe(target);
+    }
+
+    return () => {
+      cancelAnimationFrame(raf);
+      window.removeEventListener('resize', scheduleUpdate);
+      observer?.disconnect();
+    };
+  }, [containerRef]);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
     if (!canvas) return;
     const dpr = Math.min(window.devicePixelRatio || 1, 1.5);
     const { cell, canvasW, canvasH } = PX;
     const baseW = canvasW * cell;
     const baseH = canvasH * cell;
-    const fitW = Math.max(260, Math.min(window.innerWidth - 48, baseW));
-    const scale = Math.min(1, fitW / baseW);
+    const host = containerRef?.current || canvas.parentElement;
+    const hostStyle = host ? window.getComputedStyle(host) : null;
+    const padX = hostStyle ? parseFloat(hostStyle.paddingLeft || '0') + parseFloat(hostStyle.paddingRight || '0') : 0;
+    const padY = hostStyle ? parseFloat(hostStyle.paddingTop || '0') + parseFloat(hostStyle.paddingBottom || '0') : 0;
+    const gap = hostStyle ? parseFloat(hostStyle.rowGap || hostStyle.gap || '0') || 0 : 0;
+    const siblingHeight = host
+      ? Array.from(host.children).reduce((total, child) => (
+          child === canvas ? total : total + child.getBoundingClientRect().height
+        ), 0)
+      : 0;
+    const gapHeight = host ? gap * Math.max(0, host.children.length - 1) : 0;
+    const availableW = box.width > 0 ? box.width - padX : Math.min(window.innerWidth - 48, baseW);
+    const availableH = box.height > 0 ? box.height - padY - siblingHeight - gapHeight : baseH;
+    const fitW = Math.max(1, Math.min(baseW, availableW));
+    const fitH = Math.max(1, Math.min(baseH, availableH));
+    const scale = Math.min(1, fitW / baseW, fitH / baseH);
     const logicalW = Math.round(baseW * scale);
     const logicalH = Math.round(baseH * scale);
     canvas.width = Math.round(logicalW * dpr);
@@ -403,7 +488,7 @@ function PixelClockCanvas({ hours, minutes, lowPower = false }) {
     ctx.fillRect(colonX * cell, colCY + 4 * cell, PX.size, PX.size);
     ctx.shadowBlur = 0;
     ctx.globalAlpha = 1;
-  }, [hours, minutes, lowPower, tick]);
+  }, [hours, minutes, lowPower, tick, box, containerRef]);
 
   return <canvas ref={canvasRef} className="pixel-clock-canvas" aria-hidden="true" />;
 }
@@ -671,6 +756,7 @@ function V4RadioView({
 
   const eqRef = useRef(null);
   const eqSpansRef = useRef(null);
+  const clockPanelRef = useRef(null);
   useEffect(() => {
     if (!eqRef.current) return;
     eqSpansRef.current = Array.from(eqRef.current.querySelectorAll('span'));
@@ -749,8 +835,8 @@ function V4RadioView({
           </div>
         </header>
 
-        <section className="v4-clock-panel">
-          <PixelClockCanvas hours={clock.getHours()} minutes={clock.getMinutes()} />
+        <section className="v4-clock-panel" ref={clockPanelRef}>
+          <PixelClockCanvas hours={clock.getHours()} minutes={clock.getMinutes()} containerRef={clockPanelRef} />
           <p>{weekdays[clock.getDay()]}</p>
           <small>{clock.getDate()} · {months[clock.getMonth()].toUpperCase()} · {clock.getFullYear()}</small>
           <div className={servicesOk ? 'v4-onair' : 'v4-onair idle'}>
@@ -931,6 +1017,11 @@ export default function App() {
   const [dnaLibrary, setDnaLibrary] = useState({ likedCount: 0, playlistCount: 0 });
   const [dnaHistory, setDnaHistory] = useState([]);
   const [showDnaHistory, setShowDnaHistory] = useState(false);
+  const [showPresetPanel, setShowPresetPanel] = useState(false);
+  const [gamePresetId, setGamePresetId] = useState(() => localStorage.getItem(WEB_GAME_PRESET_KEY) || '');
+  const [gamePresetCatalog, setGamePresetCatalog] = useState({ presets: [], errors: [] });
+  const [gamePresetJson, setGamePresetJson] = useState('');
+  const [gamePresetMessage, setGamePresetMessage] = useState('');
   const mountedRef = useRef(true);
   useEffect(() => () => { mountedRef.current = false; }, []);
   const [castDevices, setCastDevices] = useState([]);
@@ -991,6 +1082,64 @@ export default function App() {
   const introWarmupRef = useRef(new Map());
   const autoplayOptionsRef = useRef({ skipIntro: false });
   const [autoplayToken, setAutoplayToken] = useState(0);
+
+  async function loadGamePresetCatalog(reload = false) {
+    try {
+      const catalog = reload ? await api.gamePresetsReload() : await api.gamePresets();
+      if (!mountedRef.current) return null;
+      setGamePresetCatalog(catalog || { presets: [], errors: [] });
+      return catalog;
+    } catch (error) {
+      if (mountedRef.current) setGamePresetMessage(error.message || '氛围包列表读取失败');
+      return null;
+    }
+  }
+
+  function selectGamePreset(id) {
+    setGamePresetId(id);
+    if (id) {
+      localStorage.setItem(WEB_GAME_PRESET_KEY, id);
+    } else {
+      localStorage.removeItem(WEB_GAME_PRESET_KEY);
+    }
+    setGamePresetMessage(id ? '已选择氛围包' : '已切回自动匹配');
+  }
+
+  function parseGamePresetJson() {
+    const parsed = JSON.parse(gamePresetJson);
+    if (!parsed?.id) throw new Error('缺少 id');
+    if (!parsed?.displayName) throw new Error('缺少 displayName');
+    if (!Array.isArray(parsed.scenes) || parsed.scenes.length === 0) throw new Error('至少需要一个 Scene');
+    if (parsed.scenes.some((scene) => !scene?.id || !scene?.label)) throw new Error('Scene 缺少 id 或 label');
+    return parsed;
+  }
+
+  async function importGamePreset() {
+    try {
+      const preset = parseGamePresetJson();
+      await api.gamePresetSave(preset);
+      if (!mountedRef.current) return;
+      setGamePresetMessage('已导入：' + preset.displayName);
+      await loadGamePresetCatalog();
+    } catch (error) {
+      if (mountedRef.current) setGamePresetMessage(error.message || '导入失败');
+    }
+  }
+
+  async function deleteGamePreset(id) {
+    try {
+      await api.gamePresetDelete(id);
+      if (!mountedRef.current) return;
+      if (gamePresetId === id) {
+        setGamePresetId('');
+        localStorage.removeItem(WEB_GAME_PRESET_KEY);
+      }
+      setGamePresetMessage('已删除社区氛围包');
+      await loadGamePresetCatalog();
+    } catch (error) {
+      if (mountedRef.current) setGamePresetMessage(error.message || '删除失败');
+    }
+  }
   const planRef = useRef(null);
   const planDjUrlRef = useRef(null);
   const planIdRef = useRef(null);
@@ -3059,6 +3208,10 @@ function seekTo(ratio) {
     }
   }, [showCastPanel]);
 
+  useEffect(() => {
+    if (showPresetPanel) loadGamePresetCatalog();
+  }, [showPresetPanel]);
+
   async function startNeteaseLogin() {
     setQrMessage('');
     try {
@@ -3475,6 +3628,50 @@ function seekTo(ratio) {
         </div>
       ) : null}
 
+      {showPresetPanel ? (
+        <div className="qr-backdrop" role="dialog" aria-modal="true" aria-label="游戏氛围包管理">
+          <div className="qr-card game-preset-card">
+            <h3>游戏氛围包</h3>
+            <div className="preset-actions">
+              <button onClick={() => selectGamePreset('')}>自动匹配</button>
+              <button onClick={() => loadGamePresetCatalog(true)}>刷新</button>
+            </div>
+            <div className="preset-list">
+              {(gamePresetCatalog.presets || []).map((preset) => (
+                <div className="preset-row" key={preset.id}>
+                  <div>
+                    <strong>{preset.displayName}</strong>
+                    <small>{preset.source === 'builtin' ? '内置' : '社区'} · {preset.sceneCount || 0} Scenes</small>
+                  </div>
+                  <div className="preset-row-actions">
+                    <button className={gamePresetId === preset.id ? 'active' : ''} onClick={() => selectGamePreset(preset.id)}>使用</button>
+                    <button disabled={preset.source === 'builtin'} onClick={() => deleteGamePreset(preset.id)}>删除</button>
+                  </div>
+                </div>
+              ))}
+            </div>
+            {(gamePresetCatalog.errors || []).map((error, index) => (
+              <p className="preset-error" key={`${error.file || 'error'}-${index}`}>{error.file || 'preset'}：{error.message || error.code || '格式错误'}</p>
+            ))}
+            <div className="preset-actions">
+              <button onClick={() => setGamePresetJson(JSON.stringify(GAME_PRESET_SAMPLE, null, 2))}>插入样例</button>
+              <button onClick={() => { setGamePresetJson(''); setGamePresetMessage(''); }}>清空</button>
+            </div>
+            <textarea
+              className="preset-json-input"
+              placeholder="粘贴 Preset JSON..."
+              rows={8}
+              value={gamePresetJson}
+              onChange={(event) => setGamePresetJson(event.target.value)}
+            />
+            <p className="preset-format-hint">必填 id、displayName、scenes；Scene 必填 id、label；天气 clear/cloudy/rain/snow/fog；时间 morning/noon/afternoon/evening/night</p>
+            <button className="dna-btn" disabled={!gamePresetJson.trim()} onClick={importGamePreset}>导入 / 更新</button>
+            {gamePresetMessage ? <p className="preset-error">{gamePresetMessage}</p> : null}
+            <button className="dna-close" onClick={() => setShowPresetPanel(false)}>关闭</button>
+          </div>
+        </div>
+      ) : null}
+
       {qr ? (
         <div className="qr-backdrop" role="dialog" aria-modal="true" aria-label="网易云扫码登录">
           <div className="qr-card">
@@ -3577,6 +3774,13 @@ function seekTo(ratio) {
                       </svg>
                     </button>
                   ) : null}
+                  <button
+                    className={gamePresetId ? 'icon-btn on' : 'icon-btn'}
+                    onClick={() => setShowPresetPanel(true)}
+                    title={gamePresetId ? `游戏氛围包: ${gamePresetId}` : '游戏氛围包'}
+                  >
+                    <span aria-hidden="true">▣</span>
+                  </button>
                   <button
                     className={netease.loggedIn ? 'icon-btn on' : 'icon-btn'}
                     onClick={startNeteaseLogin}

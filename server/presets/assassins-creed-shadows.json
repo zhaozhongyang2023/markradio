@@ -1,0 +1,106 @@
+{
+  "id": "assassins-creed-shadows",
+  "displayName": "刺客信条·影",
+  "gameNames": [
+    "刺客信条·影",
+    "刺客信条影",
+    "刺客教条影",
+    "Assassin's Creed Shadows",
+    "Assassins Creed Shadows",
+    "AC Shadows"
+  ],
+  "world": [
+    "战国日本",
+    "忍者潜行",
+    "武士对决",
+    "城下町雨夜",
+    "竹林与神社"
+  ],
+  "djPersona": "像一位安静的战国夜行电台 DJ。话少，语气低，懂得潜行、刀光、雨声和长路。",
+  "musicDirection": [
+    "和风暗色",
+    "低频",
+    "太鼓",
+    "环境氛围",
+    "LoFi"
+  ],
+  "defaultScene": "shinobi-night",
+  "scenes": [
+    {
+      "id": "shinobi-night",
+      "label": "忍影潜行",
+      "icon": "☾",
+      "mood": "平静",
+      "vibe": "夜色压低一点，脚步轻一点。",
+      "musicDirection": [
+        "和风暗色",
+        "低频",
+        "潜行感",
+        "极简鼓点"
+      ],
+      "weather": ["fog", "rain", "cloudy"],
+      "time": ["evening", "night"],
+      "sampleLines": [
+        "灯火远一点，脚步轻一点。",
+        "今晚适合从屋檐下经过。"
+      ]
+    },
+    {
+      "id": "samurai-duel",
+      "label": "武士对决",
+      "icon": "刀",
+      "mood": "愤怒",
+      "vibe": "刀光很近，心要稳。",
+      "musicDirection": [
+        "太鼓",
+        "低频",
+        "史诗",
+        "紧张推进"
+      ],
+      "weather": ["clear", "cloudy"],
+      "time": ["afternoon", "evening"],
+      "sampleLines": [
+        "别急，先把呼吸压住。",
+        "刀出鞘前，世界会安静一下。"
+      ]
+    },
+    {
+      "id": "castle-town-rain",
+      "label": "雨中城下町",
+      "icon": "雨",
+      "mood": "治愈",
+      "vibe": "雨落在瓦上，慢慢走。",
+      "musicDirection": [
+        "雨声感",
+        "和风",
+        "氛围",
+        "木质乐器"
+      ],
+      "weather": ["rain", "fog"],
+      "time": ["afternoon", "evening", "night"],
+      "sampleLines": [
+        "雨落在瓦上，路不用赶。",
+        "这段路，慢慢穿过就好。"
+      ]
+    },
+    {
+      "id": "hideout-calm",
+      "label": "据点整理",
+      "icon": "✦",
+      "mood": "治愈",
+      "vibe": "把刀收好，今晚慢一点。",
+      "musicDirection": [
+        "LoFi",
+        "木质",
+        "轻打击",
+        "安静背景"
+      ],
+      "weather": ["clear", "cloudy"],
+      "time": ["morning", "noon", "afternoon"],
+      "sampleLines": [
+        "把刀收好，先让夜静下来。",
+        "据点里这会儿，适合慢一点。"
+      ]
+    }
+  ]
+}

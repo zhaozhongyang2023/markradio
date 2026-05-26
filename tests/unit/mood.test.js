@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { normalizeMood, recommendMood, scoreTrackForMood } from '../server/mood.js';
+import { normalizeMood, recommendMood, scoreTrackForMood } from '../../server/mood.js';
 
 test('normalizeMood keeps supported mood and falls back to 平静', () => {
   assert.equal(normalizeMood('愤怒'), '愤怒');

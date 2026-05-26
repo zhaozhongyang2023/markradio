@@ -14,7 +14,7 @@ let _lastSessionCleanup = 0;
 const DEFAULT_QUEUE_LIMIT = 5;
 const TTS_PRELOAD_LIMIT = 5;
 
-export async function createRadioPlan({ store, mood: requestedMood = null, nowPlaying = null, deferTts = false, onTtsReady = null, userRequest = '', mode = 'radio', currentPlan = null, gameName = '', gameVibe = '', autoContinue = false }) {
+export async function createRadioPlan({ store, mood: requestedMood = null, nowPlaying = null, deferTts = false, onTtsReady = null, userRequest = '', mode = 'radio', currentPlan = null, gameName = '', gameVibe = '', gamePresetId = '', gamePresetContext = null, autoContinue = false }) {
   // 每 30 分钟清理一次 session 级别的已播放记录，防止长期泄漏
   const nowMs = Date.now();
   if (nowMs - _lastSessionCleanup > 1800000) { sessionPlayedIdsByMode.clear(); _lastSessionCleanup = nowMs; }
@@ -25,7 +25,7 @@ export async function createRadioPlan({ store, mood: requestedMood = null, nowPl
   const voice = store.get('voice');
   const musicDna = store.get('musicDna');
   const recentTendency = store.getTendency();
-  const gameContext = (gameName || gameVibe) ? buildGameContext(gameName, gameVibe) : null;
+  const gameContext = (gameName || gameVibe || gamePresetContext) ? buildGameContext(gameName, gameVibe, gamePresetContext) : null;
   const emotionMomentum = calcEmotionMomentum(store);
   const weather = await getWeather().catch((error) => ({
     source: 'error',
@@ -155,7 +155,9 @@ export async function createRadioPlan({ store, mood: requestedMood = null, nowPl
       need: true,
       userRequest: userRequest || '',
       gameName: gameName || '',
-      gameVibe: gameVibe || ''
+      gameVibe: gameVibe || '',
+      presetId: gamePresetId || gamePresetContext?.presetId || '',
+      gamePresetContext: gamePresetContext || null
     } : null
   };
   store.set('planToday', todayPlan);
@@ -249,7 +251,7 @@ function updateCardTts({ store, planId, index, tts, onTtsReady }) {
 
 // Session-level played track IDs to prevent duplicates per mode
 
-function fillQueueTracks(selected, candidates, limit, playedSet) {
+export function fillQueueTracks(selected, candidates, limit, playedSet) {
   const seen = new Set(playedSet);
   const queue = [];
   // AI 选曲优先，不被去重跳过
@@ -270,7 +272,7 @@ function fillQueueTracks(selected, candidates, limit, playedSet) {
   return queue;
 }
 
-function buildTrackReason(track, index, plan, mood) {
+export function buildTrackReason(track, index, plan, mood) {
   const title = track?.title || '这首歌';
   const artist = track?.artist || '';
   const album = track?.album || '';
@@ -296,13 +298,13 @@ function buildTrackReason(track, index, plan, mood) {
   return `${segue} ${reason} ${songId}${albumLine}。`.replace(/\s+/g, ' ').trim();
 }
 
-function buildIntroText({ plan, specialDates, track }) {
+export function buildIntroText({ plan, specialDates, track }) {
   const dateHint = specialDates?.[0]?.name ? `今天靠近${specialDates[0].name}。` : '';
   // Pre-intro: elegant opening only, no song reference (handled by card intro)
   return `${dateHint}${plan.say || '夜晚独享这个幽静的时光。'}`.replace(/\s+/g, ' ').trim();
 }
 
-function buildTimeContext(now) {
+export function buildTimeContext(now) {
   const parts = new Intl.DateTimeFormat('zh-CN', {
     timeZone: 'Asia/Shanghai',
     weekday: 'long',
@@ -322,7 +324,7 @@ function buildTimeContext(now) {
   };
 }
 
-function periodName(hour) {
+export function periodName(hour) {
   if (hour < 5) return '深夜';
   if (hour < 9) return '清晨';
   if (hour < 12) return '上午';
@@ -333,7 +335,7 @@ function periodName(hour) {
 }
 
 // Emotion Momentum: 根据连续播放历史计算 DJ 语气倾斜
-function calcEmotionMomentum(store) {
+export function calcEmotionMomentum(store) {
   const recent = store.recentPlays(20);
   if (!recent.length) return null;
   const moods = recent.map(r => r.mood).filter(Boolean);

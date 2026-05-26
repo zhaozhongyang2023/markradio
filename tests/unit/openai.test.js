@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { demoPlan, normalizePlan, parseDjJson } from '../server/openai.js';
+import { demoPlan, normalizePlan, parseDjJson } from '../../server/openai.js';
 
 test('parseDjJson accepts fenced JSON', () => {
   const plan = parseDjJson('```json\n{"reply":"收到","say":"晚上好","play":[{"id":"a","reason":"适合今晚"}],"mood":"平静"}\n```');

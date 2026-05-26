@@ -332,8 +332,10 @@ p {
   justify-content: center;
   flex-direction: column;
   gap: 5px;
+  width: 100%;
   margin: 0 0 0;
   min-height: 0;
+  overflow: hidden;
   padding: 8px 0 10px;
   background:
     radial-gradient(circle, rgba(65, 84, 144, 0.25) 1px, transparent 1.25px) 0 0 / 14px 14px,
@@ -341,7 +343,9 @@ p {
 }
 
 .v4-clock-panel .pixel-clock-canvas {
-  max-width: calc(100vw - 72px);
+  display: block;
+  max-width: 100%;
+  height: auto;
 }
 
 .v4-text-clock {
@@ -1892,9 +1896,20 @@ p {
     padding: max(18px, env(safe-area-inset-top, 18px)) max(18px, env(safe-area-inset-right, 18px)) max(18px, env(safe-area-inset-bottom, 18px)) max(18px, env(safe-area-inset-left, 18px));
   }
 
+  .v4-shell:not(.is-deck) {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .v4-shell:not(.is-deck) .v4-radio {
+    width: min(480px, calc(100vw - 36px));
+    max-width: 480px;
+  }
+
   .phone {
-    width: min(560px, calc(100vw - 36px));
-    max-width: 560px;
+    width: min(480px, calc(100vw - 36px));
+    max-width: 480px;
     height: min(860px, calc(100dvh - 36px));
     min-height: 0;
     border: 1px solid rgba(255, 255, 255, 0.1);
@@ -1903,8 +1918,8 @@ p {
   }
 
   .hero-panel {
-    flex: 0 0 clamp(184px, 24dvh, 220px);
-    min-height: 184px;
+    flex: 0 0 clamp(150px, 20dvh, 180px);
+    min-height: 150px;
     padding: 8px 24px 0;
   }
 
@@ -1918,14 +1933,14 @@ p {
   }
 
   .spectrum-bars {
-    height: 160px;
-    margin: 0 10px -18px;
+    height: 120px;
+    margin: 0 10px -10px;
     padding: 0 10px;
     opacity: 0.75;
     pointer-events: none;
   }
   .spectrum-bars span {
-    height: calc(6px + var(--level, 0.18) * 100px);
+    height: calc(6px + var(--level, 0.18) * 74px);
     background: #42d8b2;
   }
 
@@ -2093,6 +2108,11 @@ p {
     max-height: 860px;
     border-radius: 22px;
     grid-template-rows: auto minmax(176px, 28dvh) auto auto auto auto auto minmax(0, 1fr) auto auto;
+  }
+
+  .v4-shell:not(.is-deck) .v4-radio {
+    width: min(480px, calc(100vw - 36px));
+    max-width: 480px;
   }
 
   .v4-player-strip,
@@ -2839,7 +2859,7 @@ p {
   }
 
   .v4-clock-panel .pixel-clock-canvas {
-    width: min(560px, calc(100% - 120px)) !important;
+    max-width: 100% !important;
     height: auto !important;
   }
 
@@ -3239,6 +3259,97 @@ p {
   color: rgba(0,0,0,0.55);
   font-size: 13px;
   cursor: pointer;
+}
+
+.game-preset-card {
+  width: min(90vw, 520px);
+  max-height: min(82vh, 720px);
+  overflow: auto;
+  justify-items: stretch;
+}
+
+.preset-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  width: 100%;
+}
+
+.preset-list {
+  display: grid;
+  gap: 8px;
+  width: 100%;
+}
+
+.preset-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+  padding: 10px;
+  border: 1px solid rgba(0,0,0,0.08);
+  border-radius: 8px;
+  background: rgba(0,0,0,0.035);
+}
+
+.preset-row strong,
+.preset-row small {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.preset-row strong {
+  color: #111;
+  font-size: 13px;
+}
+
+.preset-row small {
+  margin-top: 3px;
+  color: rgba(0,0,0,0.42);
+  font-size: 11px;
+}
+
+.preset-row-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.preset-row-actions button.active {
+  background: #2ba88a;
+}
+
+.preset-row-actions button:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.preset-json-input {
+  box-sizing: border-box;
+  width: 100%;
+  padding: 10px;
+  border: 1px solid rgba(0,0,0,0.12);
+  border-radius: 8px;
+  background: rgba(0,0,0,0.035);
+  color: #111;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 11px;
+  line-height: 1.45;
+  resize: vertical;
+}
+
+.preset-format-hint,
+.preset-error {
+  margin: 0;
+  color: rgba(0,0,0,0.45);
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.preset-error {
+  color: #9b4a1d;
 }
 .dna-result {
   display: flex;

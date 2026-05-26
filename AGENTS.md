@@ -289,31 +289,68 @@ curl http://192.168.2.33:80/switch
 | 树莓派 | `192.168.2.33` | — | — |
 | 路由器(旁路) | `192.168.3.254` | `92:23:b4:1f:cb:6c` | OpenWrt |
 
-### WiFi 稳定性修复（5 层）
+# 1. 提交代码
+git add -A
+git commit -m '描述改动'
 
-| 层 | 文件 | 作用 |
-|---|---|---|
-| mac80211 | `/etc/NetworkManager/dispatcher.d/99-wifi-powersave-off` | 连接时 `iw power_save off` |
-| rtw88 驱动 | `/etc/modprobe.d/rtw88.conf` | `disable_lps_deep=Y disable_aspm=Y` |
-| PCIe ASPM | `/etc/systemd/system/disable-wifi-aspm.service` | 启动时设 `pcie_aspm=performance` |
-| 睡眠唤醒 | `/etc/systemd/system/moodwave-wifi-resume.service` | 唤醒后等待 wlan0 就绪(120s) + 重连(60s) |
-| NM 连接 | NancyOpenWrt 配置 | 手动 IP + may-fail=no |
+# 2. 一键部署到两台机器
+bash deploy.sh
 
-一键修复：`bash ~/moodwave/scripts/fix-wifi-steamdeck.sh [--dry-run]`
+# 3. 如果 deploy.sh 部分失败，手动补：
+#    Deck:
+#    rsync -avz --delete --exclude='node_modules' --exclude='.git' --exclude='.env' \
+#      --exclude='data' --exclude='moodwave.log' --exclude='moodwave.pid' \
+#      ./ deck@192.168.3.121:/home/deck/moodwave/
+#    ssh deck@192.168.3.121 'cd ~/moodwave && bash scripts/moodwave.sh stop && bash scripts/moodwave.sh server'
 
-### 验证命令
-
-```bash
-# 电源管理
-iw dev wlan0 get power_save                                       # off
-
-# rtw88 驱动
-cat /sys/module/rtw88_core/parameters/disable_lps_deep            # Y
-cat /sys/module/rtw88_pci/parameters/disable_aspm                  # Y
-
-# PCIe ASPM
-cat /sys/module/pcie_aspm/parameters/policy                        # [performance]
-
-# 唤醒日志
-sudo journalctl -t moodwave-wifi-resume --no-pager -n 10
+# 4. Deck 游戏模式：重启 Steam 加载最新 Decky 插件
 ```
+
+### 部署验证
+
+| 机器 | 命令 |
+|------|------|
+| 树莓派 | `curl http://192.168.2.33:8765/api/health` |
+| Steam Deck | `curl http://192.168.3.121:38765/api/health` |
+
+期望：`{"ok":true,"name":"MoodWave","mode":"steamdeck"}`（或 `standard`）
+
+## Steam Deck Mihomo 代理
+
+### 开关
+| 命令 | 作用 |
+|------|------|
+| `proxy-on` | 开启全系统代理 |
+| `proxy-off` | 关闭全系统代理 |
+| `proxy-status` | 查看代理状态 |
+| `sudo systemctl start/stop mihomo` | 同上 |
+
+### 文件位置
+| 文件 | 说明 |
+|------|------|
+| `/usr/local/bin/mihomo` | 主程序 |
+| `/etc/mihomo/config.yaml` | TUN 模式配置 + 订阅 |
+| `/etc/systemd/system/mihomo.service` | 系统服务（默认不自启） |
+| `~/Desktop/Proxy.desktop` | 桌面开关快捷方式 |
+
+### 影响
+- TUN 模式透明代理全系统流量
+- 局域网 192.168.x.x/10.x/172.16.x 直连
+- 关闭后路由自动恢复，无残留
+- MoodWave 无需额外配置
+
+## Steam Deck WiFi 最终结论（2026-05-25）
+
+**根因：蓝牙干扰**，非软件问题。已回滚所有 WiFi 修复。
+
+### 已回滚的修改
+- `/etc/NetworkManager/dispatcher.d/99-wifi-powersave-off` ✅ 已删除
+- `/etc/modprobe.d/rtw88.conf` ✅ 已删除
+- `/etc/systemd/system/disable-wifi-aspm.service` ✅ 已删除
+- `/etc/systemd/system/moodwave-wifi-resume.service` ✅ 已删除
+- `/usr/local/bin/moodwave-wifi-resume.sh` ✅ 已删除
+- NancyOpenWrt 恢复默认 DHCP 配置 ✅
+
+### 保留
+- Mihomo 代理（独立安装，不受影响）
+- MoodWave 服务

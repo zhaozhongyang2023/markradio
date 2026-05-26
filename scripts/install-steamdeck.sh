@@ -527,4 +527,6 @@ echo "    查看状态:  systemctl --user status moodwave.service"
 echo "    重启服务:  systemctl --user restart moodwave.service"
 echo "    查看日志:  journalctl --user -u moodwave.service -f"
 echo "    卸载重装:  bash ${APP_PREFIX}/scripts/uninstall-steamdeck.sh"
+
+# ═══════════════════════════════════════════
 echo ""

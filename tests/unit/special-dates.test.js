@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { getSpecialDates } from '../server/special-dates.js';
+import { getSpecialDates } from '../../server/special-dates.js';
 
 test('hits my birthday on 05-14', () => {
   const hits = getSpecialDates(new Date(2026, 4, 14), []);

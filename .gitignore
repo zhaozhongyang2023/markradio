@@ -37,5 +37,7 @@ backup/
 !public/game-radio.png
 !public/ai-dj.png
 !public/companion.png
-!public/web-radio.pngmarketing/
+!public/web-radio.png
+marketing/
 scripts/stream-bilibili.sh
+video-production/

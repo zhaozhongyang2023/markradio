@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { buildDjContext, buildMessages } from '../server/context.js';
+import { buildDjContext, buildMessages } from '../../server/context.js';
 
 test('buildDjContext includes chat userRequest', () => {
   const context = buildDjContext({
@@ -70,7 +70,7 @@ test('buildDjContext includes MoodWave Steam Deck DJ direction', () => {
 });
 
 // buildWorldContinuity 同一天不重复，不同天天气变化/不变正确生成
-import { buildWorldContinuity } from '../server/scheduler.js';
+import { buildWorldContinuity } from '../../server/scheduler.js';
 
 test('buildWorldContinuity same day returns null', () => {
   const today = new Date().toISOString().slice(0, 10);

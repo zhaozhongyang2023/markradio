@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { parseUpnpFriendlyName } from '../server/cast.js';
+import { parseUpnpFriendlyName } from '../../server/cast.js';
 
 test('parseUpnpFriendlyName reads friendly device names', () => {
   const xml = '<root><device><friendlyName>客厅音箱 &amp; MarkRadio</friendlyName></device></root>';

@@ -215,7 +215,7 @@ function requestedSongScore(track, requestedTitle) {
   if (title.includes(wanted) || wanted.includes(title)) return 1;
   // 艺人名匹配：用户说"想听许巍"，匹配到 artist="许巍" 的歌
   if (artist === wanted) return 2;
-  if (artist.includes(wanted) || wanted.includes(artist)) return 1;
+  if (artist && (artist.includes(wanted) || wanted.includes(artist))) return 1;
   return 0;
 }
 

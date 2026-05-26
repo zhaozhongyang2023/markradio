@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { detectLanguageIntent, extractRequestedSongs, normalizeNeteaseResponse, parseLyric, trackMatchesLanguage, trackMatchesRequestedTitle } from '../server/music.js';
+import { detectLanguageIntent, extractRequestedSongs, normalizeNeteaseResponse, parseLyric, trackMatchesLanguage, trackMatchesRequestedTitle } from '../../server/music.js';
 
 test('parseLyric keeps timed lrc lines', () => {
   const lyric = parseLyric('[00:01.50]hello\n[00:07.00]world');
