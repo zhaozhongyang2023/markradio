@@ -7,6 +7,7 @@ const COMMUNITY_PRESET_DIR = path.resolve(process.cwd(), 'data', 'presets');
 const AUTO_SCENE_HOLD_MS = 30 * 60 * 1000;
 const MANUAL_SCENE_HOLD_MS = 60 * 60 * 1000;
 const PRESET_ID_PATTERN = /^[a-z0-9][a-z0-9._-]{1,63}$/;
+const GAME_WHISPER_TTL_MS = 12 * 1000;
 
 export const FALLBACK_GAME_SCENES = [
   { id: 'Boss战', label: 'Boss战', icon: '⚔', vibe: '今晚燃一点，按到底。', mood: '愤怒' },
@@ -165,6 +166,59 @@ export function buildGameRadioRequest({ djPersona, gameName, gameVibe, vibeHint 
   return [djPersona, sceneLine, vibeLine].filter(Boolean).join(' ');
 }
 
+export function createGameWhisper({
+  store = null,
+  presetId = '',
+  gameName = '',
+  gameVibe = '',
+  sceneId = '',
+  event = 'default',
+  weather = null,
+  now = new Date(),
+  recent = []
+} = {}) {
+  const resolved = resolveGamePreset({
+    store,
+    presetId,
+    gameName,
+    weather,
+    now,
+    sceneId,
+    manual: Boolean(sceneId),
+    preview: true
+  });
+  const rawPreset = resolved.preset?.id ? findGamePresetById(resolved.preset.id) : null;
+  const scene = resolved.scene;
+  const weatherKey = resolved.weatherKey || normalizeWeather(weather);
+  const timeKey = resolved.timeKey || resolveTimePeriod(now);
+  const recentSet = new Set((Array.isArray(recent) ? recent : []).map((item) => String(item || '').trim()).filter(Boolean));
+  const groups = [
+    whisperLinesFor(rawPreset?.whispers, event),
+    whisperLinesFor(rawPreset?.whispers, scene?.id),
+    whisperLinesFor(rawPreset?.whispers, weatherKey),
+    whisperLinesFor(rawPreset?.whispers, timeKey),
+    whisperLinesFor(rawPreset?.whispers, 'default'),
+    Array.isArray(scene?.sampleLines) ? scene.sampleLines : [],
+    fallbackWhispers({ gameName, gameVibe: scene?.label || gameVibe, event, weatherKey, timeKey })
+  ];
+  const group = groups
+    .map((lines) => [...new Set(lines.map((line) => String(line || '').trim()).filter(Boolean))])
+    .find((lines) => lines.length) || [];
+  const unique = group;
+  const fresh = unique.filter((line) => !recentSet.has(line));
+  const pool = fresh.length ? fresh : unique;
+  const text = pool.length ? pool[Math.floor(Math.random() * pool.length)] : '这段路，慢慢来。';
+  return {
+    ok: true,
+    text,
+    source: rawPreset?.id ? 'preset' : 'fallback',
+    ttl: GAME_WHISPER_TTL_MS,
+    presetId: rawPreset?.id || '',
+    sceneId: scene?.id || '',
+    event: String(event || 'default')
+  };
+}
+
 export function normalizeWeather(weather) {
   const value = String(weather?.condition || weather?.summary || weather || '').toLowerCase();
   if (!value) return 'clear';
@@ -226,8 +280,17 @@ function validatePreset(preset, file) {
     gameNames: Array.isArray(preset.gameNames) ? preset.gameNames.map(String) : [],
     world: Array.isArray(preset.world) ? preset.world.map(String) : [],
     musicDirection: Array.isArray(preset.musicDirection) ? preset.musicDirection.map(String) : [],
+    whispers: normalizeWhispers(preset.whispers),
     scenes
   };
+}
+
+function normalizeWhispers(whispers) {
+  if (!whispers || typeof whispers !== 'object' || Array.isArray(whispers)) return {};
+  return Object.fromEntries(Object.entries(whispers).map(([key, value]) => {
+    const lines = Array.isArray(value) ? value : [value];
+    return [String(key), lines.map(String).filter(Boolean)];
+  }));
 }
 
 function readPresetFile(fullPath, file, source) {
@@ -379,4 +442,33 @@ function buildPresetContext({ preset, scene, weatherKey, timeKey }) {
     matchedTime: timeKey,
     sampleLines: scene.sampleLines || []
   };
+}
+
+function whisperLinesFor(whispers, key) {
+  if (!whispers || !key) return [];
+  const value = whispers[String(key)];
+  if (!value) return [];
+  return Array.isArray(value) ? value : [value];
+}
+
+function fallbackWhispers({ gameName = '', gameVibe = '', event = '', weatherKey = '', timeKey = '' } = {}) {
+  const text = `${gameName} ${gameVibe}`.toLowerCase();
+  const gameLines = [];
+  if (/巫师|witcher/.test(text)) {
+    gameLines.push('站稳了，猎魔人。', '银剑先别收。', '这条路，不急着走完。');
+  } else if (/刺客|assassin|shadows/.test(text)) {
+    gameLines.push('灯火远一点，脚步轻一点。', '屋檐下面，风声更轻。', '刀先收好，夜还长。');
+  } else if (/赛博|cyberpunk|夜之城/.test(text)) {
+    gameLines.push('霓虹还亮着，别回头。', '夜之城的雨，一直下。');
+  } else if (/生化|resident|re4/.test(text)) {
+    gameLines.push('背后有脚步声，别回头。', '弹药省着点。');
+  } else if (/塞尔达|zelda|海拉鲁/.test(text)) {
+    gameLines.push('海拉鲁的风，慢慢吹。', '远处那座山，可以晚点去。');
+  }
+  if (weatherKey === 'rain') gameLines.push('雨声刚好，慢慢走。');
+  if (weatherKey === 'fog') gameLines.push('雾起来了，脚步放轻。');
+  if (timeKey === 'night') gameLines.push('夜深了，路不用赶。');
+  if (event === 'track_change') gameLines.push('这首接得上。');
+  if (event === 'next_radio') gameLines.push('换条路，也不错。');
+  return gameLines.length ? gameLines : ['这段路，慢慢来。', '今晚适合沉进去一点。', '先别急，听完这一段。'];
 }

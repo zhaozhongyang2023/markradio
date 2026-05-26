@@ -21,7 +21,7 @@ import { callNetease, checkNeteaseQr, createNeteaseQr, getNeteaseLoginStatus } f
 import { getWeather } from './weather.js';
 import { loadMusicDNA, saveMusicDNA, generateMusicDNA, getMusicDNASummary, accumulateDnaSignal, maybeRegenerateDna } from './profile.js';
 import { collectNeteaseLibrary } from './providers/netease.js';
-import { buildGameRadioRequest, deleteCommunityPreset, listGamePresets, reloadGamePresetCatalog, resolveGamePreset, saveCommunityPreset } from './game-presets.js';
+import { buildGameRadioRequest, createGameWhisper, deleteCommunityPreset, listGamePresets, reloadGamePresetCatalog, resolveGamePreset, saveCommunityPreset } from './game-presets.js';
 
 const store = new StateStore();
 
@@ -752,6 +752,21 @@ app.delete('/api/game/presets/:id', async (request, reply) => {
 });
 
 app.post('/api/game/presets/reload', async () => reloadGamePresetCatalog());
+
+app.post('/api/ai/game-whisper', async (request) => {
+  const whisper = createGameWhisper({
+    store,
+    presetId: String(request.body?.presetId || '').trim(),
+    gameName: String(request.body?.gameName || request.body?.name || '').trim(),
+    gameVibe: String(request.body?.gameVibe || request.body?.vibe || '').trim(),
+    sceneId: String(request.body?.sceneId || '').trim(),
+    event: String(request.body?.event || 'default').trim(),
+    weather: store.get('weather'),
+    now: new Date(),
+    recent: Array.isArray(request.body?.recent) ? request.body.recent : []
+  });
+  return whisper;
+});
 
 app.post('/api/ai/game-radio', async (request) => {
   const gameVibe = String(request.body?.gameVibe || request.body?.vibe || '').trim();

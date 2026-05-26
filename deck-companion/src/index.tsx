@@ -11,6 +11,8 @@ const GAME_NAME_KEY = 'moodwave.deck.gameName';
 const GAME_VIBE_KEY = 'moodwave.deck.gameVibe';
 const GAME_SCENE_KEY = 'moodwave.deck.gameSceneId';
 const GAME_PRESET_KEY = 'moodwave.deck.gamePresetId';
+const GAME_WHISPER_RECENT_KEY = 'moodwave.deck.gameWhisperRecent';
+const GAME_WHISPER_AUTO_TS_KEY = 'moodwave.deck.gameWhisperAutoTs';
 const QUERY_KEY = 'moodwave.deck.query';
 const MINIMAL_KEY = 'moodwave.deck.minimalMode';
 const AUTO_CONTINUE_KEY = 'moodwave.deck.autoContinue';
@@ -85,6 +87,13 @@ type GamePresetSummary = {
 type GamePresetCatalog = {
   presets?: GamePresetSummary[];
   errors?: Array<{ file?: string; source?: string; message?: string; code?: string }>;
+};
+
+type GameWhisperPayload = {
+  ok?: boolean;
+  text?: string;
+  source?: string;
+  ttl?: number;
 };
 
 type Page = 'radio' | 'search' | 'game' | 'settings';
@@ -262,6 +271,7 @@ function Content() {
   const [gamePresetJson, setGamePresetJson] = useState('');
   const [gamePresetMessage, setGamePresetMessage] = useState('');
   const [gamePresetLoading, setGamePresetLoading] = useState(false);
+  const [gameWhisper, setGameWhisper] = useState('');
   const gameNameEditedRef = useRef(false);  // 用户手动编辑后不再自动覆盖
   const [minimalMode, setMinimalMode] = useState(() => localStorage.getItem(MINIMAL_KEY) === '1');
   const [autoContinue, setAutoContinue] = useState(() => localStorage.getItem(AUTO_CONTINUE_KEY) === '1');
@@ -425,11 +435,13 @@ function Content() {
 
   const runTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const runTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const whisperTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   // 组件卸载时清理运行中的 timer
   useEffect(() => {
     return () => {
       if (runTimerRef.current) clearInterval(runTimerRef.current);
       if (runTimeoutRef.current) clearTimeout(runTimeoutRef.current);
+      if (whisperTimeoutRef.current) clearTimeout(whisperTimeoutRef.current);
     };
   }, []);
 
@@ -529,7 +541,7 @@ function Content() {
   async function handleMinimalNextBetter() {
     const mode = getActiveMode(now);
     if (mode === 'game') {
-      await startGameRadio('换个感觉');
+      await startGameRadio('换个感觉', 'next_radio');
     } else if (mode === 'search') {
       await nextRadio(query);
     } else {
@@ -595,7 +607,7 @@ function Content() {
     });
   }
 
-  async function startGameRadio(label = 'AI DJ 准备中') {
+  async function startGameRadio(label = 'AI DJ 准备中', whisperEvent = 'start') {
     const presetScene = gamePreset?.fallback === false
       ? gamePreset.scenes?.find((item) => item.id === gameSceneId)
       : null;
@@ -611,6 +623,7 @@ function Content() {
         deferTts: true,
         autoContinue: autoContinue
       });
+      await requestGameWhisper(whisperEvent, true);
     });
   }
 
@@ -623,6 +636,67 @@ function Content() {
         icon: vibe.icon,
         vibe: vibe.hint
       }));
+
+  function readRecentWhispers() {
+    try {
+      const parsed = JSON.parse(localStorage.getItem(GAME_WHISPER_RECENT_KEY) || '[]');
+      return Array.isArray(parsed) ? parsed : [];
+    } catch {
+      return [];
+    }
+  }
+
+  function rememberWhisper(text: string) {
+    const nowMs = Date.now();
+    const next = [
+      { text, ts: nowMs },
+      ...readRecentWhispers().filter((item: any) => item?.text && nowMs - Number(item.ts || 0) < 60 * 60 * 1000 && item.text !== text)
+    ].slice(0, 12);
+    localStorage.setItem(GAME_WHISPER_RECENT_KEY, JSON.stringify(next));
+  }
+
+  async function requestGameWhisper(event = 'default', force = false) {
+    const activeMode = getActiveMode(now);
+    if (!force && activeMode !== 'game') return;
+    const presetScene = gamePreset?.fallback === false
+      ? gamePreset.scenes?.find((item) => item.id === gameSceneId)
+      : null;
+    const nextGameName = gameName.trim();
+    const nextGameVibe = presetScene?.label || gameVibe;
+    if (!nextGameName && !nextGameVibe && !gamePresetId) return;
+    const nowMs = Date.now();
+    const lastAutoAt = Number(localStorage.getItem(GAME_WHISPER_AUTO_TS_KEY) || '0');
+    if (!force && nowMs - lastAutoAt < 10 * 60 * 1000) return;
+    const recent = readRecentWhispers()
+      .filter((item: any) => nowMs - Number(item.ts || 0) < 60 * 60 * 1000)
+      .map((item: any) => item.text)
+      .filter(Boolean);
+    try {
+      const payload = await apiRequest<GameWhisperPayload>(apiBase, '/api/ai/game-whisper', {
+        gameName: nextGameName || undefined,
+        gameVibe: nextGameVibe || undefined,
+        sceneId: presetScene?.id || undefined,
+        presetId: gamePresetId || undefined,
+        event,
+        recent
+      });
+      const text = String(payload.text || '').trim();
+      if (!text) return;
+      setGameWhisper(text);
+      rememberWhisper(text);
+      if (!force) localStorage.setItem(GAME_WHISPER_AUTO_TS_KEY, String(nowMs));
+      if (whisperTimeoutRef.current) clearTimeout(whisperTimeoutRef.current);
+      whisperTimeoutRef.current = setTimeout(() => setGameWhisper(''), Number(payload.ttl || 12000));
+    } catch {
+      /* 低语是氛围增强，失败不影响播放 */
+    }
+  }
+
+  useEffect(() => {
+    const trackKey = track?.id || track?.sourceId || track?.title || '';
+    if (!trackKey || !playing || getActiveMode(now) !== 'game') return;
+    requestGameWhisper('track_change', false);
+  }, [track?.id, track?.sourceId, track?.title, playing, now.now?.mode]);
 
   return (
     <div className="mw-root">
@@ -1050,6 +1124,22 @@ function Content() {
           overflow: hidden;
           text-overflow: ellipsis;
         }
+        .mw-whisper {
+          margin: 5px 0 6px;
+          padding: 6px 8px;
+          border: 1px solid rgba(66,216,178,.18);
+          border-left: 3px solid rgba(66,216,178,.72);
+          border-radius: 6px;
+          background: linear-gradient(90deg, rgba(66,216,178,.12), rgba(255,255,255,.035));
+          color: rgba(231,255,247,.94);
+          font-size: 11px;
+          font-weight: 800;
+          line-height: 15px;
+        }
+        .mw-minimal .mw-whisper {
+          margin: 6px 0 0;
+          font-size: 11px;
+        }
         .mw-preset-list {
           display: grid;
           gap: 5px;
@@ -1191,6 +1281,7 @@ function Content() {
                   <div className="mw-minimal-world-mood">
                     {ctx.moodIcon ? ctx.moodIcon + ' ' : ''}{currentMood}{ctx.vibeSentence ? ' · "' + ctx.vibeSentence + '"' : ctx.vibeHint ? ' · ' + ctx.vibeHint : ''}
                   </div>
+                  {gameWhisper ? <div className="mw-whisper">{gameWhisper}</div> : null}
                 </div>
               );
             }
@@ -1356,6 +1447,7 @@ function Content() {
               {gamePreset.preset.world?.length ? ` · ${gamePreset.preset.world.slice(0, 3).join(' / ')}` : ''}
             </div>
           )}
+          {gameWhisper ? <div className="mw-whisper">{gameWhisper}</div> : null}
           <div className="mw-card">
             <div className="mw-grid two">
               {gameSceneOptions.map((scene) => (
@@ -1379,8 +1471,8 @@ function Content() {
           </div>
           {gamePresetLoading && <div className="mw-section-hint">正在读取游戏氛围包...</div>}
           <div className="mw-action-row">
-            <AppButton active disabled={busy || !gameVibe} onClick={() => startGameRadio('电台启动中')}>▶ 开始电台</AppButton>
-            <AppButton disabled={busy || !gameVibe} onClick={() => startGameRadio('换个感觉')}>↻ 来点别的</AppButton>
+            <AppButton active disabled={busy || !gameVibe} onClick={() => startGameRadio('电台启动中', 'start')}>▶ 开始电台</AppButton>
+            <AppButton disabled={busy || !gameVibe} onClick={() => startGameRadio('换个感觉', 'next_radio')}>↻ 来点别的</AppButton>
           </div>
         </div>
       )}
