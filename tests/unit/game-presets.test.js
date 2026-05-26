@@ -192,3 +192,13 @@ test('buildGameRadioRequest reflects current scene only', () => {
   assert.match(text, /雨落在瓦上/);
   assert.doesNotMatch(text, /忍影潜行/);
 });
+
+test('findGamePreset matches fullwidth colon variant', () => {
+  const preset = findGamePreset('刺客信条：影');
+  assert.equal(preset?.id, 'assassins-creed-shadows');
+});
+
+test('findGamePreset matches fullwidth semicolon variant', () => {
+  const preset = findGamePreset('刺客信条；影');
+  assert.equal(preset?.id, 'assassins-creed-shadows');
+});
