@@ -40,8 +40,14 @@
         "开放感",
         "自然氛围"
       ],
-      "weather": ["clear"],
-      "time": ["morning", "noon", "afternoon"],
+      "weather": [
+        "clear"
+      ],
+      "time": [
+        "morning",
+        "noon",
+        "afternoon"
+      ],
       "sampleLines": [
         "远远看到一座神庙。",
         "今天的海拉鲁天气不错。"
@@ -59,8 +65,15 @@
         "空灵感",
         "单音旋律"
       ],
-      "weather": ["clear", "cloudy"],
-      "time": ["morning", "noon", "afternoon"],
+      "weather": [
+        "clear",
+        "cloudy"
+      ],
+      "time": [
+        "morning",
+        "noon",
+        "afternoon"
+      ],
       "sampleLines": [
         "神庙里很安静，听自己的呼吸。",
         "这个谜题，慢慢来。"
@@ -78,8 +91,13 @@
         "治愈系",
         "木质打击"
       ],
-      "weather": ["rain"],
-      "time": ["night", "evening"],
+      "weather": [
+        "rain"
+      ],
+      "time": [
+        "night",
+        "evening"
+      ],
       "sampleLines": [
         "雨让石头变滑，但风景更好。",
         "找个檐下躲一躲，听听雨。"
@@ -87,7 +105,7 @@
     },
     {
       "id": "stable-campfire",
-      "label": "篝火驿站",
+      "label": "荒野篝火",
       "icon": "✦",
       "mood": "治愈",
       "vibe": "坐下，料理刚做好。",
@@ -97,8 +115,14 @@
         "轻打击",
         "驿站氛围"
       ],
-      "weather": ["clear", "cloudy"],
-      "time": ["evening", "night"],
+      "weather": [
+        "clear",
+        "cloudy"
+      ],
+      "time": [
+        "evening",
+        "night"
+      ],
       "sampleLines": [
         "驿站今晚有位子。",
         "烤个苹果吧，恢复一下。"

@@ -39,8 +39,15 @@
         "轻打击",
         "酒馆氛围"
       ],
-      "weather": ["rain", "fog", "cloudy"],
-      "time": ["evening", "night"],
+      "weather": [
+        "rain",
+        "fog",
+        "cloudy"
+      ],
+      "time": [
+        "evening",
+        "night"
+      ],
       "sampleLines": [
         "酒温好了，牌在桌上。",
         "今晚不急，先来一局昆特。"
@@ -58,8 +65,14 @@
         "紧张弦乐",
         "部落鼓点"
       ],
-      "weather": ["fog", "rain"],
-      "time": ["night", "evening"],
+      "weather": [
+        "fog",
+        "rain"
+      ],
+      "time": [
+        "night",
+        "evening"
+      ],
       "sampleLines": [
         "沼泽里有东西在动。",
         "把剑油涂好，别偷懒。"
@@ -67,7 +80,7 @@
     },
     {
       "id": "skellige-storm",
-      "label": "史凯利格风暴",
+      "label": "群岛风暴",
       "icon": "⚡",
       "mood": "愤怒",
       "vibe": "风很大，站稳了。",
@@ -77,8 +90,14 @@
         "风笛",
         "重击鼓"
       ],
-      "weather": ["rain", "cloudy"],
-      "time": ["afternoon", "evening"],
+      "weather": [
+        "rain",
+        "cloudy"
+      ],
+      "time": [
+        "afternoon",
+        "evening"
+      ],
       "sampleLines": [
         "海风里夹着盐和传说。",
         "别盯着浪看太久。"
@@ -86,7 +105,7 @@
     },
     {
       "id": "hearth-rest",
-      "label": "篝火整理",
+      "label": "旅店歇脚",
       "icon": "✦",
       "mood": "治愈",
       "vibe": "把剑放下，先坐。",
@@ -96,8 +115,14 @@
         "安静背景",
         "篝火噼啪"
       ],
-      "weather": ["clear", "cloudy"],
-      "time": ["night", "evening"],
+      "weather": [
+        "clear",
+        "cloudy"
+      ],
+      "time": [
+        "night",
+        "evening"
+      ],
       "sampleLines": [
         "篝火还旺，坐下歇会儿。",
         "今天挣够克朗了，歇吧。"
