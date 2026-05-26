@@ -16,7 +16,28 @@ const TTS_PRELOAD_LIMIT = 5;
 
 // ─── gameVibeSentence fallback（DeepSeek 常漏填此字段）───
 function fallbackGameVibeSentence(mood, gameName, gameVibe) {
-  const map = {
+  // 1. 游戏专属氛围句（优先匹配）
+  const gameMap = {
+    '巫师3': ['百果园的雨，慢慢走。', '篝火旁边，不用说话。', '猎魔人的路，一个人走。'],
+    '艾尔登法环': ['褪色者，火点在远处。', '狭间地很大，不急。'],
+    '赛博朋克2077': ['霓虹灯下，慢一点。', '夜之城的雨，一直下。'],
+    '刺客信条': ['灯火远一点，脚步轻一点。', '从屋檐下经过。', '刀收好，夜还长。'],
+    '生化危机': ['背后有脚步声，别回头。', '走廊很长，回声很远。'],
+    '空洞骑士': ['地下很安静。', '圣巢的风，轻轻的。'],
+    '塞尔达': ['海拉鲁的风，慢慢吹。', '开塔之前，先听首歌。'],
+    '星露谷物语': ['农场里的日子，慢慢过。', '今天不赶进度。'],
+    '我的世界': ['方块搭到一半，休息一下。', '矿洞很深，慢慢挖。'],
+    '死亡搁浅': ['山那么远，不急着到。', '一个人送货的路上。'],
+    '原神': ['风起地从这里开始。', '提瓦特很大，慢慢逛。'],
+  };
+  for (const [key, lines] of Object.entries(gameMap)) {
+    if ((gameName && gameName.includes(key)) || (gameVibe && gameVibe.includes(key))) {
+      return lines[Math.floor(Math.random() * lines.length)];
+    }
+  }
+
+  // 2. 按 mood 通用氛围句（兜底）
+  const moodMap = {
     愤怒: ['燃一点，按到底。', '今晚别松手。'],
     开心: ['节奏跟上来。', '今晚速度别停。'],
     悲伤: ['慢慢的，不急。', '声音低一点。'],
@@ -24,7 +45,7 @@ function fallbackGameVibeSentence(mood, gameName, gameVibe) {
     忧郁: ['声音沉一点。', '今晚安静听。'],
     治愈: ['外面下雨，适合慢慢走。', '今晚别太累。'],
   };
-  const lines = map[mood] || map['平静'];
+  const lines = moodMap[mood] || moodMap['平静'];
   return lines[Math.floor(Math.random() * lines.length)];
 }
 
