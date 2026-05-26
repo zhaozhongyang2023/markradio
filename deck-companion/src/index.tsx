@@ -664,11 +664,12 @@ function Content() {
           font-weight: 600;
           letter-spacing: .02em;
         }
-        .mw-weather-line {
-          text-align: center;
-          color: rgba(255,255,255,.48);
+        .mw-brand-weather {
+          margin-left: auto;
+          color: rgba(255,255,255,.42);
           font-size: 10px;
-          margin-bottom: 2px;
+          font-weight: 400;
+          white-space: nowrap;
         }
         .mw-minimal-logo {
           position: absolute;
@@ -1238,11 +1239,10 @@ function Content() {
           {playing && track ? <button className="mw-minimal-toggle" onClick={() => { setMinimalMode(true); localStorage.setItem(MINIMAL_KEY, '1'); }} title="极简模式">◁ 极简</button> : null}
         </div>
 
-      {now.weather ? <div className="mw-weather-line">{cityLabel(now.weather.city || '') || '本地'} · {now.weather.condition || '未知'}{now.weather.temperature != null ? ' ' + Math.round(now.weather.temperature) + '°C' : ''}</div> : null}
-
       <div className="mw-brand-bar">
         <img src={`data:image/png;base64,${ICON_BASE64}`} alt="MoodWave" />
         <span>MoodWave · AI DJ</span>
+        {now.weather ? <span className="mw-brand-weather">{cityLabel(now.weather.city || '') || '本地'} · {now.weather.condition || '未知'}{now.weather.temperature != null ? ' ' + Math.round(now.weather.temperature) + '°C' : ''}</span> : null}
       </div>
 
       <div className="mw-topbar">
