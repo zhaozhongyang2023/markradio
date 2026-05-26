@@ -3260,6 +3260,97 @@ p {
   font-size: 13px;
   cursor: pointer;
 }
+
+.game-preset-card {
+  width: min(90vw, 520px);
+  max-height: min(82vh, 720px);
+  overflow: auto;
+  justify-items: stretch;
+}
+
+.preset-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  width: 100%;
+}
+
+.preset-list {
+  display: grid;
+  gap: 8px;
+  width: 100%;
+}
+
+.preset-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+  padding: 10px;
+  border: 1px solid rgba(0,0,0,0.08);
+  border-radius: 8px;
+  background: rgba(0,0,0,0.035);
+}
+
+.preset-row strong,
+.preset-row small {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.preset-row strong {
+  color: #111;
+  font-size: 13px;
+}
+
+.preset-row small {
+  margin-top: 3px;
+  color: rgba(0,0,0,0.42);
+  font-size: 11px;
+}
+
+.preset-row-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.preset-row-actions button.active {
+  background: #2ba88a;
+}
+
+.preset-row-actions button:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.preset-json-input {
+  box-sizing: border-box;
+  width: 100%;
+  padding: 10px;
+  border: 1px solid rgba(0,0,0,0.12);
+  border-radius: 8px;
+  background: rgba(0,0,0,0.035);
+  color: #111;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 11px;
+  line-height: 1.45;
+  resize: vertical;
+}
+
+.preset-format-hint,
+.preset-error {
+  margin: 0;
+  color: rgba(0,0,0,0.45);
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.preset-error {
+  color: #9b4a1d;
+}
 .dna-result {
   display: flex;
   flex-direction: column;

@@ -9,6 +9,8 @@ const CONFIG_VERSION = 7;
 const API_BASE_KEY = 'moodwave.deck.apiBase';
 const GAME_NAME_KEY = 'moodwave.deck.gameName';
 const GAME_VIBE_KEY = 'moodwave.deck.gameVibe';
+const GAME_SCENE_KEY = 'moodwave.deck.gameSceneId';
+const GAME_PRESET_KEY = 'moodwave.deck.gamePresetId';
 const QUERY_KEY = 'moodwave.deck.query';
 const MINIMAL_KEY = 'moodwave.deck.minimalMode';
 const AUTO_CONTINUE_KEY = 'moodwave.deck.autoContinue';
@@ -49,6 +51,42 @@ type NowPayload = {
   };
 };
 
+type GamePresetScene = {
+  id: string;
+  label: string;
+  icon?: string;
+  mood?: string;
+  vibe?: string;
+  musicDirection?: string[];
+};
+
+type GamePresetPayload = {
+  fallback?: boolean;
+  preset?: {
+    id: string;
+    displayName: string;
+    world?: string[];
+    djPersona?: string;
+  } | null;
+  scenes?: GamePresetScene[];
+  scene?: GamePresetScene | null;
+};
+
+type GamePresetSummary = {
+  id: string;
+  displayName: string;
+  source?: 'builtin' | 'community';
+  sceneCount?: number;
+  gameNames?: string[];
+  world?: string[];
+  defaultScene?: string;
+};
+
+type GamePresetCatalog = {
+  presets?: GamePresetSummary[];
+  errors?: Array<{ file?: string; source?: string; message?: string; code?: string }>;
+};
+
 type Page = 'radio' | 'search' | 'game' | 'settings';
 
 const moods = [
@@ -74,16 +112,50 @@ const gameVibes = [
   { id: '模拟器怀旧', icon: '▣', hint: '像小时候一样' },
 ];
 
+const GAME_PRESET_SAMPLE = {
+  id: 'elden-ring-night',
+  displayName: '艾尔登法环 · 夜巡包',
+  gameNames: ['艾尔登法环', 'Elden Ring', 'ELDEN RING'],
+  world: ['交界地', '黑暗奇幻', '篝火', '孤独探索'],
+  djPersona: '像一位低声陪你跑图的夜巡电台 DJ。话少，沉稳，不打扰战斗。',
+  musicDirection: ['低频', '暗色氛围', '史诗感', '慢速鼓点'],
+  defaultScene: 'night-explore',
+  scenes: [
+    {
+      id: 'night-explore',
+      label: '夜晚跑图',
+      icon: '☾',
+      mood: '平静',
+      vibe: '篝火还远，先慢慢走。',
+      musicDirection: ['低频', '暗色 LoFi', '长时间循环'],
+      weather: ['clear', 'fog', 'cloudy'],
+      time: ['evening', 'night'],
+      sampleLines: ['先别急，路还很长。', '篝火还远，慢慢来。']
+    },
+    {
+      id: 'boss-door',
+      label: '雾门前',
+      icon: '⚔',
+      mood: '愤怒',
+      vibe: '进去之前，先把呼吸压稳。',
+      musicDirection: ['史诗', '低频', '压迫感'],
+      weather: ['clear', 'fog'],
+      time: ['afternoon', 'evening', 'night'],
+      sampleLines: ['门后很安静。', '这一把，慢一点也没关系。']
+    }
+  ]
+};
+
 function normalizeBase(value: string) {
   return (value || DEFAULT_API_BASE).trim().replace(/\/+$/, '');
 }
 
-async function apiRequest<T>(apiBase: string, path: string, body?: unknown): Promise<T> {
+async function apiRequest<T>(apiBase: string, path: string, body?: unknown, method?: string): Promise<T> {
   const url = `${normalizeBase(apiBase)}${path}`;
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 15000);
   const opts: RequestInit = {
-    method: body ? 'POST' : 'GET',
+    method: method || (body ? 'POST' : 'GET'),
     headers: body ? { 'Content-Type': 'application/json' } : undefined,
     body: body ? JSON.stringify(body) : undefined,
     signal: controller.signal,
@@ -174,7 +246,14 @@ function Content() {
   const [progress, setProgress] = useState(0);
   const [query, setQuery] = useState(() => localStorage.getItem(QUERY_KEY) || searchExamples[0].id);
   const [gameVibe, setGameVibe] = useState(() => localStorage.getItem(GAME_VIBE_KEY) || '探索地图');
+  const [gameSceneId, setGameSceneId] = useState(() => localStorage.getItem(GAME_SCENE_KEY) || '');
+  const [gamePresetId, setGamePresetId] = useState(() => localStorage.getItem(GAME_PRESET_KEY) || '');
   const [gameName, setGameName] = useState(() => localStorage.getItem(GAME_NAME_KEY) || '');
+  const [gamePreset, setGamePreset] = useState<GamePresetPayload | null>(null);
+  const [gamePresetCatalog, setGamePresetCatalog] = useState<GamePresetCatalog>({});
+  const [gamePresetJson, setGamePresetJson] = useState('');
+  const [gamePresetMessage, setGamePresetMessage] = useState('');
+  const [gamePresetLoading, setGamePresetLoading] = useState(false);
   const gameNameEditedRef = useRef(false);  // 用户手动编辑后不再自动覆盖
   const [minimalMode, setMinimalMode] = useState(() => localStorage.getItem(MINIMAL_KEY) === '1');
   const [autoContinue, setAutoContinue] = useState(() => localStorage.getItem(AUTO_CONTINUE_KEY) === '1');
@@ -199,6 +278,106 @@ function Content() {
   }
   const refreshRef = useRef(refresh);
   refreshRef.current = refresh;
+
+  async function loadGamePreset(name = gameName, presetId = gamePresetId) {
+    const nextName = String(name || '').trim();
+    const nextPresetId = String(presetId || '').trim();
+    if (!nextName && !nextPresetId) {
+      setGamePreset(null);
+      return;
+    }
+    setGamePresetLoading(true);
+    try {
+      const params = new URLSearchParams();
+      if (nextName) params.set('gameName', nextName);
+      if (nextPresetId) params.set('presetId', nextPresetId);
+      const payload = await apiRequest<GamePresetPayload>(apiBase, `/api/game/preset?${params.toString()}`);
+      const presetMismatch = nextPresetId && payload.preset?.id !== nextPresetId;
+      if (nextPresetId && (payload.fallback || presetMismatch)) {
+        setGamePresetId('');
+        setGameSceneId('');
+        localStorage.removeItem(GAME_PRESET_KEY);
+        localStorage.removeItem(GAME_SCENE_KEY);
+        setGamePresetMessage('氛围包已失效，已切回自动匹配');
+      }
+      setGamePreset(payload);
+      const storedSceneId = localStorage.getItem(GAME_SCENE_KEY) || '';
+      const hasStoredScene = Boolean(payload.scenes?.some((scene) => scene.id === storedSceneId));
+      if (!payload.fallback && payload.scene && !hasStoredScene) {
+        setGameSceneId(payload.scene.id);
+        setGameVibe(payload.scene.label);
+        localStorage.setItem(GAME_SCENE_KEY, payload.scene.id);
+        localStorage.setItem(GAME_VIBE_KEY, payload.scene.label);
+      }
+    } catch {
+      setGamePreset(null);
+    } finally {
+      setGamePresetLoading(false);
+    }
+  }
+
+  async function loadGamePresetCatalog(reload = false) {
+    try {
+      const payload = await apiRequest<GamePresetCatalog>(
+        apiBase,
+        reload ? '/api/game/presets/reload' : '/api/game/presets',
+        reload ? {} : undefined
+      );
+      setGamePresetCatalog(payload);
+      return payload;
+    } catch (error) {
+      setGamePresetMessage(error instanceof Error ? error.message : '氛围包列表读取失败');
+      return null;
+    }
+  }
+
+  function useGamePreset(id: string) {
+    setGamePresetId(id);
+    localStorage.setItem(GAME_PRESET_KEY, id);
+    setGameSceneId('');
+    localStorage.removeItem(GAME_SCENE_KEY);
+    loadGamePreset(gameName, id);
+  }
+
+  function useAutoGamePreset() {
+    setGamePresetId('');
+    localStorage.removeItem(GAME_PRESET_KEY);
+    setGameSceneId('');
+    localStorage.removeItem(GAME_SCENE_KEY);
+    loadGamePreset(gameName, '');
+  }
+
+  function parsePresetJson() {
+    const parsed = JSON.parse(gamePresetJson);
+    if (!parsed?.id) throw new Error('缺少 id');
+    if (!parsed?.displayName) throw new Error('缺少 displayName');
+    if (!Array.isArray(parsed.scenes) || parsed.scenes.length === 0) throw new Error('至少需要一个 Scene');
+    const badScene = parsed.scenes.find((scene: any) => !scene?.id || !scene?.label);
+    if (badScene) throw new Error('Scene 缺少 id 或 label');
+    return parsed;
+  }
+
+  async function importGamePreset() {
+    try {
+      const preset = parsePresetJson();
+      await apiRequest(apiBase, '/api/game/presets', { preset });
+      setGamePresetMessage('已导入：' + preset.displayName);
+      await loadGamePresetCatalog();
+    } catch (error) {
+      setGamePresetMessage(error instanceof Error ? error.message : '导入失败');
+    }
+  }
+
+  async function deleteGamePreset(id: string) {
+    try {
+      await apiRequest(apiBase, `/api/game/presets/${encodeURIComponent(id)}`, undefined, 'DELETE');
+      if (gamePresetId === id) useAutoGamePreset();
+      setGamePresetMessage('已删除社区氛围包');
+      await loadGamePresetCatalog();
+    } catch (error) {
+      setGamePresetMessage(error instanceof Error ? error.message : '删除失败');
+    }
+  }
 
 
   async function switchMode(mode: Page) {
@@ -261,6 +440,14 @@ function Content() {
       document.removeEventListener('visibilitychange', onVisible);
     };
   }, []);
+
+  useEffect(() => {
+    if (page === 'game') loadGamePreset(gameName, gamePresetId);
+  }, [apiBase, page, gameName, gamePresetId]);
+
+  useEffect(() => {
+    if (page === 'settings') loadGamePresetCatalog();
+  }, [apiBase, page]);
 
   const currentPlan = minimalMode ? now.plan : ((page !== 'settings' ? now.plans?.[page] : null) || now.plan);
   const track = now.now?.track || currentPlan?.queue?.[0] || null;
@@ -351,7 +538,9 @@ function Content() {
     const mode = getActiveMode(now);
     if (mode === 'game' && gameName.trim()) return '🎮 正在陪你玩 ' + gameName.trim();
     if (mode === 'game') {
+      const presetScene = gamePreset?.scenes?.find(v => v.id === gameSceneId);
       const vibe = gameVibes.find(v => v.id === gameVibe);
+      if (presetScene) return `${presetScene.icon || '▣'} ${presetScene.label} — ${presetScene.vibe || '游戏电台'}`;
       return vibe ? `${vibe.icon} ${vibe.id} — ${vibe.hint}` : ('🎮 ' + (gameVibe || '游戏电台'));
     }
     if (mode === 'search') return query.trim() ? '寻歌 · ' + query.trim() : '寻歌电台';
@@ -365,8 +554,9 @@ function Content() {
     const hasGame = getActiveMode(now) === 'game' && Boolean(gameName.trim());
     const moodIcon = moods.find(m => m.id === currentMood)?.icon || '';
     const vibeSentence = now.plan?.plan?.gameVibeSentence || '';
+    const presetScene = gamePreset?.scenes?.find(v => v.id === gameSceneId);
     const vibe = gameVibes.find(v => v.id === gameVibe);
-    const vibeHint = vibe?.hint || '';
+    const vibeHint = presetScene?.vibe || vibe?.hint || '';
     return { city, condition, temp, hasGame, moodIcon, vibeSentence, vibeHint };
   }
 
@@ -403,18 +593,33 @@ function Content() {
   }
 
   async function startGameRadio(label = 'AI DJ 准备中') {
+    const presetScene = gamePreset?.fallback === false
+      ? gamePreset.scenes?.find((item) => item.id === gameSceneId)
+      : null;
     const vibe = gameVibes.find((item) => item.id === gameVibe);
     await run(label, async () => {
       await apiRequest(apiBase, '/api/ai/game-radio', {
-        gameVibe,
+        gameVibe: presetScene?.label || gameVibe,
         gameName: gameName.trim() || undefined,
-        vibeHint: vibe?.hint || '',
+        sceneId: presetScene?.id || undefined,
+        presetId: gamePresetId || undefined,
+        vibeHint: presetScene?.vibe || vibe?.hint || '',
         mode: 'steamdeck',
         deferTts: true,
         autoContinue: autoContinue
       });
     });
   }
+
+  const presetScenes = gamePreset?.fallback === false ? (gamePreset.scenes || []) : [];
+  const gameSceneOptions: GamePresetScene[] = presetScenes.length
+    ? presetScenes
+    : gameVibes.map((vibe) => ({
+        id: vibe.id,
+        label: vibe.id,
+        icon: vibe.icon,
+        vibe: vibe.hint
+      }));
 
   return (
     <div className="mw-root">
@@ -826,6 +1031,73 @@ function Content() {
           color: #42d8b2;
           font-size: 13px;
         }
+        .mw-section-hint {
+          margin: -2px 0 6px;
+          color: rgba(255,255,255,.48);
+          font-size: 10px;
+          line-height: 14px;
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
+        }
+        .mw-preset-list {
+          display: grid;
+          gap: 5px;
+          margin-top: 6px;
+        }
+        .mw-preset-item {
+          display: grid;
+          grid-template-columns: minmax(0, 1fr) auto;
+          gap: 6px;
+          align-items: center;
+          padding: 6px;
+          border: 1px solid rgba(255,255,255,.08);
+          border-radius: 6px;
+          background: rgba(255,255,255,.035);
+        }
+        .mw-preset-name {
+          min-width: 0;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+          color: rgba(255,255,255,.84);
+          font-size: 10.5px;
+          font-weight: 800;
+        }
+        .mw-preset-meta {
+          color: rgba(255,255,255,.44);
+          font-size: 9.5px;
+          line-height: 13px;
+        }
+        .mw-preset-actions {
+          display: grid;
+          grid-template-columns: 48px 48px;
+          gap: 4px;
+        }
+        .mw-preset-actions .mw-button {
+          height: 24px;
+          font-size: 9.5px;
+        }
+        .mw-preset-json {
+          box-sizing: border-box;
+          width: 100%;
+          min-height: 92px;
+          margin-top: 6px;
+          padding: 7px;
+          border: 1px solid rgba(255,255,255,.12);
+          border-radius: 6px;
+          background: rgba(0,0,0,.25);
+          color: rgba(255,255,255,.82);
+          font-size: 10px;
+          line-height: 1.35;
+          resize: vertical;
+        }
+        .mw-preset-error {
+          margin-top: 5px;
+          color: rgba(255,198,132,.9);
+          font-size: 9.5px;
+          line-height: 13px;
+        }
         .mw-action-row {
           display: grid;
           grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
@@ -1067,21 +1339,34 @@ function Content() {
       {page === 'game' && (
         <div>
           <div className="mw-section-title"><span>▣</span>现在想怎么玩？</div>
+          {gamePreset?.preset && (
+            <div className="mw-section-hint">
+              {gamePreset.preset.displayName}
+              {gamePreset.preset.world?.length ? ` · ${gamePreset.preset.world.slice(0, 3).join(' / ')}` : ''}
+            </div>
+          )}
           <div className="mw-card">
             <div className="mw-grid two">
-              {gameVibes.map((vibe) => (
+              {gameSceneOptions.map((scene) => (
                 <AppButton
-                  key={vibe.id}
-                  active={gameVibe === vibe.id}
+                  key={scene.id}
+                  active={presetScenes.length ? gameSceneId === scene.id : gameVibe === scene.id}
                   disabled={busy}
-                  title={vibe.hint}
-                  onClick={() => { setGameVibe(vibe.id); localStorage.setItem(GAME_VIBE_KEY, vibe.id); }}
+                  title={scene.vibe || scene.label}
+                  onClick={() => {
+                    setGameSceneId(presetScenes.length ? scene.id : '');
+                    setGameVibe(scene.label);
+                    if (presetScenes.length) localStorage.setItem(GAME_SCENE_KEY, scene.id);
+                    else localStorage.removeItem(GAME_SCENE_KEY);
+                    localStorage.setItem(GAME_VIBE_KEY, scene.label);
+                  }}
                 >
-                  <span className="mw-icon">{vibe.icon}</span>{vibe.id}
+                  <span className="mw-icon">{scene.icon || '▣'}</span>{scene.label}
                 </AppButton>
               ))}
             </div>
           </div>
+          {gamePresetLoading && <div className="mw-section-hint">正在读取游戏氛围包...</div>}
           <div className="mw-action-row">
             <AppButton active disabled={busy || !gameVibe} onClick={() => startGameRadio('电台启动中')}>▶ 开始电台</AppButton>
             <AppButton disabled={busy || !gameVibe} onClick={() => startGameRadio('换个感觉')}>↻ 来点别的</AppButton>
@@ -1122,6 +1407,51 @@ function Content() {
               {autoContinue ? '✓ ' : ''}自动续播 · 播完自动换下一组
             </AppButton>
           </PanelSectionRow>
+          <div className="mw-section-title"><span>▣</span>游戏氛围包</div>
+          <div className="mw-card">
+            <div className="mw-action-row">
+              <AppButton active={!gamePresetId} disabled={busy} onClick={useAutoGamePreset}>自动匹配</AppButton>
+              <AppButton disabled={busy} onClick={() => loadGamePresetCatalog(true)}>刷新</AppButton>
+            </div>
+            <div className="mw-preset-list">
+              {(gamePresetCatalog.presets || []).map((preset) => (
+                <div className="mw-preset-item" key={preset.id}>
+                  <div>
+                    <div className="mw-preset-name">{preset.displayName}</div>
+                    <div className="mw-preset-meta">{preset.source === 'builtin' ? '内置' : '社区'} · {preset.sceneCount || 0} Scenes</div>
+                  </div>
+                  <div className="mw-preset-actions">
+                    <AppButton active={gamePresetId === preset.id} disabled={busy} onClick={() => useGamePreset(preset.id)}>
+                      使用
+                    </AppButton>
+                    <AppButton disabled={busy || preset.source === 'builtin'} onClick={() => deleteGamePreset(preset.id)}>
+                      删除
+                    </AppButton>
+                  </div>
+                </div>
+              ))}
+            </div>
+            {(gamePresetCatalog.errors || []).map((error, index) => (
+              <div className="mw-preset-error" key={`${error.file || 'error'}-${index}`}>
+                {error.file || 'preset'}：{error.message || error.code || '格式错误'}
+              </div>
+            ))}
+          </div>
+          <div className="mw-card" style={{ marginTop: 6 }}>
+            <div className="mw-action-row">
+              <AppButton disabled={busy} onClick={() => setGamePresetJson(JSON.stringify(GAME_PRESET_SAMPLE, null, 2))}>插入样例</AppButton>
+              <AppButton disabled={busy} onClick={() => { setGamePresetJson(''); setGamePresetMessage(''); }}>清空</AppButton>
+            </div>
+            <textarea
+              className="mw-preset-json"
+              placeholder="粘贴 Preset JSON..."
+              value={gamePresetJson}
+              onChange={(event) => setGamePresetJson(event.currentTarget.value)}
+            />
+            <div className="mw-section-hint">必填 id、displayName、scenes；Scene 必填 id、label；天气 clear/cloudy/rain/snow/fog；时间 morning/noon/afternoon/evening/night</div>
+            <AppButton active disabled={busy || !gamePresetJson.trim()} onClick={importGamePreset}>导入 / 更新</AppButton>
+            {gamePresetMessage ? <div className="mw-preset-error">{gamePresetMessage}</div> : null}
+          </div>
         </PanelSection>
       )}
 

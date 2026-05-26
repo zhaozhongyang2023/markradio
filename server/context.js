@@ -177,8 +177,12 @@ export function injectGameContext(gameContext) {
   if (!gameContext?.game_name) return '';
   const parts = [
     `当前游戏：${gameContext.game_name}${gameContext.game_state ? '（' + gameContext.game_state + '）' : ''}。`,
+    gameContext.dj_persona ? `DJ 人格：${gameContext.dj_persona}` : '',
+    gameContext.scene_label ? `当前 Scene：${gameContext.scene_label}。` : '',
+    gameContext.scene_vibe ? `Scene 感觉：${gameContext.scene_vibe}` : '',
     gameContext.game_vibe ? `游戏氛围：${gameContext.game_vibe}。` : '',
-    gameContext.music_direction?.length ? `音乐方向：${gameContext.music_direction.join('、')}。` : ''
+    gameContext.music_direction?.length ? `音乐方向：${gameContext.music_direction.join('、')}。` : '',
+    gameContext.sample_lines?.length ? `参考语气：${gameContext.sample_lines.join(' / ')}` : ''
   ].filter(Boolean);
   return parts.length ? '[GAME_CONTEXT]\n' + parts.join('\n') + '\n选曲需匹配游戏世界感，不要破坏沉浸体验。\n另外生成一句 6~12 字的极短游戏陪伴文案（gameVibeSentence），贴合游戏名称和场景氛围，像朋友在身边轻声说。' : '';
 }

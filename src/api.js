@@ -132,6 +132,27 @@ export const api = {
       method: 'POST',
       body: JSON.stringify(body)
     }),
+  gamePresets: () => request('/api/game/presets'),
+  gamePreset: ({ gameName = '', presetId = '' } = {}) => {
+    const params = new URLSearchParams();
+    if (gameName) params.set('gameName', gameName);
+    if (presetId) params.set('presetId', presetId);
+    return request(`/api/game/preset${params.toString() ? `?${params}` : ''}`);
+  },
+  gamePresetsReload: () =>
+    request('/api/game/presets/reload', {
+      method: 'POST',
+      body: JSON.stringify({})
+    }),
+  gamePresetSave: (preset) =>
+    request('/api/game/presets', {
+      method: 'POST',
+      body: JSON.stringify({ preset })
+    }),
+  gamePresetDelete: (id) =>
+    request(`/api/game/presets/${encodeURIComponent(id)}`, {
+      method: 'DELETE'
+    }),
   v5Playback: (action, body = {}) =>
     request(`/api/${action}`, {
       method: 'POST',

@@ -14,7 +14,7 @@ let _lastSessionCleanup = 0;
 const DEFAULT_QUEUE_LIMIT = 5;
 const TTS_PRELOAD_LIMIT = 5;
 
-export async function createRadioPlan({ store, mood: requestedMood = null, nowPlaying = null, deferTts = false, onTtsReady = null, userRequest = '', mode = 'radio', currentPlan = null, gameName = '', gameVibe = '', autoContinue = false }) {
+export async function createRadioPlan({ store, mood: requestedMood = null, nowPlaying = null, deferTts = false, onTtsReady = null, userRequest = '', mode = 'radio', currentPlan = null, gameName = '', gameVibe = '', gamePresetId = '', gamePresetContext = null, autoContinue = false }) {
   // 每 30 分钟清理一次 session 级别的已播放记录，防止长期泄漏
   const nowMs = Date.now();
   if (nowMs - _lastSessionCleanup > 1800000) { sessionPlayedIdsByMode.clear(); _lastSessionCleanup = nowMs; }
@@ -25,7 +25,7 @@ export async function createRadioPlan({ store, mood: requestedMood = null, nowPl
   const voice = store.get('voice');
   const musicDna = store.get('musicDna');
   const recentTendency = store.getTendency();
-  const gameContext = (gameName || gameVibe) ? buildGameContext(gameName, gameVibe) : null;
+  const gameContext = (gameName || gameVibe || gamePresetContext) ? buildGameContext(gameName, gameVibe, gamePresetContext) : null;
   const emotionMomentum = calcEmotionMomentum(store);
   const weather = await getWeather().catch((error) => ({
     source: 'error',
@@ -155,7 +155,9 @@ export async function createRadioPlan({ store, mood: requestedMood = null, nowPl
       need: true,
       userRequest: userRequest || '',
       gameName: gameName || '',
-      gameVibe: gameVibe || ''
+      gameVibe: gameVibe || '',
+      presetId: gamePresetId || gamePresetContext?.presetId || '',
+      gamePresetContext: gamePresetContext || null
     } : null
   };
   store.set('planToday', todayPlan);

@@ -102,6 +102,68 @@ test('GET /api/mood', async () => {
   assert.ok(Array.isArray(body.moods));
 });
 
+test('GET /api/game/preset', async () => {
+  const { status, body } = await api.get('/api/game/preset?gameName=%E5%88%BA%E5%AE%A2%E4%BF%A1%E6%9D%A1%C2%B7%E5%BD%B1');
+  assert.equal(status, 200);
+  assert.equal(body.fallback, false);
+  assert.equal(body.preset.id, 'assassins-creed-shadows');
+  assert.ok(Array.isArray(body.scenes));
+});
+
+test('GET /api/game/presets', async () => {
+  const { status, body } = await api.get('/api/game/presets');
+  assert.equal(status, 200);
+  assert.ok(Array.isArray(body.presets));
+  assert.ok(body.presets.some((preset) => preset.id === 'assassins-creed-shadows' && preset.source === 'builtin'));
+  assert.ok(Array.isArray(body.errors));
+});
+
+test('GET /api/game/preset supports presetId', async () => {
+  const { status, body } = await api.get('/api/game/preset?presetId=assassins-creed-shadows&gameName=unknown');
+  assert.equal(status, 200);
+  assert.equal(body.fallback, false);
+  assert.equal(body.preset.id, 'assassins-creed-shadows');
+});
+
+test('community game preset CRUD', async () => {
+  const id = `test-pack-${Date.now()}`;
+  const preset = {
+    id,
+    displayName: 'Test Pack',
+    gameNames: ['Test Game'],
+    scenes: [{ id: 'default', label: 'Default' }]
+  };
+  const created = await api.post('/api/game/presets', { preset });
+  assert.equal(created.status, 200);
+  assert.equal(created.body.preset.id, id);
+
+  const selected = await api.get(`/api/game/preset?presetId=${id}`);
+  assert.equal(selected.status, 200);
+  assert.equal(selected.body.preset.id, id);
+
+  const deleted = await request('DELETE', `/api/game/presets/${id}`);
+  assert.equal(deleted.status, 200);
+  assert.equal(deleted.body.ok, true);
+});
+
+test('community game preset rejects builtin overwrite', async () => {
+  const { status, body } = await api.post('/api/game/presets', {
+    preset: {
+      id: 'assassins-creed-shadows',
+      displayName: 'Overwrite',
+      scenes: [{ id: 'default', label: 'Default' }]
+    }
+  });
+  assert.equal(status, 409);
+  assert.equal(body.ok, false);
+});
+
+test('POST /api/game/presets/reload', async () => {
+  const { status, body } = await api.post('/api/game/presets/reload', {});
+  assert.equal(status, 200);
+  assert.ok(Array.isArray(body.presets));
+});
+
 test('PUT /api/mood', async () => {
   const { status, body } = await api.put('/api/mood', { mood: '开心' });
   assert.equal(status, 200);

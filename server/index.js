@@ -21,6 +21,7 @@ import { callNetease, checkNeteaseQr, createNeteaseQr, getNeteaseLoginStatus } f
 import { getWeather } from './weather.js';
 import { loadMusicDNA, saveMusicDNA, generateMusicDNA, getMusicDNASummary, accumulateDnaSignal, maybeRegenerateDna } from './profile.js';
 import { collectNeteaseLibrary } from './providers/netease.js';
+import { buildGameRadioRequest, deleteCommunityPreset, listGamePresets, reloadGamePresetCatalog, resolveGamePreset, saveCommunityPreset } from './game-presets.js';
 
 const store = new StateStore();
 
@@ -64,13 +65,37 @@ async function advanceToNext(store) {
   if (ci >= plan.queue.length - 1) {
     if (plan.regenerate?.need && !_autoRegenerating) {
       _autoRegenerating = true;
+      const hasGameRegenerate = Boolean(
+        plan.regenerate.presetId ||
+        plan.regenerate.gameName ||
+        plan.regenerate.gameVibe ||
+        plan.regenerate.gamePresetContext
+      );
+      const regenPreset = hasGameRegenerate && (plan.regenerate.presetId || plan.regenerate.gameName)
+        ? resolveGamePreset({
+            store,
+            presetId: plan.regenerate.presetId || '',
+            gameName: plan.regenerate.gameName || '',
+            weather: store.get('weather'),
+            now: new Date()
+          })
+        : null;
       const regenParams = {
         store,
         mode: plan.mode || mode,
         mood: plan.mood,
-        userRequest: plan.regenerate.userRequest || '',
+        userRequest: hasGameRegenerate
+          ? buildGameRadioRequest({
+              djPersona: regenPreset?.preset?.djPersona || '你不是 AI 助手。你是一名 Steam Deck 深夜 AI 游戏电台 DJ。语气温柔、简短、有留白、有陪伴感。不要像客服，不要解释算法，不要长篇大论。',
+              gameName: plan.regenerate.gameName || '',
+              gameVibe: regenPreset?.scene?.label || plan.regenerate.gameVibe || '',
+              vibeHint: regenPreset?.scene?.vibe || ''
+            })
+          : (plan.regenerate.userRequest || ''),
         gameName: plan.regenerate.gameName || '',
-        gameVibe: plan.regenerate.gameVibe || '',
+        gameVibe: regenPreset?.scene?.label || plan.regenerate.gameVibe || '',
+        gamePresetId: regenPreset?.preset?.id || '',
+        gamePresetContext: regenPreset?.context || plan.regenerate.gamePresetContext || null,
         deferTts: true,
         autoContinue: true
       };
@@ -169,7 +194,7 @@ await app.register(websocket);
 app.addHook('onRequest', async (request, reply) => {
   reply.header('Access-Control-Allow-Origin', '*');
   reply.header('Access-Control-Allow-Headers', 'Content-Type');
-  reply.header('Access-Control-Allow-Methods', 'GET,PUT,POST,OPTIONS');
+  reply.header('Access-Control-Allow-Methods', 'GET,PUT,POST,DELETE,OPTIONS');
   reply.header('Access-Control-Allow-Private-Network', 'true');
   if (request.method === 'OPTIONS') return reply.send();
 });
@@ -649,18 +674,78 @@ app.post('/api/ai/next-radio', async (request) => {
   };
 });
 
+app.get('/api/game/preset', async (request) => {
+  const gameName = String(request.query?.gameName || request.query?.name || '').trim();
+  const presetId = String(request.query?.presetId || '').trim();
+  return resolveGamePreset({
+    store,
+    presetId,
+    gameName,
+    weather: store.get('weather'),
+    now: new Date(),
+    preview: true
+  });
+});
+
+app.get('/api/game/presets', async () => listGamePresets());
+
+app.post('/api/game/presets', async (request, reply) => {
+  try {
+    const preset = request.body?.preset || request.body;
+    const result = saveCommunityPreset(preset);
+    return { ...result, catalog: listGamePresets() };
+  } catch (error) {
+    return reply.code(error.code === 'builtin_conflict' ? 409 : 400).send({
+      ok: false,
+      code: error.code || 'invalid_preset',
+      message: error.message
+    });
+  }
+});
+
+app.delete('/api/game/presets/:id', async (request, reply) => {
+  try {
+    const result = deleteCommunityPreset(String(request.params.id || ''));
+    return { ...result, catalog: listGamePresets() };
+  } catch (error) {
+    const status = error.code === 'not_found' ? 404 : error.code === 'builtin_delete_forbidden' ? 403 : 400;
+    return reply.code(status).send({
+      ok: false,
+      code: error.code || 'delete_failed',
+      message: error.message
+    });
+  }
+});
+
+app.post('/api/game/presets/reload', async () => reloadGamePresetCatalog());
+
 app.post('/api/ai/game-radio', async (request) => {
   const gameVibe = String(request.body?.gameVibe || request.body?.vibe || '').trim();
   const gameName = String(request.body?.gameName || request.body?.name || '').trim();
   const vibeHint = String(request.body?.vibeHint || '').trim();
-  const mood = request.body?.mood || store.get('mood')?.current;
+  const sceneId = String(request.body?.sceneId || '').trim();
+  const presetId = String(request.body?.presetId || '').trim();
+  const presetResult = resolveGamePreset({
+    store,
+    presetId,
+    gameName,
+    weather: store.get('weather'),
+    now: new Date(),
+    sceneId,
+    manual: Boolean(sceneId)
+  });
+  const scene = presetResult.scene;
+  const resolvedGameVibe = scene?.label || gameVibe;
+  const resolvedVibeHint = scene?.vibe || vibeHint;
+  const mood = request.body?.mood || scene?.mood || store.get('mood')?.current;
   // 游戏电台 DJ 人格提示（通过 userRequest 传递，不修改 Prompt 系统）
-  const djPersona = '你不是 AI 助手。你是一名 Steam Deck 深夜 AI 游戏电台 DJ。语气温柔、简短、有留白、有陪伴感。不要像客服，不要解释算法，不要长篇大论。';
-  const sceneLine = gameName
-    ? `游戏场景——${gameVibe}。正在玩：${gameName}。`
-    : `游戏场景——${gameVibe}。`;
-  const vibeLine = vibeHint ? `感觉：${vibeHint}` : '';
-  const userRequest = [djPersona, sceneLine, vibeLine].filter(Boolean).join(' ');
+  const djPersona = presetResult.preset?.djPersona || '你不是 AI 助手。你是一名 Steam Deck 深夜 AI 游戏电台 DJ。语气温柔、简短、有留白、有陪伴感。不要像客服，不要解释算法，不要长篇大论。';
+  const userRequest = buildGameRadioRequest({
+    djPersona,
+    gameName,
+    gameVibe: resolvedGameVibe,
+    vibeHint: resolvedVibeHint
+  });
   playerStop();
   const plan = await createRadioPlan({
     store,
@@ -668,7 +753,9 @@ app.post('/api/ai/game-radio', async (request) => {
     mood,
     userRequest,
     gameName,
-    gameVibe,
+    gameVibe: resolvedGameVibe,
+    gamePresetId: presetResult.preset?.id || '',
+    gamePresetContext: presetResult.context,
     autoContinue: request.body?.autoContinue === true,
     deferTts: true,
     onTtsReady: (updatedPlan) => {
@@ -679,15 +766,19 @@ app.post('/api/ai/game-radio', async (request) => {
   broadcast('plan', plan);
   broadcast('now', publicNow());
   // 信号记录 + 异步 DNA 检测
-  if (gameVibe) {
-    const gameSignal = gameName ? `${gameName}→${gameVibe}` : gameVibe;
+  if (resolvedGameVibe) {
+    const gameSignal = gameName ? `${gameName}→${resolvedGameVibe}` : resolvedGameVibe;
     accumulateDnaSignal(store, "gameVibe", gameSignal);
   }
   maybeRegenerateDna(store);
   return {
     ok: true,
-    gameVibe,
+    gameVibe: resolvedGameVibe,
     gameName: gameName || null,
+    preset: presetResult.preset,
+    scene,
+    autoSelected: presetResult.autoSelected,
+    sceneLockedUntil: presetResult.sceneLockedUntil,
     dj_intro: plan.tts?.text || plan.plan?.say || '',
     songs: plan.queue || [],
     plan,

@@ -48,13 +48,32 @@ https://xxx.xxx.com/link/xxxxxxxx
 打开终端（Konsole），逐行执行：
 
 ```bash
-# 下载
-curl -sL https://github.com/MetaCubeX/mihomo/releases/latest/download/mihomo-linux-amd64.gz -o /tmp/mihomo.gz
+# 自动获取最新版 Linux amd64 安装包地址（不依赖 GitHub API）
+rm -f /tmp/mihomo.gz /tmp/mihomo
+
+MIHOMO_TAG=$(
+  curl -fsSLI --retry 5 --retry-all-errors --connect-timeout 15 --max-time 60 \
+    -o /dev/null -w '%{url_effective}' \
+    https://github.com/MetaCubeX/mihomo/releases/latest |
+  sed 's#.*/##'
+)
+
+if ! echo "$MIHOMO_TAG" | grep -Eq '^v[0-9]+\.[0-9]+\.[0-9]+$'; then
+  echo "✗ 没拿到 mihomo 最新版本号，请检查网络或稍后重试"
+  exit 1
+fi
+
+MIHOMO_URL="https://github.com/MetaCubeX/mihomo/releases/download/${MIHOMO_TAG}/mihomo-linux-amd64-${MIHOMO_TAG}.gz"
+echo "下载：$MIHOMO_URL"
+curl -fL --retry 5 --retry-all-errors --connect-timeout 20 --max-time 300 \
+  "$MIHOMO_URL" -o /tmp/mihomo.gz
+gzip -t /tmp/mihomo.gz
 
 # 解压并安装
 gunzip -f /tmp/mihomo.gz
 sudo mv /tmp/mihomo /usr/local/bin/mihomo
 sudo chmod 755 /usr/local/bin/mihomo
+mihomo -v
 ```
 
 #### 2. 创建配置文件
@@ -325,18 +344,75 @@ bash scripts/install-steamdeck.sh --repo https://github.com/zhaozhongyang2023/ma
 
 ### 安装过程中会依次问你：
 
-| 顺序 | 问题 | 怎么做 |
+| 顺序 | 问题 | 怎么做 | 注册入口 |
 |------|------|--------|
-| 1 | **AI Key** ⭐ | 粘贴你的 DeepSeek Key，**必须填** |
-| 2 | Fish Audio Key | 语音朗读 DJ 开场白，**回车跳过** |
-| 3 | 网易云 API 地址 | 真实音乐库 + Music DNA，**回车跳过**（用 Demo 歌单） |
-| 4 | OpenWeather Key | 根据天气调氛围，**回车跳过** |
+| 1 | **AI Key** ⭐ | 粘贴你的 DeepSeek Key，**必须填** | [platform.deepseek.com](https://platform.deepseek.com) → 注册 → API Keys → 创建 → 复制 |
+| 2 | Fish Audio Key | 语音朗读 DJ 开场白，**建议填写** | [fish.audio](https://fish.audio) → 注册 → API Keys。Voice ID 在 Voices 页面选中文音色复制 |
+| 3 | 网易云 API 地址 | 真实音乐库 + Music DNA，**建议填写** | 本地部署（见下方详解），填 `http://127.0.0.1:3000` |
+| 4 | OpenWeather Key | 根据天气调氛围，**建议填写** | [openweathermap.org](https://openweathermap.org/api) → 免费注册 → API keys → 复制 |
 
 > 最少只填一个 AI Key，其余全部回车跳过即可正常使用。
 
 安装过程约 5～10 分钟（主要是下载依赖包），看到「🎉 MoodWave 安装完成！」就代表成功。
 
 ---
+
+---
+
+## 注册 API Key 详解
+
+> 虽然只需 AI Key 就能用，但配齐下面四项后体验会完全不同：DJ 开口说话、歌单精准匹配、扫码导入红心歌单、天气感知氛围。
+
+### DeepSeek（必填 ⭐）
+
+1. 浏览器打开 [platform.deepseek.com](https://platform.deepseek.com)
+2. 注册账号（手机号即可）
+3. 左侧菜单 → **API Keys** → 点击创建
+4. 复制 Key，粘贴到安装脚本的 AI Key 提示处
+
+> 新用户赠送 500 万 token 免费额度，日常使用足够很久。充值也很便宜，1 元约 100 万 token。
+
+### Fish Audio（建议 — DJ 语音朗读）
+
+1. 浏览器打开 [fish.audio](https://fish.audio)
+2. 注册账号 → 进入控制台
+3. 左侧 **API Keys** → 创建 Key → 复制
+4. 左侧 **Voices** → 选一个中文音色 → 复制 Voice ID
+
+> 安装时先填 API Key，再填 Voice ID。推荐音色：`Alex`（男声，沉稳）或 `Elena`（女声，温柔）。免费额度日常够用。
+
+### 网易云 API（建议 — 真实音乐库 + Music DNA 扫码）
+
+网易云 API 需要在 Steam Deck 上本地部署一个小服务。不用担心，Node.js 已经装好了，只需要三步：
+
+```bash
+# 1. 克隆网易云 API 项目
+git clone https://github.com/Binaryify/NeteaseCloudMusicApi.git ~/netease-api
+
+# 2. 安装依赖
+cd ~/netease-api && npm install
+
+# 3. 启动服务（保持终端窗口开着）
+node app.js
+```
+
+启动后会显示 `server running @ http://localhost:3000`。
+
+安装 MoodWave 时，网易云 API 地址填：`http://127.0.0.1:3000`
+
+> 💡 建议配好网易云 API 后再做 Music DNA（第七步），这样才能扫码导入你的网易云红心歌单和听歌记录，AI DJ 才能真正懂你的口味。用 Demo 歌单的话，音乐会比较随机。
+
+> ⚠️ 网易云 API 服务不会开机自启。每次重启 Steam Deck 后，打开终端执行 `cd ~/netease-api && node app.js` 即可。
+
+### OpenWeather（建议 — DJ 感知天气）
+
+1. 浏览器打开 [openweathermap.org](https://openweathermap.org/api)
+2. 点击 **Sign Up** 注册免费账号
+3. 登录后进入 **API keys** 页面
+4. 复制默认 Key（或创建一个新的）
+5. 安装时填写 Key + 城市（格式：`Beijing,CN` / `Shanghai,CN`）
+
+> 免费版每分钟 60 次调用，MoodWave 大概每 10 分钟查一次，完全够用。配好后 DJ 会说「外面下雨了，放点暖和的歌。」
 
 ## 第六步：验证安装
 
@@ -376,7 +452,7 @@ http://127.0.0.1:38080/api/health
 
 这是 MoodWave 的核心功能。AI 分析你的网易云听歌记录，生成专属 **Music DNA**，三种模式都会参考。
 
-V6 升级：Music DNA 变成三维结构——**核心情绪 / 聆听状态 / 音乐性格**，比简单的风格标签更深入。
+V6 升级：Music DNA 从 3 维升级为 5 维——**核心情绪 / 聆听状态 / 音乐性格 / 游戏氛围 / 置信度**。DNA 直接参与选歌决策：匹配你口味的歌曲自动排到歌单前面，越用越精准。
 
 ### 操作流程
 
