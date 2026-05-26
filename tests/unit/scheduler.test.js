@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {
   buildWorldContinuity,
   calcEmotionMomentum,
+  fallbackGameVibeSentence,
   fillQueueTracks,
   buildTrackReason,
   buildIntroText,
@@ -196,4 +197,35 @@ test('buildIntroText no special date', () => {
   });
   assert.match(result, /晚安/);
   assert.doesNotMatch(result, /今天靠近/);
+});
+
+// ─── fallbackGameVibeSentence ───
+test('fallbackGameVibeSentence matches assassin creed', () => {
+  const result = fallbackGameVibeSentence('平静', '刺客信条·影', '');
+  const valid = ['灯火远一点，脚步轻一点。', '从屋檐下经过。', '刀收好，夜还长。'];
+  assert.ok(valid.includes(result), `got: ${result}`);
+});
+
+test('fallbackGameVibeSentence matches witcher 3', () => {
+  const result = fallbackGameVibeSentence('平静', '巫师3·狂猎', '');
+  const valid = ['百果园的雨，慢慢走。', '篝火旁边，不用说话。', '猎魔人的路，一个人走。'];
+  assert.ok(valid.includes(result), `got: ${result}`);
+});
+
+test('fallbackGameVibeSentence unknown game falls back to mood', () => {
+  const result = fallbackGameVibeSentence('治愈', '未知游戏', '');
+  const valid = ['外面下雨，适合慢慢走。', '今晚别太累。'];
+  assert.ok(valid.includes(result), `got: ${result}`);
+});
+
+test('fallbackGameVibeSentence unknown mood falls back to 平静', () => {
+  const result = fallbackGameVibeSentence('不存在的mood', '', '');
+  const valid = ['夜色压低一点。', '慢慢走，不赶路。'];
+  assert.ok(valid.includes(result), `got: ${result}`);
+});
+
+test('fallbackGameVibeSentence empty gameName skips game matching', () => {
+  const result = fallbackGameVibeSentence('开心', '', '');
+  const valid = ['节奏跟上来。', '今晚速度别停。'];
+  assert.ok(valid.includes(result), `got: ${result}`);
 });

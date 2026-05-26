@@ -15,7 +15,7 @@ const DEFAULT_QUEUE_LIMIT = 5;
 const TTS_PRELOAD_LIMIT = 5;
 
 // ─── gameVibeSentence fallback（DeepSeek 常漏填此字段）───
-function fallbackGameVibeSentence(mood, gameName, gameVibe) {
+export function fallbackGameVibeSentence(mood, gameName, gameVibe) {
   // 1. 游戏专属氛围句（优先匹配）
   const gameMap = {
     '巫师3': ['百果园的雨，慢慢走。', '篝火旁边，不用说话。', '猎魔人的路，一个人走。'],
