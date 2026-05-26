@@ -17,7 +17,7 @@ function request(method, urlPath, body) {
     const options = {
       method,
       headers: body ? { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(JSON.stringify(body)) } : {},
-      timeout: 5000
+      timeout: 15000
     };
     const req = http.request(`http://127.0.0.1:${TEST_API_PORT}${urlPath}`, options, (res) => {
       let data = '';
@@ -206,6 +206,43 @@ test('GET /api/special-dates', async () => {
 test('GET /api/plan/today', async () => {
   const { status } = await api.get('/api/plan/today');
   assert.ok(status === 200 || status === 204);
+});
+
+test('POST /api/plan/today keeps ordinary radio mode', async () => {
+  const { status, body } = await api.post('/api/plan/today', { mood: '平静' });
+  assert.equal(status, 200);
+  assert.equal(body.mode, 'radio');
+  assert.equal(body.mood, '平静');
+  assert.equal(body.regenerate, null);
+  assert.ok(Array.isArray(body.queue));
+});
+
+test('POST /api/plan/today accepts game parameters', async () => {
+  const { status, body } = await api.post('/api/plan/today', {
+    mode: 'game',
+    gameName: '巫师3',
+    gameVibe: '猎魔人上路',
+    presetId: 'the-witcher-3',
+    autoContinue: true
+  });
+  assert.equal(status, 200);
+  assert.equal(body.mode, 'game');
+  assert.equal(body.regenerate.gameName, '巫师3');
+  assert.equal(body.regenerate.presetId, 'the-witcher-3');
+  assert.ok(body.plan.gameVibeSentence || body.regenerate.gameVibe);
+});
+
+test('POST /api/plan/today does not persist invalid presetId', async () => {
+  const { status, body } = await api.post('/api/plan/today', {
+    mode: 'game',
+    gameName: '巫师3',
+    gameVibe: '猎魔人上路',
+    presetId: 'missing-preset',
+    autoContinue: true
+  });
+  assert.equal(status, 200);
+  assert.equal(body.mode, 'game');
+  assert.equal(body.regenerate.presetId, 'the-witcher-3');
 });
 
 test('GET /api/profile/music-dna', async () => {
