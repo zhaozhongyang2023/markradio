@@ -188,6 +188,29 @@ test('POST /api/ai/game-whisper returns Assassin line', async () => {
   assert.ok(body.text);
 });
 
+test('POST /api/ai/game-whisper returns preset lines for all builtin game packs', async () => {
+  const cases = [
+    ['the-witcher-3', '巫师3'],
+    ['assassins-creed-shadows', '刺客信条·影'],
+    ['cyberpunk-2077', '赛博朋克2077'],
+    ['zelda-botw', '塞尔达传说·旷野之息'],
+    ['resident-evil-4', '生化危机4·重制版']
+  ];
+
+  for (const [presetId, gameName] of cases) {
+    const { status, body } = await api.post('/api/ai/game-whisper', {
+      gameName,
+      presetId,
+      event: 'start'
+    });
+    assert.equal(status, 200);
+    assert.equal(body.ok, true);
+    assert.equal(body.source, 'preset');
+    assert.equal(body.presetId, presetId);
+    assert.ok(body.text);
+  }
+});
+
 test('POST /api/ai/game-whisper returns fallback for unknown game', async () => {
   const { status, body } = await api.post('/api/ai/game-whisper', {
     gameName: '未知游戏',

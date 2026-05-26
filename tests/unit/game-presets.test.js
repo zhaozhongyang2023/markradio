@@ -254,6 +254,24 @@ test('createGameWhisper falls back from invalid presetId to gameName', () => {
   assert.ok(result.text);
 });
 
+test('createGameWhisper has preset whispers for all builtin game packs', () => {
+  const cases = [
+    ['the-witcher-3', '巫师3'],
+    ['assassins-creed-shadows', '刺客信条·影'],
+    ['cyberpunk-2077', '赛博朋克2077'],
+    ['zelda-botw', '塞尔达传说·旷野之息'],
+    ['resident-evil-4', '生化危机4·重制版']
+  ];
+
+  for (const [presetId, gameName] of cases) {
+    const result = createGameWhisper({ presetId, gameName, event: 'start' });
+    assert.equal(result.ok, true);
+    assert.equal(result.source, 'preset');
+    assert.equal(result.presetId, presetId);
+    assert.ok(result.text);
+  }
+});
+
 test('preset without whispers still loads', () => {
   const preset = validatePresetInput({
     id: 'no-whispers',
