@@ -1,0 +1,108 @@
+{
+  "id": "zelda-botw",
+  "displayName": "塞尔达传说·旷野之息",
+  "gameNames": [
+    "塞尔达",
+    "塞尔达传说",
+    "旷野之息",
+    "塞尔达旷野之息",
+    "BotW",
+    "Breath of the Wild",
+    "Zelda"
+  ],
+  "world": [
+    "海拉鲁旷野",
+    "草原与雪山",
+    "古代神殿",
+    "精灵森林",
+    "自由探索",
+    "滑翔与攀爬"
+  ],
+  "djPersona": "像一位在哈特诺村山顶用希卡石板放歌的旅人。语气轻快，知道每座神庙的位置，也尊重每一场雨。",
+  "musicDirection": [
+    "极简钢琴",
+    "环境氛围",
+    "管弦轻奏",
+    "自然采样",
+    "治愈系"
+  ],
+  "defaultScene": "plains-ride",
+  "scenes": [
+    {
+      "id": "plains-ride",
+      "label": "平原驰骋",
+      "icon": "⌖",
+      "mood": "开心",
+      "vibe": "风在耳边，马在脚下。",
+      "musicDirection": [
+        "钢琴轻奏",
+        "管弦轻快",
+        "开放感",
+        "自然氛围"
+      ],
+      "weather": ["clear"],
+      "time": ["morning", "noon", "afternoon"],
+      "sampleLines": [
+        "远远看到一座神庙。",
+        "今天的海拉鲁天气不错。"
+      ]
+    },
+    {
+      "id": "shrine-puzzle",
+      "label": "神殿解谜",
+      "icon": "✦",
+      "mood": "平静",
+      "vibe": "静下来，感受一下。",
+      "musicDirection": [
+        "极简氛围",
+        "电子轻音",
+        "空灵感",
+        "单音旋律"
+      ],
+      "weather": ["clear", "cloudy"],
+      "time": ["morning", "noon", "afternoon"],
+      "sampleLines": [
+        "神庙里很安静，听自己的呼吸。",
+        "这个谜题，慢慢来。"
+      ]
+    },
+    {
+      "id": "rain-climb",
+      "label": "雨夜攀爬",
+      "icon": "☾",
+      "mood": "治愈",
+      "vibe": "下雨了，但别停。",
+      "musicDirection": [
+        "雨声采样",
+        "极简钢琴",
+        "治愈系",
+        "木质打击"
+      ],
+      "weather": ["rain"],
+      "time": ["night", "evening"],
+      "sampleLines": [
+        "雨让石头变滑，但风景更好。",
+        "找个檐下躲一躲，听听雨。"
+      ]
+    },
+    {
+      "id": "stable-campfire",
+      "label": "篝火驿站",
+      "icon": "✦",
+      "mood": "治愈",
+      "vibe": "坐下，料理刚做好。",
+      "musicDirection": [
+        "LoFi",
+        "木吉他",
+        "轻打击",
+        "驿站氛围"
+      ],
+      "weather": ["clear", "cloudy"],
+      "time": ["evening", "night"],
+      "sampleLines": [
+        "驿站今晚有位子。",
+        "烤个苹果吧，恢复一下。"
+      ]
+    }
+  ]
+}

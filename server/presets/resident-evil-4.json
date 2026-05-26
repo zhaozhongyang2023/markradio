@@ -1,0 +1,108 @@
+{
+  "id": "resident-evil-4",
+  "displayName": "生化危机4·重制版",
+  "gameNames": [
+    "生化危机4",
+    "生化危机4重制",
+    "生化4",
+    "恶灵古堡4",
+    "Resident Evil 4",
+    "RE4",
+    "Biohazard 4"
+  ],
+  "world": [
+    "西班牙村庄",
+    "寄生恐怖",
+    "哥特城堡",
+    "孤岛实验室",
+    "生存恐怖",
+    "商人补给"
+  ],
+  "djPersona": "像一位在村庄教堂里用打字机存档的幸存者。语气压得很低，知道哪里有弹药，也知道哪里不该去。",
+  "musicDirection": [
+    "工业恐怖",
+    "管弦紧张",
+    "低频环境",
+    "哥特氛围",
+    "脉冲节奏"
+  ],
+  "defaultScene": "village-night",
+  "scenes": [
+    {
+      "id": "village-night",
+      "label": "村庄夜袭",
+      "icon": "⚔",
+      "mood": "愤怒",
+      "vibe": "他们来了，别停。",
+      "musicDirection": [
+        "工业恐怖",
+        "紧张打击",
+        "低频推进",
+        "追逐节奏"
+      ],
+      "weather": ["fog", "rain"],
+      "time": ["night"],
+      "sampleLines": [
+        "背后有脚步声，别回头。",
+        "弹药省着用，先跑。"
+      ]
+    },
+    {
+      "id": "castle-explore",
+      "label": "城堡探索",
+      "icon": "⌖",
+      "mood": "平静",
+      "vibe": "烛火晃，慢慢走。",
+      "musicDirection": [
+        "哥特氛围",
+        "管弦低沉",
+        "空灵感",
+        "钟声采样"
+      ],
+      "weather": ["clear", "cloudy"],
+      "time": ["evening", "night"],
+      "sampleLines": [
+        "走廊很长，回声很远。",
+        "这里的烛台很久没人擦过了。"
+      ]
+    },
+    {
+      "id": "merchant-stop",
+      "label": "商人整备",
+      "icon": "✦",
+      "mood": "治愈",
+      "vibe": "Stranger，有什么好东西？",
+      "musicDirection": [
+        "LoFi",
+        "轻打击",
+        "诡异轻快",
+        "商人氛围"
+      ],
+      "weather": ["clear", "cloudy", "rain"],
+      "time": ["morning", "noon", "afternoon"],
+      "sampleLines": [
+        "商人说今天有好货。",
+        "整理下背包，喘口气。"
+      ]
+    },
+    {
+      "id": "final-escape",
+      "label": "最终逃脱",
+      "icon": "⚡",
+      "mood": "愤怒",
+      "vibe": "跑！什么都别管！",
+      "musicDirection": [
+        "工业电子",
+        "急促鼓点",
+        "紧张管弦",
+        "脉冲推进"
+      ],
+      "weather": ["clear", "cloudy"],
+      "time": ["afternoon", "evening"],
+      "sampleLines": [
+        "直升机的声音，听见了吗？",
+        "最后这段路，一口气冲过去。"
+      ]
+    }
+  ]
+}
