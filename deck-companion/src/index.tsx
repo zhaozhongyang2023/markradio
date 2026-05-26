@@ -162,7 +162,15 @@ async function apiRequest<T>(apiBase: string, path: string, body?: unknown, meth
   };
   try {
     const res = await fetch(url, opts);
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    if (!res.ok) {
+      let msg = `HTTP ${res.status}`;
+      try {
+        const b = await res.json().catch(() => null);
+        if (b?.message) msg = b.message;
+        else if (b?.error) msg = b.error;
+      } catch {}
+      throw new Error(msg);
+    }
     return res.json() as Promise<T>;
   } finally {
     clearTimeout(timeout);
@@ -393,19 +401,16 @@ function Content() {
     setBusy(true);
     setStatus(label);
     setProgress(0);
-    // 模拟进度增长到 85%
+    const startTs = Date.now();
     const timer = setInterval(() => {
-      setProgress((prev) => {
-        if (prev >= 85) return 85;
-        const step = prev < 30 ? 6 : prev < 60 ? 3 : 1;
-        return Math.min(85, prev + step);
-      });
+      const elapsed = (Date.now() - startTs) / 1000;
+      setProgress(Math.min(90, 5 + elapsed * 10.6));
     }, 200);
     runTimerRef.current = timer;
     try {
       await task();
       setProgress(100);
-      runTimeoutRef.current = setTimeout(() => setProgress(0), 600);
+      runTimeoutRef.current = setTimeout(() => setProgress(0), 800);
       await refresh();
     } catch (error) {
       setProgress(0);
@@ -425,8 +430,6 @@ function Content() {
     return () => {
       if (runTimerRef.current) clearInterval(runTimerRef.current);
       if (runTimeoutRef.current) clearTimeout(runTimeoutRef.current);
-      setBusy(false);
-      setProgress(0);
     };
   }, []);
 
