@@ -1,0 +1,107 @@
+{
+  "id": "cyberpunk-2077",
+  "displayName": "赛博朋克2077",
+  "gameNames": [
+    "赛博朋克2077",
+    "赛博朋克",
+    "Cyberpunk 2077",
+    "Cyberpunk",
+    "CP2077",
+    "夜之城"
+  ],
+  "world": [
+    "夜之城霓虹",
+    "义体科技",
+    "街头帮派",
+    "超级企业",
+    "雨夜暗巷",
+    "合成器浪潮"
+  ],
+  "djPersona": "像一位在来生酒吧地下室用黑客芯片混音的网络行者。语气冷但带感情，知道每条暗巷的频率。",
+  "musicDirection": [
+    "合成器浪潮",
+    "工业电子",
+    "暗波",
+    "霓虹氛围",
+    "低频脉动"
+  ],
+  "defaultScene": "night-city-drive",
+  "scenes": [
+    {
+      "id": "night-city-drive",
+      "label": "街头狂飙",
+      "icon": "⚡",
+      "mood": "愤怒",
+      "vibe": "踩到底，别回头看。",
+      "musicDirection": [
+        "合成器浪潮",
+        "工业电子",
+        "快节奏",
+        "重低音"
+      ],
+      "weather": ["clear", "rain"],
+      "time": ["night", "evening"],
+      "sampleLines": [
+        "引擎声比警笛好听。",
+        "这条路我熟，坐稳了。"
+      ]
+    },
+    {
+      "id": "afterlife-bar",
+      "label": "来生酒吧",
+      "icon": "✦",
+      "mood": "平静",
+      "vibe": "来一杯强尼银手。",
+      "musicDirection": [
+        "暗波",
+        "慢节奏电子",
+        "爵士采样",
+        "霓虹氛围"
+      ],
+      "weather": ["clear", "cloudy", "rain"],
+      "time": ["night", "evening"],
+      "sampleLines": [
+        "调酒师认识我，不用开口。",
+        "今晚的月亮是紫色的。"
+      ]
+    },
+    {
+      "id": "arasaka-infiltration",
+      "label": "荒坂渗透",
+      "icon": "☾",
+      "mood": "愤怒",
+      "vibe": "悄无声息，像数据流。",
+      "musicDirection": [
+        "暗波",
+        "紧张电子",
+        "低频脉冲",
+        "奇异音效"
+      ],
+      "weather": ["fog", "rain"],
+      "time": ["night"],
+      "sampleLines": [
+        "别触发警报，呼吸轻一点。",
+        "数据墙后面有人盯着。"
+      ]
+    },
+    {
+      "id": "apartment-rain",
+      "label": "公寓雨夜",
+      "icon": "☾",
+      "mood": "治愈",
+      "vibe": "窗外的霓虹就是今晚的壁纸。",
+      "musicDirection": [
+        "LoFi",
+        "合成器氛围",
+        "雨声采样",
+        "安静脉冲"
+      ],
+      "weather": ["rain"],
+      "time": ["night", "evening"],
+      "sampleLines": [
+        "雨打在霓虹上，很好看。",
+        "把义体关了，今晚做个普通人。"
+      ]
+    }
+  ]
+}

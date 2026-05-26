@@ -14,6 +14,21 @@ let _lastSessionCleanup = 0;
 const DEFAULT_QUEUE_LIMIT = 5;
 const TTS_PRELOAD_LIMIT = 5;
 
+// ─── gameVibeSentence fallback（DeepSeek 常漏填此字段）───
+function fallbackGameVibeSentence(mood, gameName, gameVibe) {
+  const map = {
+    愤怒: ['燃一点，按到底。', '今晚别松手。'],
+    开心: ['节奏跟上来。', '今晚速度别停。'],
+    悲伤: ['慢慢的，不急。', '声音低一点。'],
+    平静: ['夜色压低一点。', '慢慢走，不赶路。'],
+    焦虑: ['深呼吸，放松。', '声音放轻。'],
+    治愈: ['外面下雨，适合慢慢走。', '今晚别太累。'],
+  };
+  const lines = map[mood] || map['平静'];
+  return lines[Math.floor(Math.random() * lines.length)];
+}
+
+
 export async function createRadioPlan({ store, mood: requestedMood = null, nowPlaying = null, deferTts = false, onTtsReady = null, userRequest = '', mode = 'radio', currentPlan = null, gameName = '', gameVibe = '', gamePresetId = '', gamePresetContext = null, autoContinue = false }) {
   // 每 30 分钟清理一次 session 级别的已播放记录，防止长期泄漏
   const nowMs = Date.now();
@@ -86,6 +101,9 @@ export async function createRadioPlan({ store, mood: requestedMood = null, nowPl
   const plan = await generateDjPlan({ messages, fallbackTracks: candidates, mood }).catch((error) =>
     demoPlan(candidates, mood, `GPT-5.5 暂不可用，已降级：${error.message}`)
   );
+  if (!plan.gameVibeSentence && (gameName || gameVibe)) {
+    plan.gameVibeSentence = fallbackGameVibeSentence(mood, gameName, gameVibe);
+  }
   const byId = new Map(candidates.map((track) => [track.id, track]));
   let selected = plan.play.map((id, i) => {
     const track = byId.get(id);

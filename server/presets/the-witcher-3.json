@@ -1,0 +1,132 @@
+{
+  "id": "the-witcher-3",
+  "displayName": "巫师3·狂猎",
+  "gameNames": [
+    "巫师3",
+    "巫师三",
+    "巫师3狂猎",
+    "The Witcher 3",
+    "Witcher 3",
+    "Wild Hunt"
+  ],
+  "world": [
+    "中世纪黑暗奇幻",
+    "猎魔人旅途",
+    "沼泽与森林",
+    "史凯利格群岛",
+    "陶森特葡萄园",
+    "怪物狩猎"
+  ],
+  "djPersona": "像一位坐在乌鸦窝酒馆角落的吟游诗人。语气沙哑，偶尔哼两句，懂得旅途、剑油和寂寞。",
+  "musicDirection": [
+    "中古民谣",
+    "黑暗氛围",
+    "弦乐",
+    "低频",
+    "史诗"
+  ],
+  "defaultScene": "tavern-gwent",
+  "scenes": [
+    {
+      "id": "tavern-gwent",
+      "label": "昆特牌之夜",
+      "icon": "▣",
+      "mood": "平静",
+      "vibe": "来一局？输了请酒。",
+      "musicDirection": [
+        "中古民谣",
+        "鲁特琴",
+        "轻打击",
+        "酒馆氛围"
+      ],
+      "weather": [
+        "rain",
+        "fog",
+        "cloudy"
+      ],
+      "time": [
+        "evening",
+        "night"
+      ],
+      "sampleLines": [
+        "酒温好了，牌在桌上。",
+        "今晚不急，先来一局昆特。"
+      ]
+    },
+    {
+      "id": "swamp-tracking",
+      "label": "沼泽追踪",
+      "icon": "⌖",
+      "mood": "愤怒",
+      "vibe": "银剑出鞘，该干活了。",
+      "musicDirection": [
+        "黑暗氛围",
+        "低频推进",
+        "紧张弦乐",
+        "部落鼓点"
+      ],
+      "weather": [
+        "fog",
+        "rain"
+      ],
+      "time": [
+        "night",
+        "evening"
+      ],
+      "sampleLines": [
+        "沼泽里有东西在动。",
+        "把剑油涂好，别偷懒。"
+      ]
+    },
+    {
+      "id": "skellige-storm",
+      "label": "群岛风暴",
+      "icon": "⚡",
+      "mood": "愤怒",
+      "vibe": "风很大，站稳了。",
+      "musicDirection": [
+        "史诗",
+        "北欧民谣",
+        "风笛",
+        "重击鼓"
+      ],
+      "weather": [
+        "rain",
+        "cloudy"
+      ],
+      "time": [
+        "afternoon",
+        "evening"
+      ],
+      "sampleLines": [
+        "海风里夹着盐和传说。",
+        "别盯着浪看太久。"
+      ]
+    },
+    {
+      "id": "hearth-rest",
+      "label": "旅店歇脚",
+      "icon": "✦",
+      "mood": "治愈",
+      "vibe": "把剑放下，先坐。",
+      "musicDirection": [
+        "LoFi",
+        "木吉他",
+        "安静背景",
+        "篝火噼啪"
+      ],
+      "weather": [
+        "clear",
+        "cloudy"
+      ],
+      "time": [
+        "night",
+        "evening"
+      ],
+      "sampleLines": [
+        "篝火还旺，坐下歇会儿。",
+        "今天挣够克朗了，歇吧。"
+      ]
+    }
+  ]
+}

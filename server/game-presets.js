@@ -265,7 +265,7 @@ function codedError(code, message) {
 function normalizeName(value) {
   return String(value || '')
     .toLowerCase()
-    .replace(/[·'’"“”\s:_\-—–]/g, '')
+    .replace(/[·'’"“”\s:_\-—–：；]/g, '')
     .trim();
 }
 

@@ -7,7 +7,8 @@
     "刺客教条影",
     "Assassin's Creed Shadows",
     "Assassins Creed Shadows",
-    "AC Shadows"
+    "AC Shadows",
+    "刺客信条：影"
   ],
   "world": [
     "战国日本",
@@ -38,8 +39,15 @@
         "潜行感",
         "极简鼓点"
       ],
-      "weather": ["fog", "rain", "cloudy"],
-      "time": ["evening", "night"],
+      "weather": [
+        "fog",
+        "rain",
+        "cloudy"
+      ],
+      "time": [
+        "evening",
+        "night"
+      ],
       "sampleLines": [
         "灯火远一点，脚步轻一点。",
         "今晚适合从屋檐下经过。"
@@ -57,8 +65,14 @@
         "史诗",
         "紧张推进"
       ],
-      "weather": ["clear", "cloudy"],
-      "time": ["afternoon", "evening"],
+      "weather": [
+        "clear",
+        "cloudy"
+      ],
+      "time": [
+        "afternoon",
+        "evening"
+      ],
       "sampleLines": [
         "别急，先把呼吸压住。",
         "刀出鞘前，世界会安静一下。"
@@ -76,8 +90,15 @@
         "氛围",
         "木质乐器"
       ],
-      "weather": ["rain", "fog"],
-      "time": ["afternoon", "evening", "night"],
+      "weather": [
+        "rain",
+        "fog"
+      ],
+      "time": [
+        "afternoon",
+        "evening",
+        "night"
+      ],
       "sampleLines": [
         "雨落在瓦上，路不用赶。",
         "这段路，慢慢穿过就好。"
@@ -95,8 +116,15 @@
         "轻打击",
         "安静背景"
       ],
-      "weather": ["clear", "cloudy"],
-      "time": ["morning", "noon", "afternoon"],
+      "weather": [
+        "clear",
+        "cloudy"
+      ],
+      "time": [
+        "morning",
+        "noon",
+        "afternoon"
+      ],
       "sampleLines": [
         "把刀收好，先让夜静下来。",
         "据点里这会儿，适合慢一点。"

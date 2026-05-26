@@ -383,7 +383,15 @@ bash scripts/install-steamdeck.sh --repo https://github.com/zhaozhongyang2023/ma
 
 ### 网易云 API（建议 — 真实音乐库 + Music DNA 扫码）
 
-网易云 API 需要在 Steam Deck 上本地部署一个小服务。不用担心，Node.js 已经装好了，只需要三步：
+网易云 API 是一个独立的小服务，需要本地部署（Node.js 已经装好了）。
+
+**如果你已经有网易云 API 地址**，直接粘贴到安装提示处即可。装完再配也行：编辑 `~/.config/moodwave/config.env`，加一行：
+
+```
+NETEASE_API_BASE=http://你的API地址
+```
+
+**如果你想本地部署**，三步搞定：
 
 ```bash
 # 1. 克隆网易云 API 项目
@@ -396,14 +404,11 @@ cd ~/netease-api && npm install
 node app.js
 ```
 
-启动后会显示 `server running @ http://localhost:3000`。
-
-安装 MoodWave 时，网易云 API 地址填：`http://127.0.0.1:3000`
+启动后会显示 `server running @ http://localhost:3000`，这个地址就是你的 API 地址，填入 `http://127.0.0.1:3000` 即可。
 
 > 💡 建议配好网易云 API 后再做 Music DNA（第七步），这样才能扫码导入你的网易云红心歌单和听歌记录，AI DJ 才能真正懂你的口味。用 Demo 歌单的话，音乐会比较随机。
 
 > ⚠️ 网易云 API 服务不会开机自启。每次重启 Steam Deck 后，打开终端执行 `cd ~/netease-api && node app.js` 即可。
-
 ### OpenWeather（建议 — DJ 感知天气）
 
 1. 浏览器打开 [openweathermap.org](https://openweathermap.org/api)
