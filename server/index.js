@@ -469,9 +469,43 @@ app.post('/api/plan/today', async (request) => {
     }
   }
   playerStop();
+  const gameName = String(request.body?.gameName || request.body?.name || '').trim();
+  const gameVibe = String(request.body?.gameVibe || request.body?.vibe || '').trim();
+  const sceneId = String(request.body?.sceneId || '').trim();
+  const presetId = String(request.body?.presetId || '').trim();
+  const gameModeRequested = request.body?.mode === 'game' || Boolean(gameName || gameVibe || sceneId || presetId);
+  const presetResult = gameModeRequested
+    ? resolveGamePreset({
+        store,
+        presetId,
+        gameName,
+        weather: store.get('weather'),
+        now: new Date(),
+        sceneId,
+        manual: Boolean(sceneId)
+      })
+    : null;
+  const scene = presetResult?.scene;
+  const resolvedGameVibe = scene?.label || gameVibe;
+  const resolvedVibeHint = scene?.vibe || String(request.body?.vibeHint || '').trim();
+  const djPersona = presetResult?.preset?.djPersona || '你不是 AI 助手。你是一名 Steam Deck 深夜 AI 游戏电台 DJ。语气温柔、简短、有留白、有陪伴感。不要像客服，不要解释算法，不要长篇大论。';
   const plan = await createRadioPlan({
     store,
-    mood: request.body?.mood || null,
+    mode: gameModeRequested ? 'game' : 'radio',
+    mood: request.body?.mood || scene?.mood || null,
+    userRequest: gameModeRequested
+      ? buildGameRadioRequest({
+          djPersona,
+          gameName,
+          gameVibe: resolvedGameVibe,
+          vibeHint: resolvedVibeHint
+        })
+      : '',
+    gameName: gameModeRequested ? gameName : '',
+    gameVibe: gameModeRequested ? resolvedGameVibe : '',
+    gamePresetId: presetResult?.preset?.id || '',
+    gamePresetContext: presetResult?.context || null,
+    autoContinue: request.body?.autoContinue === true,
     deferTts: true,
     onTtsReady: (updatedPlan) => {
       broadcast('plan', updatedPlan);
