@@ -523,6 +523,8 @@ curl -L https://github.com/SteamDeckHomebrew/decky-loader/raw/main/dist/install_
 - 🔍 **AI 寻歌** — 告诉 AI 想听什么（参考 Music DNA）
 
 > V6 新特性：Game Radio 输入游戏名（如「巫师3」），AI 自动感知**游戏世界氛围**，插件渲染**极简世界卡片**（天气+游戏+心情+vibe）。
+>
+> 内置游戏包还会优先使用专属 **Game Whisper**：开始、切歌、换台、雨天、夜晚都有更贴近游戏世界的短句。已覆盖巫师3、刺客信条·影、赛博朋克2077、塞尔达旷野之息、生化危机4 重制版。
 
 ---
 
@@ -573,6 +575,17 @@ systemctl --user restart moodwave.service
 
 > Decky 插件会自动跟随 Steam 重启加载最新版。如果没更新，游戏模式 → Decky → ⚙ → Reload Plugins。
 
+### 升级后验证 Game Whisper
+
+```bash
+curl -s http://127.0.0.1:38765/api/health
+curl -s -X POST http://127.0.0.1:38765/api/ai/game-whisper \
+  -H 'Content-Type: application/json' \
+  -d '{"presetId":"cyberpunk-2077","gameName":"赛博朋克2077","event":"start"}'
+```
+
+如果返回里有 `"source":"preset"` 和一段短句，说明内置游戏包低语已经生效。
+
 ---
 
 ## 卸载
@@ -599,6 +612,7 @@ bash ~/moodwave/scripts/uninstall-steamdeck.sh
 | 网页开了但没歌 | 检查 AI Key：`cat ~/.config/moodwave/config.env` |
 | Decky 找不到 MoodWave | 检查目录：`ls ~/homebrew/plugins/moodwave-deck-companion/` |
 | Game Radio 没反应 | 确认本地 API 还在跑：`curl http://127.0.0.1:38765/api/health` |
+| Game Whisper 没有游戏味 | 升级后重启服务，并确认返回来源：`curl -s -X POST http://127.0.0.1:38765/api/ai/game-whisper -H 'Content-Type: application/json' -d '{"presetId":"the-witcher-3","gameName":"巫师3","event":"start"}'` |
 | 装完显示 Demo 歌单 | 正常现象。配置网易云 API + 生成 Music DNA 后更精准 |
 | 怎么换 AI Key | 编辑 `~/.config/moodwave/config.env`，改 `AI_API_KEY=`，重启服务 |
 | 忘记 sudo 密码 | 桌面模式 → 系统设置 → 用户 → 改密码 |

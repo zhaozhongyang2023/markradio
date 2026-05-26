@@ -95,6 +95,8 @@ JRPG OST / LoFi / City Pop
 
 > 你在玩什么，它知道。**中世纪篝火 → 民谣感、赛博霓虹 → Synthwave。**
 
+V6 内置游戏包现在带有专属 **Game Whisper**：开始、切歌、换台、雨天、夜晚都会优先使用对应世界观短句。巫师3、刺客信条·影、赛博朋克2077、塞尔达旷野之息、生化危机4 重制版都已覆盖，未知游戏会自动降级为通用 DJ 低语。
+
 ### 🔍 AI 寻歌 — 自然语言找歌
 
 告诉 AI 你想听什么，它帮你找。不是搜索引擎——AI 理解**情绪、画面感、年代感、游戏感**，同时参考你的 Music DNA。
@@ -125,6 +127,7 @@ JRPG OST / LoFi / City Pop
 
 - 🧠 **AI DJ 灵魂系统** — 克制、少语，像一个活在你时空里的 DJ
 - 🌍 **游戏世界感** — 在巫师3里像中世纪篝火，在赛博朋克里像霓虹都市
+- 🗣️ **Game Whisper** — 内置游戏包有专属开始/切歌/换台/天气/夜晚短句，未知游戏自动降级
 - 🖼️ **极简世界卡片** — 天气 + 游戏名 + 心情 + 一句温柔的独白，不抢注意力
 - 🧬 **Music DNA** — 五维音乐人格：核心情绪 / 聆听状态 / 音乐性格 / 游戏氛围 / 置信度，DNA 加权搜索直接影响选歌
 - 🌤️ **情绪势能追踪** — 记得你上次听的是什么，不会让你腻
@@ -199,6 +202,7 @@ POST /api/ai/radio         # AI 电台（参考 Music DNA + 情绪势能）
 POST /api/ai/search        # AI 寻歌（参考 Music DNA）
 POST /api/ai/next-radio    # 换个氛围
 POST /api/ai/game-radio    # 游戏电台（注入 DJ 灵魂 + 游戏世界感 + vibe 文案）
+POST /api/ai/game-whisper  # 游戏氛围短句（内置游戏包优先，未知游戏降级）
 POST /api/play             # 播放
 POST /api/pause            # 暂停
 POST /api/next             # 下一首
