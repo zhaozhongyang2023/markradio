@@ -541,7 +541,6 @@ function Content() {
   function renderVinylRecord(minimal = false) {
     return (
       <div className={`mw-vinyl-stage${playing ? ' is-playing' : ''}${minimal ? ' is-minimal' : ''}`} aria-hidden="true">
-        <div className="mw-vinyl-dust" />
         <div className="mw-vinyl-disc">
           <div className={`mw-vinyl-label${vinylCover ? ' has-cover' : ''}`}>
             <span>{vinylLabel}</span>
@@ -1043,38 +1042,70 @@ function Content() {
           position: relative;
           width: 56px;
           height: 56px;
+          --vinyl-disc-inset: 3px;
+          --vinyl-label-size: 24px;
+          --vinyl-arm-width: 32px;
+          --vinyl-arm-top: 8px;
+          --vinyl-arm-right: -9px;
+          --vinyl-arm-rest: 10deg;
+          --vinyl-arm-play: -8deg;
           flex: 0 0 auto;
           overflow: visible;
         }
         .mw-vinyl-stage.is-minimal {
           width: 72px;
           height: 72px;
-        }
-        .mw-vinyl-dust {
-          position: absolute;
-          inset: -6px;
-          border-radius: 50%;
-          background-image: radial-gradient(circle, rgba(218,202,163,.72) 0 1px, transparent 1.35px);
-          background-size: 4px 4px;
-          opacity: .32;
-          transform: rotate(-18deg);
-          -webkit-mask-image: radial-gradient(circle at 44% 52%, transparent 0 32%, #000 33% 58%, transparent 59%);
-          mask-image: radial-gradient(circle at 44% 52%, transparent 0 32%, #000 33% 58%, transparent 59%);
+          --vinyl-disc-inset: 4px;
+          --vinyl-label-size: 30px;
+          --vinyl-arm-width: 40px;
+          --vinyl-arm-top: 10px;
+          --vinyl-arm-right: -11px;
+          --vinyl-arm-rest: 10deg;
+          --vinyl-arm-play: -8deg;
         }
         .mw-vinyl-disc {
           position: absolute;
-          inset: 3px;
+          inset: var(--vinyl-disc-inset);
           border-radius: 50%;
           background:
-            radial-gradient(circle at 50% 50%, rgba(255,255,255,.9) 0 2px, transparent 2.5px),
-            radial-gradient(circle at 50% 50%, transparent 0 13px, rgba(255,255,255,.1) 13.5px 14.5px, transparent 15px),
-            repeating-radial-gradient(circle at 50% 50%, #080808 0 2px, #181818 2.6px 3.8px);
+            radial-gradient(circle at 50% 50%, rgba(8,8,8,1) 0 2px, transparent 2.4px),
+            radial-gradient(circle at 50% 50%, transparent 0 15%, rgba(255,255,255,.12) 15.4% 16.4%, transparent 17%),
+            radial-gradient(circle at 50% 50%, transparent 0 54%, rgba(255,255,255,.1) 54.4% 55.4%, transparent 56%),
+            linear-gradient(138deg, transparent 0 18%, rgba(255,255,255,.16) 23%, transparent 34% 100%),
+            repeating-radial-gradient(circle at 50% 50%, #050505 0 1.3px, #171717 1.7px 2.4px, #0b0b0b 2.8px 4px);
           box-shadow:
-            inset 0 0 0 1px rgba(255,255,255,.08),
-            inset 0 0 12px rgba(255,255,255,.04),
-            0 8px 18px rgba(0,0,0,.34);
+            inset 0 0 0 1px rgba(255,255,255,.12),
+            inset 0 0 0 3px rgba(0,0,0,.5),
+            inset 6px -10px 18px rgba(0,0,0,.62),
+            inset -8px 9px 16px rgba(255,255,255,.045),
+            0 8px 18px rgba(0,0,0,.38);
           animation: mw-vinyl-spin 5.2s linear infinite;
           animation-play-state: paused;
+        }
+        .mw-vinyl-disc::before {
+          content: "";
+          position: absolute;
+          inset: 7%;
+          border-radius: 50%;
+          border: 1px solid rgba(255,255,255,.08);
+          box-shadow:
+            inset 0 0 0 5px rgba(0,0,0,.2),
+            0 0 0 1px rgba(0,0,0,.5);
+          pointer-events: none;
+        }
+        .mw-vinyl-disc::after {
+          content: "";
+          position: absolute;
+          left: 50%;
+          top: 50%;
+          width: 5px;
+          height: 5px;
+          border-radius: 50%;
+          transform: translate(-50%, -50%);
+          background: rgba(5,5,5,.95);
+          box-shadow: 0 0 0 1px rgba(255,255,255,.2);
+          pointer-events: none;
+          z-index: 2;
         }
         .mw-vinyl-stage.is-playing .mw-vinyl-disc {
           animation-play-state: running;
@@ -1086,8 +1117,8 @@ function Content() {
           display: flex;
           align-items: center;
           justify-content: center;
-          width: 24px;
-          height: 24px;
+          width: var(--vinyl-label-size);
+          height: var(--vinyl-label-size);
           border-radius: 50%;
           transform: translate(-50%, -50%);
           background:
@@ -1101,6 +1132,7 @@ function Content() {
           text-align: center;
           box-shadow: inset 0 0 0 1px rgba(255,255,255,.34);
           overflow: hidden;
+          z-index: 1;
         }
         .mw-vinyl-label span {
           max-width: 18px;
@@ -1123,12 +1155,7 @@ function Content() {
           object-fit: cover;
           box-shadow: inset 0 0 0 1px rgba(255,255,255,.22);
         }
-        .mw-vinyl-stage.is-minimal .mw-vinyl-disc {
-          inset: 4px;
-        }
         .mw-vinyl-stage.is-minimal .mw-vinyl-label {
-          width: 30px;
-          height: 30px;
           font-size: 9px;
         }
         .mw-vinyl-stage.is-minimal .mw-vinyl-label span {
@@ -1136,47 +1163,51 @@ function Content() {
         }
         .mw-vinyl-arm {
           position: absolute;
-          top: 2px;
-          right: 0;
-          width: 30px;
-          height: 12px;
-          transform: rotate(32deg);
-          transform-origin: 27px 6px;
+          top: var(--vinyl-arm-top);
+          right: var(--vinyl-arm-right);
+          width: var(--vinyl-arm-width);
+          height: 14px;
+          transform: rotate(var(--vinyl-arm-rest));
+          transform-origin: calc(100% - 5px) 7px;
           transition: transform .35s ease;
           filter: drop-shadow(0 2px 4px rgba(0,0,0,.35));
+          z-index: 3;
         }
         .mw-vinyl-stage.is-playing .mw-vinyl-arm {
-          transform: rotate(43deg);
+          transform: rotate(var(--vinyl-arm-play));
         }
         .mw-vinyl-arm::before {
           content: "";
           position: absolute;
-          right: -1px;
+          right: 0;
           top: 1px;
-          width: 9px;
-          height: 9px;
+          width: 11px;
+          height: 11px;
           border-radius: 50%;
-          background: rgba(255,255,255,.92);
-          box-shadow: 0 0 0 1px rgba(255,255,255,.2);
+          background: linear-gradient(135deg, rgba(255,255,255,.96), rgba(151,162,166,.88));
+          box-shadow:
+            inset 0 0 0 1px rgba(255,255,255,.34),
+            0 0 0 1px rgba(0,0,0,.35);
         }
         .mw-vinyl-arm span {
           position: absolute;
           left: 0;
-          top: 5px;
-          width: 27px;
+          top: 6px;
+          width: calc(100% - 7px);
           height: 2px;
           border-radius: 999px;
-          background: rgba(255,255,255,.9);
+          background: linear-gradient(90deg, rgba(235,238,234,.96), rgba(159,171,173,.88));
         }
         .mw-vinyl-arm span::after {
           content: "";
           position: absolute;
-          left: -2px;
-          top: -2px;
+          left: -3px;
+          top: -1px;
           width: 7px;
-          height: 6px;
-          border-radius: 2px;
-          background: rgba(255,255,255,.9);
+          height: 5px;
+          border-radius: 1px 4px 4px 1px;
+          background: linear-gradient(135deg, rgba(245,246,240,.96), rgba(119,130,134,.92));
+          box-shadow: 1px 3px 0 -1px rgba(66,216,178,.85);
         }
         @keyframes mw-vinyl-spin {
           to { transform: rotate(360deg); }
