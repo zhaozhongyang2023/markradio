@@ -995,7 +995,7 @@ function Content() {
         .mw-mini-record {
           display: grid;
           grid-template-columns: 58px minmax(0, 1fr);
-          gap: 8px;
+          gap: 12px;
           align-items: center;
           margin-bottom: 7px;
           min-width: 0;
@@ -1045,10 +1045,10 @@ function Content() {
           --vinyl-disc-inset: 3px;
           --vinyl-label-size: 24px;
           --vinyl-arm-width: 32px;
-          --vinyl-arm-top: 8px;
+          --vinyl-arm-top: 4px;
           --vinyl-arm-right: -9px;
-          --vinyl-arm-rest: 10deg;
-          --vinyl-arm-play: -8deg;
+          --vinyl-arm-rest: 22deg;
+          --vinyl-arm-play: -3deg;
           flex: 0 0 auto;
           overflow: visible;
         }
@@ -1058,10 +1058,10 @@ function Content() {
           --vinyl-disc-inset: 4px;
           --vinyl-label-size: 30px;
           --vinyl-arm-width: 40px;
-          --vinyl-arm-top: 10px;
+          --vinyl-arm-top: 6px;
           --vinyl-arm-right: -11px;
-          --vinyl-arm-rest: 10deg;
-          --vinyl-arm-play: -8deg;
+          --vinyl-arm-rest: 22deg;
+          --vinyl-arm-play: -3deg;
         }
         .mw-vinyl-disc {
           position: absolute;
@@ -1337,7 +1337,7 @@ function Content() {
         .mw-minimal-vinyl-row {
           display: grid;
           grid-template-columns: 76px minmax(0, 1fr);
-          gap: 10px;
+          gap: 14px;
           align-items: center;
           margin: 3px 0 9px;
           min-width: 0;
