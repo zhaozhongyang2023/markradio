@@ -20,7 +20,7 @@ import { buildCastUrl, resolveCastHost } from './cast-url.js';
 import { callNetease, checkNeteaseQr, createNeteaseQr, getNeteaseLoginStatus } from './netease-auth.js';
 import { getWeather } from './weather.js';
 import { loadMusicDNA, saveMusicDNA, generateMusicDNA, getMusicDNASummary, accumulateDnaSignal, maybeRegenerateDna } from './profile.js';
-import { collectNeteaseLibrary } from './providers/netease.js';
+import { collectNeteaseLibrary, getLikedSongs, isNeteaseSongLiked } from './providers/netease.js';
 import { buildGameRadioRequest, createGameWhisper, deleteCommunityPreset, listGamePresets, reloadGamePresetCatalog, resolveGamePreset, saveCommunityPreset } from './game-presets.js';
 
 const store = new StateStore();
@@ -362,6 +362,22 @@ app.post('/api/netease/qr/check', async (request) => {
   const key = String(request.body?.key || '');
   if (!key) return { code: 400, message: 'missing key', loggedIn: false };
   return checkNeteaseQr(store, key);
+});
+
+app.get('/api/netease/liked', async (request, reply) => {
+  const rawId = String(request.query?.id || '').trim();
+  const id = rawId.replace(/^netease-/, '').trim();
+  if (!/^\d+$/.test(id)) {
+    return reply.code(400).send({ ok: false, message: '缺少有效的网易云歌曲 ID' });
+  }
+
+  const status = await getNeteaseLoginStatus(store).catch(() => ({ loggedIn: false }));
+  if (!status.loggedIn) {
+    return reply.code(401).send({ ok: false, message: '请先登录网易云音乐' });
+  }
+
+  const ids = await getLikedSongs(store);
+  return { ok: true, liked: isNeteaseSongLiked(ids, id), trackId: `netease-${id}` };
 });
 
 app.post('/api/netease/like', async (request, reply) => {

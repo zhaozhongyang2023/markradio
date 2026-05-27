@@ -249,6 +249,18 @@ test('PUT /api/taste', async () => {
   assert.equal(body.taste, '摇滚');
 });
 
+test('GET /api/netease/liked rejects invalid id', async () => {
+  const { status, body } = await api.get('/api/netease/liked?id=abc');
+  assert.equal(status, 400);
+  assert.equal(body.ok, false);
+});
+
+test('GET /api/netease/liked returns 401 when not logged in', async () => {
+  const { status, body } = await api.get('/api/netease/liked?id=123');
+  assert.equal(status, 401);
+  assert.equal(body.ok, false);
+});
+
 test('GET /api/voice', async () => {
   const { status, body } = await api.get('/api/voice');
   assert.equal(status, 200);

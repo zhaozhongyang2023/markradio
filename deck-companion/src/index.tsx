@@ -96,6 +96,12 @@ type GameWhisperPayload = {
   ttl?: number;
 };
 
+type NeteaseLikedPayload = {
+  ok?: boolean;
+  liked?: boolean;
+  trackId?: string;
+};
+
 type Page = 'radio' | 'search' | 'game' | 'settings';
 
 const moods = [
@@ -245,6 +251,15 @@ function cityLabel(raw: string): string {
   return cityNameMap[name] || name;
 }
 
+function neteaseTrackId(track: Track | null): string {
+  if (!track) return '';
+  const sourceId = String(track.sourceId || '').trim();
+  if (sourceId) return sourceId;
+  const id = String(track.id || '').trim();
+  if (id.startsWith('netease-')) return id.replace(/^netease-/, '');
+  return track.source === 'netease' ? id : '';
+}
+
 function Content() {
   const [apiBase, setApiBase] = useState(() => {
     const storedVersion = localStorage.getItem('moodwave.deck.configVersion');
@@ -272,6 +287,8 @@ function Content() {
   const [gamePresetMessage, setGamePresetMessage] = useState('');
   const [gamePresetLoading, setGamePresetLoading] = useState(false);
   const [gameWhisper, setGameWhisper] = useState('');
+  const [trackLiked, setTrackLiked] = useState<boolean | null>(null);
+  const [favoriteBusy, setFavoriteBusy] = useState(false);
   const gameNameEditedRef = useRef(false);  // 用户手动编辑后不再自动覆盖
   const [minimalMode, setMinimalMode] = useState(() => localStorage.getItem(MINIMAL_KEY) === '1');
   const [autoContinue, setAutoContinue] = useState(() => localStorage.getItem(AUTO_CONTINUE_KEY) === '1');
@@ -436,6 +453,7 @@ function Content() {
   const runTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const runTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const whisperTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const likedRequestRef = useRef(0);
   // 组件卸载时清理运行中的 timer
   useEffect(() => {
     return () => {
@@ -493,6 +511,7 @@ function Content() {
 
   const currentMood = (now.now?.mood || currentPlan?.mood || now.plans?.radio?.mood || '').trim();
   const queue = currentPlan?.queue || [];
+  const canFavoriteTrack = Boolean(neteaseTrackId(track));
   const djLine = currentPlan?.tts?.text || currentPlan?.plan?.say || currentPlan?.plan?.reply || '';
   const djForTrack = (() => {
     const idx = queue.findIndex(t => t.id === track?.id || (track?.sourceId && t.sourceId === track?.sourceId));
@@ -692,11 +711,52 @@ function Content() {
     }
   }
 
+  async function refreshTrackLiked(nextTrack = track) {
+    const songId = neteaseTrackId(nextTrack);
+    const requestId = likedRequestRef.current + 1;
+    likedRequestRef.current = requestId;
+    if (!songId) {
+      setTrackLiked(null);
+      return;
+    }
+    try {
+      const payload = await apiRequest<NeteaseLikedPayload>(apiBase, `/api/netease/liked?id=${encodeURIComponent(songId)}`);
+      if (likedRequestRef.current !== requestId) return;
+      setTrackLiked(Boolean(payload.liked));
+    } catch {
+      if (likedRequestRef.current !== requestId) return;
+      setTrackLiked(null);
+    }
+  }
+
+  async function toggleTrackLiked() {
+    const songId = neteaseTrackId(track);
+    if (!track || !songId || favoriteBusy) return;
+    const previous = trackLiked === true;
+    const next = !previous;
+    setFavoriteBusy(true);
+    setTrackLiked(next);
+    try {
+      const payload = await apiRequest<NeteaseLikedPayload>(apiBase, '/api/netease/like', { track, like: next });
+      setTrackLiked(Boolean(payload.liked));
+      setStatus(payload.liked ? '已收藏到网易云' : '已取消收藏');
+    } catch (error) {
+      setTrackLiked(previous);
+      setStatus(error instanceof Error ? error.message : '网易云收藏失败');
+    } finally {
+      setFavoriteBusy(false);
+    }
+  }
+
   useEffect(() => {
     const trackKey = track?.id || track?.sourceId || track?.title || '';
     if (!trackKey || !playing || getActiveMode(now) !== 'game') return;
     requestGameWhisper('track_change', false);
   }, [track?.id, track?.sourceId, track?.title, playing, now.now?.mode]);
+
+  useEffect(() => {
+    refreshTrackLiked(track);
+  }, [track?.id, track?.sourceId, track?.source, apiBase]);
 
   return (
     <div className="mw-root">
@@ -780,6 +840,9 @@ function Content() {
           grid-template-columns: repeat(3, minmax(0, 1fr));
           gap: 5px;
         }
+        .mw-grid.four {
+          grid-template-columns: repeat(4, minmax(0, 1fr));
+        }
         .mw-grid.two {
           grid-template-columns: repeat(2, minmax(0, 1fr));
         }
@@ -839,6 +902,11 @@ function Content() {
           font-size: 15px;
           line-height: 1;
           text-overflow: clip;
+        }
+        .mw-button.is-favorite {
+          border-color: rgba(66,216,178,.46);
+          color: #42d8b2;
+          text-shadow: 0 0 10px rgba(66,216,178,.34);
         }
         .mw-busy-dot {
           display: inline-block;
@@ -1072,7 +1140,7 @@ function Content() {
         }
         .mw-minimal-transport {
           display: grid;
-          grid-template-columns: 1fr 1fr 1fr;
+          grid-template-columns: repeat(4, minmax(0, 1fr));
           gap: 4px;
           margin-bottom: 5px;
         }
@@ -1317,6 +1385,7 @@ function Content() {
             <button type="button" className="mw-button is-transport" disabled={busy} title="上一首" onClick={() => run('上一首', () => apiRequest(apiBase, '/api/prev', {}))}>⏮</button>
             <button type="button" className="mw-button is-transport" disabled={busy} title={playing ? '暂停' : '播放'} onClick={() => run(playing ? '暂停' : '播放', () => apiRequest(apiBase, playing ? '/api/pause' : '/api/play', {}))}>{playing ? '⏯' : '▶'}</button>
             <button type="button" className="mw-button is-transport" disabled={busy} title="下一首" onClick={() => run('下一首', () => apiRequest(apiBase, '/api/next', {}))}>⏭</button>
+            <button type="button" className={`mw-button is-transport${trackLiked ? ' is-favorite' : ''}`} disabled={busy || favoriteBusy || !canFavoriteTrack} title={trackLiked ? '取消网易云喜欢' : '收藏到网易云喜欢'} onClick={toggleTrackLiked}>{trackLiked ? '♥' : '♡'}</button>
           </div>
           <div className="mw-minimal-actions">
             <AppButton disabled={busy} onClick={handleMinimalNextBetter}>↻ 来点别的</AppButton>
@@ -1353,7 +1422,7 @@ function Content() {
             <div className="mw-mini-title">{trackLine}</div>
             <div className="mw-mini-state">{playing ? "📻 正在陪你" : '我在等你'}</div>
           </div>
-          <div className="mw-grid">
+          <div className="mw-grid four">
             <button
               type="button"
               className="mw-button is-transport"
@@ -1380,6 +1449,15 @@ function Content() {
               onClick={() => run('下一首', () => apiRequest(apiBase, '/api/next', {}))}
             >
               ›
+            </button>
+            <button
+              type="button"
+              className={`mw-button is-transport${trackLiked ? ' is-favorite' : ''}`}
+              disabled={busy || favoriteBusy || !canFavoriteTrack}
+              title={trackLiked ? '取消网易云喜欢' : '收藏到网易云喜欢'}
+              onClick={toggleTrackLiked}
+            >
+              {trackLiked ? '♥' : '♡'}
             </button>
           </div>
           {playing ? <div className="mw-progress-bar"><div className="mw-progress-bar-fill" style={{width: `${Math.round(progressRatio * 100)}%`}} /></div> : null}
