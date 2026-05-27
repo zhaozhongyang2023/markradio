@@ -48,7 +48,7 @@ test('normalizeNeteaseResponse accepts cloudsearch result songs', () => {
         id: 2080477031,
         name: '乌兰巴托的夜',
         ar: [{ name: '谭维维' }],
-        al: { name: '热门华语' },
+        al: { name: '热门华语', picUrl: 'https://p1.music.126.net/cover.jpg' },
         dt: 240000
       }]
     }
@@ -57,6 +57,7 @@ test('normalizeNeteaseResponse accepts cloudsearch result songs', () => {
   assert.equal(tracks[0].id, 'netease-2080477031');
   assert.equal(tracks[0].title, '乌兰巴托的夜');
   assert.equal(tracks[0].artist, '谭维维');
+  assert.equal(tracks[0].coverUrl, 'https://p1.music.126.net/cover.jpg');
 });
 
 // ─── buildDemoQueue ───

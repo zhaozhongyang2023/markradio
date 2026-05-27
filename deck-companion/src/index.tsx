@@ -24,10 +24,26 @@ type Track = {
   sourceId?: string;
   title?: string;
   artist?: string;
+  coverUrl?: string;
+  picUrl?: string;
+  albumPicUrl?: string;
+  imageUrl?: string;
+  artworkUrl?: string;
   reason?: string;
   lyric?: Array<{ time: number; text: string }>;
   duration?: number;
 };
+
+function vinylLabelForTrack(track: Track | null): string {
+  const text = `${track?.title || ''}${track?.artist || ''}`.trim();
+  if (!text) return 'MW';
+  const chars = Array.from(text).filter((ch) => /[A-Za-z0-9\u4e00-\u9fff]/.test(ch));
+  return (chars.slice(0, 2).join('') || 'MW').toUpperCase();
+}
+
+function vinylCoverForTrack(track: Track | null): string {
+  return String(track?.coverUrl || track?.picUrl || track?.albumPicUrl || track?.imageUrl || track?.artworkUrl || '').trim();
+}
 
 type NowPayload = {
   now?: {
@@ -519,6 +535,23 @@ function Content() {
     return '';
   })();
   const trackLine = track?.title ? `${track.title}${track.artist ? ` - ${track.artist}` : ''}` : "AI DJ 准备中...";
+  const vinylLabel = vinylLabelForTrack(track);
+  const vinylCover = vinylCoverForTrack(track);
+
+  function renderVinylRecord(minimal = false) {
+    return (
+      <div className={`mw-vinyl-stage${playing ? ' is-playing' : ''}${minimal ? ' is-minimal' : ''}`} aria-hidden="true">
+        <div className="mw-vinyl-dust" />
+        <div className="mw-vinyl-disc">
+          <div className={`mw-vinyl-label${vinylCover ? ' has-cover' : ''}`}>
+            <span>{vinylLabel}</span>
+            {vinylCover ? <img src={vinylCover} alt="" onError={(event) => { event.currentTarget.style.display = 'none'; }} /> : null}
+          </div>
+        </div>
+        <div className="mw-vinyl-arm"><span /></div>
+      </div>
+    );
+  }
 
   function saveGameName(value: string, fromBlur = false) {
     const v = String(value || "");
@@ -960,6 +993,17 @@ function Content() {
         .mw-mini {
           margin-bottom: 7px;
         }
+        .mw-mini-record {
+          display: grid;
+          grid-template-columns: 58px minmax(0, 1fr);
+          gap: 8px;
+          align-items: center;
+          margin-bottom: 7px;
+          min-width: 0;
+        }
+        .mw-mini-copy {
+          min-width: 0;
+        }
         .mw-mini-head {
           display: flex;
           align-items: center;
@@ -994,6 +1038,148 @@ function Content() {
           color: rgba(66,216,178,.86);
           font-size: 9.5px;
           font-weight: 800;
+        }
+        .mw-vinyl-stage {
+          position: relative;
+          width: 56px;
+          height: 56px;
+          flex: 0 0 auto;
+          overflow: visible;
+        }
+        .mw-vinyl-stage.is-minimal {
+          width: 72px;
+          height: 72px;
+        }
+        .mw-vinyl-dust {
+          position: absolute;
+          inset: -6px;
+          border-radius: 50%;
+          background-image: radial-gradient(circle, rgba(218,202,163,.72) 0 1px, transparent 1.35px);
+          background-size: 4px 4px;
+          opacity: .32;
+          transform: rotate(-18deg);
+          -webkit-mask-image: radial-gradient(circle at 44% 52%, transparent 0 32%, #000 33% 58%, transparent 59%);
+          mask-image: radial-gradient(circle at 44% 52%, transparent 0 32%, #000 33% 58%, transparent 59%);
+        }
+        .mw-vinyl-disc {
+          position: absolute;
+          inset: 3px;
+          border-radius: 50%;
+          background:
+            radial-gradient(circle at 50% 50%, rgba(255,255,255,.9) 0 2px, transparent 2.5px),
+            radial-gradient(circle at 50% 50%, transparent 0 13px, rgba(255,255,255,.1) 13.5px 14.5px, transparent 15px),
+            repeating-radial-gradient(circle at 50% 50%, #080808 0 2px, #181818 2.6px 3.8px);
+          box-shadow:
+            inset 0 0 0 1px rgba(255,255,255,.08),
+            inset 0 0 12px rgba(255,255,255,.04),
+            0 8px 18px rgba(0,0,0,.34);
+          animation: mw-vinyl-spin 5.2s linear infinite;
+          animation-play-state: paused;
+        }
+        .mw-vinyl-stage.is-playing .mw-vinyl-disc {
+          animation-play-state: running;
+        }
+        .mw-vinyl-label {
+          position: absolute;
+          left: 50%;
+          top: 50%;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          width: 24px;
+          height: 24px;
+          border-radius: 50%;
+          transform: translate(-50%, -50%);
+          background:
+            linear-gradient(135deg, rgba(66,216,178,.92), rgba(226,202,132,.82)),
+            radial-gradient(circle at 35% 30%, rgba(255,255,255,.8), transparent 42%);
+          color: rgba(0,0,0,.72);
+          font-size: 8px;
+          font-weight: 900;
+          line-height: 1;
+          letter-spacing: 0;
+          text-align: center;
+          box-shadow: inset 0 0 0 1px rgba(255,255,255,.34);
+          overflow: hidden;
+        }
+        .mw-vinyl-label span {
+          max-width: 18px;
+          overflow: hidden;
+          text-overflow: clip;
+          white-space: nowrap;
+        }
+        .mw-vinyl-label.has-cover {
+          color: rgba(255,255,255,.78);
+          background:
+            linear-gradient(135deg, rgba(16,16,16,.88), rgba(66,216,178,.22)),
+            radial-gradient(circle at 35% 30%, rgba(255,255,255,.32), transparent 42%);
+        }
+        .mw-vinyl-label.has-cover img {
+          position: absolute;
+          inset: 0;
+          width: 100%;
+          height: 100%;
+          border-radius: 50%;
+          object-fit: cover;
+          box-shadow: inset 0 0 0 1px rgba(255,255,255,.22);
+        }
+        .mw-vinyl-stage.is-minimal .mw-vinyl-disc {
+          inset: 4px;
+        }
+        .mw-vinyl-stage.is-minimal .mw-vinyl-label {
+          width: 30px;
+          height: 30px;
+          font-size: 9px;
+        }
+        .mw-vinyl-stage.is-minimal .mw-vinyl-label span {
+          max-width: 23px;
+        }
+        .mw-vinyl-arm {
+          position: absolute;
+          top: 2px;
+          right: 0;
+          width: 30px;
+          height: 12px;
+          transform: rotate(32deg);
+          transform-origin: 27px 6px;
+          transition: transform .35s ease;
+          filter: drop-shadow(0 2px 4px rgba(0,0,0,.35));
+        }
+        .mw-vinyl-stage.is-playing .mw-vinyl-arm {
+          transform: rotate(43deg);
+        }
+        .mw-vinyl-arm::before {
+          content: "";
+          position: absolute;
+          right: -1px;
+          top: 1px;
+          width: 9px;
+          height: 9px;
+          border-radius: 50%;
+          background: rgba(255,255,255,.92);
+          box-shadow: 0 0 0 1px rgba(255,255,255,.2);
+        }
+        .mw-vinyl-arm span {
+          position: absolute;
+          left: 0;
+          top: 5px;
+          width: 27px;
+          height: 2px;
+          border-radius: 999px;
+          background: rgba(255,255,255,.9);
+        }
+        .mw-vinyl-arm span::after {
+          content: "";
+          position: absolute;
+          left: -2px;
+          top: -2px;
+          width: 7px;
+          height: 6px;
+          border-radius: 2px;
+          background: rgba(255,255,255,.9);
+        }
+        @keyframes mw-vinyl-spin {
+          to { transform: rotate(360deg); }
         }
         /* 极简播放态 */
         .mw-minimal {
@@ -1116,6 +1302,20 @@ function Content() {
           overflow: hidden;
           text-overflow: ellipsis;
           white-space: nowrap;
+        }
+        .mw-minimal-vinyl-row {
+          display: grid;
+          grid-template-columns: 76px minmax(0, 1fr);
+          gap: 10px;
+          align-items: center;
+          margin: 3px 0 9px;
+          min-width: 0;
+        }
+        .mw-minimal-vinyl-copy {
+          min-width: 0;
+        }
+        .mw-minimal-vinyl-copy .mw-minimal-progress {
+          margin-bottom: 0;
         }
         .mw-minimal-progress {
           height: 2.5px;
@@ -1377,9 +1577,14 @@ function Content() {
           {djForTrack ? (
             <div className="mw-minimal-quote mw-minimal-quote-track">{djForTrack}</div>
           ) : null}
-          <div className="mw-minimal-playing">{(() => { const m2 = getActiveMode(now); return m2 === 'game' ? '🎮 正在陪你' : '📻 正在陪你'; })()}</div>
-          <div className="mw-minimal-track">{track.title || '未知歌曲'}{track.artist ? ' — ' + track.artist : ''}</div>
-          {playing ? <div className="mw-minimal-progress"><div className="mw-minimal-progress-fill" style={{width: `${Math.round(progressRatio * 100)}%`}} /></div> : null}
+          <div className="mw-minimal-vinyl-row">
+            {renderVinylRecord(true)}
+            <div className="mw-minimal-vinyl-copy">
+              <div className="mw-minimal-playing">{(() => { const m2 = getActiveMode(now); return m2 === 'game' ? '🎮 正在陪你' : '📻 正在陪你'; })()}</div>
+              <div className="mw-minimal-track">{track.title || '未知歌曲'}{track.artist ? ' — ' + track.artist : ''}</div>
+              {playing ? <div className="mw-minimal-progress"><div className="mw-minimal-progress-fill" style={{width: `${Math.round(progressRatio * 100)}%`}} /></div> : null}
+            </div>
+          </div>
           {(() => { const lyric = getCurrentLyric(track, progressRatio); return lyric ? <div className="mw-minimal-lyric">{lyric}</div> : null; })()}
           <div className="mw-minimal-transport">
             <button type="button" className="mw-button is-transport" disabled={busy} title="上一首" onClick={() => run('上一首', () => apiRequest(apiBase, '/api/prev', {}))}>⏮</button>
@@ -1418,9 +1623,15 @@ function Content() {
 
       {page !== 'settings' && (
         <div className="mw-card mw-mini">
-          <div className="mw-mini-head">
-            <div className="mw-mini-title">{trackLine}</div>
-            <div className="mw-mini-state">{playing ? "📻 正在陪你" : '我在等你'}</div>
+          <div className="mw-mini-record">
+            {renderVinylRecord(false)}
+            <div className="mw-mini-copy">
+              <div className="mw-mini-head">
+                <div className="mw-mini-title">{trackLine}</div>
+                <div className="mw-mini-state">{playing ? "正在旋转" : '待落针'}</div>
+              </div>
+              {playing ? <div className="mw-progress-bar"><div className="mw-progress-bar-fill" style={{width: `${Math.round(progressRatio * 100)}%`}} /></div> : null}
+            </div>
           </div>
           <div className="mw-grid four">
             <button
@@ -1460,7 +1671,6 @@ function Content() {
               {trackLiked ? '♥' : '♡'}
             </button>
           </div>
-          {playing ? <div className="mw-progress-bar"><div className="mw-progress-bar-fill" style={{width: `${Math.round(progressRatio * 100)}%`}} /></div> : null}
         </div>
       )}
 
