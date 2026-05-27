@@ -1214,7 +1214,7 @@ function Content() {
         }
         /* 极简播放态 */
         .mw-minimal {
-          padding: 6px 0;
+          padding: 2px 0;
         }
         .mw-minimal-tags {
           display: flex;
