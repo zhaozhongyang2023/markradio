@@ -1047,7 +1047,7 @@ function Content() {
           --vinyl-arm-width: 32px;
           --vinyl-arm-top: 4px;
           --vinyl-arm-right: -9px;
-          --vinyl-arm-rest: 22deg;
+          --vinyl-arm-rest: 28deg;
           --vinyl-arm-play: -3deg;
           flex: 0 0 auto;
           overflow: visible;
@@ -1060,7 +1060,7 @@ function Content() {
           --vinyl-arm-width: 40px;
           --vinyl-arm-top: 6px;
           --vinyl-arm-right: -11px;
-          --vinyl-arm-rest: 22deg;
+          --vinyl-arm-rest: 28deg;
           --vinyl-arm-play: -3deg;
         }
         .mw-vinyl-disc {
