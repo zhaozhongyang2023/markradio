@@ -1,4 +1,4 @@
-# 🎵 MoodWave V6 — Steam Deck 完整安装手册
+# 🎵 MoodWave — Steam Deck 完整安装手册
 
 > 装好后，你的 Steam Deck 就多了一个长期陪伴的 AI DJ。🎧
 
@@ -339,7 +339,7 @@ git clone https://github.com/zhaozhongyang2023/markradio.git ~/moodwave
 cd ~/moodwave
 
 # 一键安装
-bash scripts/install-steamdeck.sh --repo https://github.com/zhaozhongyang2023/markradio.git
+bash scripts/remote-install-steamdeck.sh --repo https://github.com/zhaozhongyang2023/markradio.git
 ```
 
 ### 安装过程中会依次问你：
@@ -457,7 +457,7 @@ http://127.0.0.1:38080/api/health
 
 这是 MoodWave 的核心功能。AI 分析你的网易云听歌记录，生成专属 **Music DNA**，三种模式都会参考。
 
-V6 升级：Music DNA 从 3 维升级为 5 维——**核心情绪 / 聆听状态 / 音乐性格 / 游戏氛围 / 置信度**。DNA 直接参与选歌决策：匹配你口味的歌曲自动排到歌单前面，越用越精准。
+Music DNA 五维体系：**核心情绪 / 聆听状态 / 音乐性格 / 游戏氛围 / 置信度**。中文分词精确匹配加 DNA 加权搜索——匹配的关键词越多，歌曲排名越靠前；置信度越高权重越大（high=1.5x / medium=1.0x / low=0.5x）。越用越精准。
 
 ### 操作流程
 
@@ -519,12 +519,10 @@ curl -L https://github.com/SteamDeckHomebrew/decky-loader/raw/main/dist/install_
 点击进入，三个 Tab：
 
 - 🎧 **AI Radio** — 按心情开电台（参考 Music DNA + 情绪势能）
-- 🎮 **Game Radio** — 选游戏氛围配 BGM（注入 DJ 灵魂 + 游戏世界感）
+- 🎮 **Game Radio** — 选游戏氛围配 BGM，自动识别 5 款内置预设（巫师3/刺客信条影/赛博朋克2077/塞尔达/生化危机4）+ 10+ 款热门游戏 fallback，Game Whisper 系统自动生成对应世界观的独白短句
 - 🔍 **AI 寻歌** — 告诉 AI 想听什么（参考 Music DNA）
 
-> V6 新特性：Game Radio 输入游戏名（如「巫师3」），AI 自动感知**游戏世界氛围**，插件渲染**极简世界卡片**（天气+游戏+心情+vibe）。
->
-> 内置游戏包还会优先使用专属 **Game Whisper**：开始、切歌、换台、雨天、夜晚都有更贴近游戏世界的短句。已覆盖巫师3、刺客信条·影、赛博朋克2077、塞尔达旷野之息、生化危机4 重制版。
+播放面板内支持 **网易云喜欢收藏**（♥ 一键收藏/取消），黑胶唱片转盘随歌旋转，播放时唱臂落针、暂停时回位。
 
 ---
 
