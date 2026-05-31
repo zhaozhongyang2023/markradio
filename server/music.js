@@ -131,6 +131,7 @@ export function normalizeNeteaseResponse(data, mood, sourceLabel = '网易云音
     .map((song) => {
       const artists = song.ar || song.artists || [];
       const album = song.al || song.album || {};
+      const coverUrl = album.picUrl || album.blurPicUrl || album.coverUrl || song.picUrl || song.coverUrl || '';
       return {
         id: `netease-${song.id}`,
         source: 'netease',
@@ -138,6 +139,7 @@ export function normalizeNeteaseResponse(data, mood, sourceLabel = '网易云音
         title: song.name,
         artist: artists.map((artist) => artist.name).filter(Boolean).join(' / ') || '未知歌手',
         album: album.name || '网易云音乐',
+        ...(coverUrl ? { coverUrl } : {}),
         duration: Math.max(30, Math.round((song.dt || song.duration || 210000) / 1000)),
         language: inferTrackLanguage({ title: song.name, artist: artists.map((artist) => artist.name).filter(Boolean).join(' / '), sourceLabel }),
         mood: [mood, '平静'],

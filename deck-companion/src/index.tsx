@@ -11,6 +11,8 @@ const GAME_NAME_KEY = 'moodwave.deck.gameName';
 const GAME_VIBE_KEY = 'moodwave.deck.gameVibe';
 const GAME_SCENE_KEY = 'moodwave.deck.gameSceneId';
 const GAME_PRESET_KEY = 'moodwave.deck.gamePresetId';
+const GAME_WHISPER_RECENT_KEY = 'moodwave.deck.gameWhisperRecent';
+const GAME_WHISPER_AUTO_TS_KEY = 'moodwave.deck.gameWhisperAutoTs';
 const QUERY_KEY = 'moodwave.deck.query';
 const MINIMAL_KEY = 'moodwave.deck.minimalMode';
 const AUTO_CONTINUE_KEY = 'moodwave.deck.autoContinue';
@@ -22,10 +24,26 @@ type Track = {
   sourceId?: string;
   title?: string;
   artist?: string;
+  coverUrl?: string;
+  picUrl?: string;
+  albumPicUrl?: string;
+  imageUrl?: string;
+  artworkUrl?: string;
   reason?: string;
   lyric?: Array<{ time: number; text: string }>;
   duration?: number;
 };
+
+function vinylLabelForTrack(track: Track | null): string {
+  const text = `${track?.title || ''}${track?.artist || ''}`.trim();
+  if (!text) return 'MW';
+  const chars = Array.from(text).filter((ch) => /[A-Za-z0-9\u4e00-\u9fff]/.test(ch));
+  return (chars.slice(0, 2).join('') || 'MW').toUpperCase();
+}
+
+function vinylCoverForTrack(track: Track | null): string {
+  return String(track?.coverUrl || track?.picUrl || track?.albumPicUrl || track?.imageUrl || track?.artworkUrl || '').trim();
+}
 
 type NowPayload = {
   now?: {
@@ -85,6 +103,19 @@ type GamePresetSummary = {
 type GamePresetCatalog = {
   presets?: GamePresetSummary[];
   errors?: Array<{ file?: string; source?: string; message?: string; code?: string }>;
+};
+
+type GameWhisperPayload = {
+  ok?: boolean;
+  text?: string;
+  source?: string;
+  ttl?: number;
+};
+
+type NeteaseLikedPayload = {
+  ok?: boolean;
+  liked?: boolean;
+  trackId?: string;
 };
 
 type Page = 'radio' | 'search' | 'game' | 'settings';
@@ -236,6 +267,15 @@ function cityLabel(raw: string): string {
   return cityNameMap[name] || name;
 }
 
+function neteaseTrackId(track: Track | null): string {
+  if (!track) return '';
+  const sourceId = String(track.sourceId || '').trim();
+  if (sourceId) return sourceId;
+  const id = String(track.id || '').trim();
+  if (id.startsWith('netease-')) return id.replace(/^netease-/, '');
+  return track.source === 'netease' ? id : '';
+}
+
 function Content() {
   const [apiBase, setApiBase] = useState(() => {
     const storedVersion = localStorage.getItem('moodwave.deck.configVersion');
@@ -262,6 +302,9 @@ function Content() {
   const [gamePresetJson, setGamePresetJson] = useState('');
   const [gamePresetMessage, setGamePresetMessage] = useState('');
   const [gamePresetLoading, setGamePresetLoading] = useState(false);
+  const [gameWhisper, setGameWhisper] = useState('');
+  const [trackLiked, setTrackLiked] = useState<boolean | null>(null);
+  const [favoriteBusy, setFavoriteBusy] = useState(false);
   const gameNameEditedRef = useRef(false);  // 用户手动编辑后不再自动覆盖
   const [minimalMode, setMinimalMode] = useState(() => localStorage.getItem(MINIMAL_KEY) === '1');
   const [autoContinue, setAutoContinue] = useState(() => localStorage.getItem(AUTO_CONTINUE_KEY) === '1');
@@ -425,11 +468,14 @@ function Content() {
 
   const runTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const runTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const whisperTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const likedRequestRef = useRef(0);
   // 组件卸载时清理运行中的 timer
   useEffect(() => {
     return () => {
       if (runTimerRef.current) clearInterval(runTimerRef.current);
       if (runTimeoutRef.current) clearTimeout(runTimeoutRef.current);
+      if (whisperTimeoutRef.current) clearTimeout(whisperTimeoutRef.current);
     };
   }, []);
 
@@ -481,6 +527,7 @@ function Content() {
 
   const currentMood = (now.now?.mood || currentPlan?.mood || now.plans?.radio?.mood || '').trim();
   const queue = currentPlan?.queue || [];
+  const canFavoriteTrack = Boolean(neteaseTrackId(track));
   const djLine = currentPlan?.tts?.text || currentPlan?.plan?.say || currentPlan?.plan?.reply || '';
   const djForTrack = (() => {
     const idx = queue.findIndex(t => t.id === track?.id || (track?.sourceId && t.sourceId === track?.sourceId));
@@ -488,6 +535,22 @@ function Content() {
     return '';
   })();
   const trackLine = track?.title ? `${track.title}${track.artist ? ` - ${track.artist}` : ''}` : "AI DJ 准备中...";
+  const vinylLabel = vinylLabelForTrack(track);
+  const vinylCover = vinylCoverForTrack(track);
+
+  function renderVinylRecord(minimal = false) {
+    return (
+      <div className={`mw-vinyl-stage${playing ? ' is-playing' : ''}${minimal ? ' is-minimal' : ''}`} aria-hidden="true">
+        <div className="mw-vinyl-disc">
+          <div className={`mw-vinyl-label${vinylCover ? ' has-cover' : ''}`}>
+            <span>{vinylLabel}</span>
+            {vinylCover ? <img src={vinylCover} alt="" onError={(event) => { event.currentTarget.style.display = 'none'; }} /> : null}
+          </div>
+        </div>
+        <div className="mw-vinyl-arm"><span /></div>
+      </div>
+    );
+  }
 
   function saveGameName(value: string, fromBlur = false) {
     const v = String(value || "");
@@ -529,7 +592,7 @@ function Content() {
   async function handleMinimalNextBetter() {
     const mode = getActiveMode(now);
     if (mode === 'game') {
-      await startGameRadio('换个感觉');
+      await startGameRadio('换个感觉', 'next_radio');
     } else if (mode === 'search') {
       await nextRadio(query);
     } else {
@@ -595,7 +658,7 @@ function Content() {
     });
   }
 
-  async function startGameRadio(label = 'AI DJ 准备中') {
+  async function startGameRadio(label = 'AI DJ 准备中', whisperEvent = 'start') {
     const presetScene = gamePreset?.fallback === false
       ? gamePreset.scenes?.find((item) => item.id === gameSceneId)
       : null;
@@ -611,6 +674,7 @@ function Content() {
         deferTts: true,
         autoContinue: autoContinue
       });
+      await requestGameWhisper(whisperEvent, true);
     });
   }
 
@@ -623,6 +687,108 @@ function Content() {
         icon: vibe.icon,
         vibe: vibe.hint
       }));
+
+  function readRecentWhispers() {
+    try {
+      const parsed = JSON.parse(localStorage.getItem(GAME_WHISPER_RECENT_KEY) || '[]');
+      return Array.isArray(parsed) ? parsed : [];
+    } catch {
+      return [];
+    }
+  }
+
+  function rememberWhisper(text: string) {
+    const nowMs = Date.now();
+    const next = [
+      { text, ts: nowMs },
+      ...readRecentWhispers().filter((item: any) => item?.text && nowMs - Number(item.ts || 0) < 60 * 60 * 1000 && item.text !== text)
+    ].slice(0, 12);
+    localStorage.setItem(GAME_WHISPER_RECENT_KEY, JSON.stringify(next));
+  }
+
+  async function requestGameWhisper(event = 'default', force = false) {
+    const activeMode = getActiveMode(now);
+    if (!force && activeMode !== 'game') return;
+    const presetScene = gamePreset?.fallback === false
+      ? gamePreset.scenes?.find((item) => item.id === gameSceneId)
+      : null;
+    const nextGameName = gameName.trim();
+    const nextGameVibe = presetScene?.label || gameVibe;
+    if (!nextGameName && !nextGameVibe && !gamePresetId) return;
+    const nowMs = Date.now();
+    const lastAutoAt = Number(localStorage.getItem(GAME_WHISPER_AUTO_TS_KEY) || '0');
+    if (!force && nowMs - lastAutoAt < 10 * 60 * 1000) return;
+    const recent = readRecentWhispers()
+      .filter((item: any) => nowMs - Number(item.ts || 0) < 60 * 60 * 1000)
+      .map((item: any) => item.text)
+      .filter(Boolean);
+    try {
+      const payload = await apiRequest<GameWhisperPayload>(apiBase, '/api/ai/game-whisper', {
+        gameName: nextGameName || undefined,
+        gameVibe: nextGameVibe || undefined,
+        sceneId: presetScene?.id || undefined,
+        presetId: gamePresetId || undefined,
+        event,
+        recent
+      });
+      const text = String(payload.text || '').trim();
+      if (!text) return;
+      setGameWhisper(text);
+      rememberWhisper(text);
+      if (!force) localStorage.setItem(GAME_WHISPER_AUTO_TS_KEY, String(nowMs));
+      if (whisperTimeoutRef.current) clearTimeout(whisperTimeoutRef.current);
+      whisperTimeoutRef.current = setTimeout(() => setGameWhisper(''), Number(payload.ttl || 12000));
+    } catch {
+      /* 低语是氛围增强，失败不影响播放 */
+    }
+  }
+
+  async function refreshTrackLiked(nextTrack = track) {
+    const songId = neteaseTrackId(nextTrack);
+    const requestId = likedRequestRef.current + 1;
+    likedRequestRef.current = requestId;
+    if (!songId) {
+      setTrackLiked(null);
+      return;
+    }
+    try {
+      const payload = await apiRequest<NeteaseLikedPayload>(apiBase, `/api/netease/liked?id=${encodeURIComponent(songId)}`);
+      if (likedRequestRef.current !== requestId) return;
+      setTrackLiked(Boolean(payload.liked));
+    } catch {
+      if (likedRequestRef.current !== requestId) return;
+      setTrackLiked(null);
+    }
+  }
+
+  async function toggleTrackLiked() {
+    const songId = neteaseTrackId(track);
+    if (!track || !songId || favoriteBusy) return;
+    const previous = trackLiked === true;
+    const next = !previous;
+    setFavoriteBusy(true);
+    setTrackLiked(next);
+    try {
+      const payload = await apiRequest<NeteaseLikedPayload>(apiBase, '/api/netease/like', { track, like: next });
+      setTrackLiked(Boolean(payload.liked));
+      setStatus(payload.liked ? '已收藏到网易云' : '已取消收藏');
+    } catch (error) {
+      setTrackLiked(previous);
+      setStatus(error instanceof Error ? error.message : '网易云收藏失败');
+    } finally {
+      setFavoriteBusy(false);
+    }
+  }
+
+  useEffect(() => {
+    const trackKey = track?.id || track?.sourceId || track?.title || '';
+    if (!trackKey || !playing || getActiveMode(now) !== 'game') return;
+    requestGameWhisper('track_change', false);
+  }, [track?.id, track?.sourceId, track?.title, playing, now.now?.mode]);
+
+  useEffect(() => {
+    refreshTrackLiked(track);
+  }, [track?.id, track?.sourceId, track?.source, apiBase]);
 
   return (
     <div className="mw-root">
@@ -706,6 +872,9 @@ function Content() {
           grid-template-columns: repeat(3, minmax(0, 1fr));
           gap: 5px;
         }
+        .mw-grid.four {
+          grid-template-columns: repeat(4, minmax(0, 1fr));
+        }
         .mw-grid.two {
           grid-template-columns: repeat(2, minmax(0, 1fr));
         }
@@ -766,6 +935,11 @@ function Content() {
           line-height: 1;
           text-overflow: clip;
         }
+        .mw-button.is-favorite {
+          border-color: rgba(66,216,178,.46);
+          color: #42d8b2;
+          text-shadow: 0 0 10px rgba(66,216,178,.34);
+        }
         .mw-busy-dot {
           display: inline-block;
           width: 6px;
@@ -818,6 +992,17 @@ function Content() {
         .mw-mini {
           margin-bottom: 7px;
         }
+        .mw-mini-record {
+          display: grid;
+          grid-template-columns: 58px minmax(0, 1fr);
+          gap: 12px;
+          align-items: center;
+          margin-bottom: 7px;
+          min-width: 0;
+        }
+        .mw-mini-copy {
+          min-width: 0;
+        }
         .mw-mini-head {
           display: flex;
           align-items: center;
@@ -853,9 +1038,183 @@ function Content() {
           font-size: 9.5px;
           font-weight: 800;
         }
+        .mw-vinyl-stage {
+          position: relative;
+          width: 56px;
+          height: 56px;
+          --vinyl-disc-inset: 3px;
+          --vinyl-label-size: 24px;
+          --vinyl-arm-width: 32px;
+          --vinyl-arm-top: 4px;
+          --vinyl-arm-right: -9px;
+          --vinyl-arm-rest: 28deg;
+          --vinyl-arm-play: -3deg;
+          flex: 0 0 auto;
+          overflow: visible;
+        }
+        .mw-vinyl-stage.is-minimal {
+          width: 72px;
+          height: 72px;
+          --vinyl-disc-inset: 4px;
+          --vinyl-label-size: 30px;
+          --vinyl-arm-width: 40px;
+          --vinyl-arm-top: 6px;
+          --vinyl-arm-right: -11px;
+          --vinyl-arm-rest: 28deg;
+          --vinyl-arm-play: -3deg;
+        }
+        .mw-vinyl-disc {
+          position: absolute;
+          inset: var(--vinyl-disc-inset);
+          border-radius: 50%;
+          background:
+            radial-gradient(circle at 50% 50%, rgba(8,8,8,1) 0 2px, transparent 2.4px),
+            radial-gradient(circle at 50% 50%, transparent 0 15%, rgba(255,255,255,.12) 15.4% 16.4%, transparent 17%),
+            radial-gradient(circle at 50% 50%, transparent 0 54%, rgba(255,255,255,.1) 54.4% 55.4%, transparent 56%),
+            linear-gradient(138deg, transparent 0 18%, rgba(255,255,255,.16) 23%, transparent 34% 100%),
+            repeating-radial-gradient(circle at 50% 50%, #050505 0 1.3px, #171717 1.7px 2.4px, #0b0b0b 2.8px 4px);
+          box-shadow:
+            inset 0 0 0 1px rgba(255,255,255,.12),
+            inset 0 0 0 3px rgba(0,0,0,.5),
+            inset 6px -10px 18px rgba(0,0,0,.62),
+            inset -8px 9px 16px rgba(255,255,255,.045),
+            0 8px 18px rgba(0,0,0,.38);
+          animation: mw-vinyl-spin 5.2s linear infinite;
+          animation-play-state: paused;
+        }
+        .mw-vinyl-disc::before {
+          content: "";
+          position: absolute;
+          inset: 7%;
+          border-radius: 50%;
+          border: 1px solid rgba(255,255,255,.08);
+          box-shadow:
+            inset 0 0 0 5px rgba(0,0,0,.2),
+            0 0 0 1px rgba(0,0,0,.5);
+          pointer-events: none;
+        }
+        .mw-vinyl-disc::after {
+          content: "";
+          position: absolute;
+          left: 50%;
+          top: 50%;
+          width: 5px;
+          height: 5px;
+          border-radius: 50%;
+          transform: translate(-50%, -50%);
+          background: rgba(5,5,5,.95);
+          box-shadow: 0 0 0 1px rgba(255,255,255,.2);
+          pointer-events: none;
+          z-index: 2;
+        }
+        .mw-vinyl-stage.is-playing .mw-vinyl-disc {
+          animation-play-state: running;
+        }
+        .mw-vinyl-label {
+          position: absolute;
+          left: 50%;
+          top: 50%;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          width: var(--vinyl-label-size);
+          height: var(--vinyl-label-size);
+          border-radius: 50%;
+          transform: translate(-50%, -50%);
+          background:
+            linear-gradient(135deg, rgba(66,216,178,.92), rgba(226,202,132,.82)),
+            radial-gradient(circle at 35% 30%, rgba(255,255,255,.8), transparent 42%);
+          color: rgba(0,0,0,.72);
+          font-size: 8px;
+          font-weight: 900;
+          line-height: 1;
+          letter-spacing: 0;
+          text-align: center;
+          box-shadow: inset 0 0 0 1px rgba(255,255,255,.34);
+          overflow: hidden;
+          z-index: 1;
+        }
+        .mw-vinyl-label span {
+          max-width: 18px;
+          overflow: hidden;
+          text-overflow: clip;
+          white-space: nowrap;
+        }
+        .mw-vinyl-label.has-cover {
+          color: rgba(255,255,255,.78);
+          background:
+            linear-gradient(135deg, rgba(16,16,16,.88), rgba(66,216,178,.22)),
+            radial-gradient(circle at 35% 30%, rgba(255,255,255,.32), transparent 42%);
+        }
+        .mw-vinyl-label.has-cover img {
+          position: absolute;
+          inset: 0;
+          width: 100%;
+          height: 100%;
+          border-radius: 50%;
+          object-fit: cover;
+          box-shadow: inset 0 0 0 1px rgba(255,255,255,.22);
+        }
+        .mw-vinyl-stage.is-minimal .mw-vinyl-label {
+          font-size: 9px;
+        }
+        .mw-vinyl-stage.is-minimal .mw-vinyl-label span {
+          max-width: 23px;
+        }
+        .mw-vinyl-arm {
+          position: absolute;
+          top: var(--vinyl-arm-top);
+          right: var(--vinyl-arm-right);
+          width: var(--vinyl-arm-width);
+          height: 14px;
+          transform: rotate(var(--vinyl-arm-rest));
+          transform-origin: calc(100% - 5px) 7px;
+          transition: transform .35s ease;
+          filter: drop-shadow(0 2px 4px rgba(0,0,0,.35));
+          z-index: 3;
+        }
+        .mw-vinyl-stage.is-playing .mw-vinyl-arm {
+          transform: rotate(var(--vinyl-arm-play));
+        }
+        .mw-vinyl-arm::before {
+          content: "";
+          position: absolute;
+          right: 0;
+          top: 1px;
+          width: 11px;
+          height: 11px;
+          border-radius: 50%;
+          background: linear-gradient(135deg, rgba(255,255,255,.96), rgba(151,162,166,.88));
+          box-shadow:
+            inset 0 0 0 1px rgba(255,255,255,.34),
+            0 0 0 1px rgba(0,0,0,.35);
+        }
+        .mw-vinyl-arm span {
+          position: absolute;
+          left: 0;
+          top: 6px;
+          width: calc(100% - 7px);
+          height: 2px;
+          border-radius: 999px;
+          background: linear-gradient(90deg, rgba(235,238,234,.96), rgba(159,171,173,.88));
+        }
+        .mw-vinyl-arm span::after {
+          content: "";
+          position: absolute;
+          left: -3px;
+          top: -1px;
+          width: 7px;
+          height: 5px;
+          border-radius: 1px 4px 4px 1px;
+          background: linear-gradient(135deg, rgba(245,246,240,.96), rgba(119,130,134,.92));
+          box-shadow: 1px 3px 0 -1px rgba(66,216,178,.85);
+        }
+        @keyframes mw-vinyl-spin {
+          to { transform: rotate(360deg); }
+        }
         /* 极简播放态 */
         .mw-minimal {
-          padding: 6px 0;
+          padding: 2px 0;
         }
         .mw-minimal-tags {
           display: flex;
@@ -975,6 +1334,20 @@ function Content() {
           text-overflow: ellipsis;
           white-space: nowrap;
         }
+        .mw-minimal-vinyl-row {
+          display: grid;
+          grid-template-columns: 76px minmax(0, 1fr);
+          gap: 14px;
+          align-items: center;
+          margin: 3px 0 9px;
+          min-width: 0;
+        }
+        .mw-minimal-vinyl-copy {
+          min-width: 0;
+        }
+        .mw-minimal-vinyl-copy .mw-minimal-progress {
+          margin-bottom: 0;
+        }
         .mw-minimal-progress {
           height: 2.5px;
           margin-bottom: 9px;
@@ -998,7 +1371,7 @@ function Content() {
         }
         .mw-minimal-transport {
           display: grid;
-          grid-template-columns: 1fr 1fr 1fr;
+          grid-template-columns: repeat(4, minmax(0, 1fr));
           gap: 4px;
           margin-bottom: 5px;
         }
@@ -1049,6 +1422,22 @@ function Content() {
           white-space: nowrap;
           overflow: hidden;
           text-overflow: ellipsis;
+        }
+        .mw-whisper {
+          margin: 5px 0 6px;
+          padding: 6px 8px;
+          border: 1px solid rgba(66,216,178,.18);
+          border-left: 3px solid rgba(66,216,178,.72);
+          border-radius: 6px;
+          background: linear-gradient(90deg, rgba(66,216,178,.12), rgba(255,255,255,.035));
+          color: rgba(231,255,247,.94);
+          font-size: 11px;
+          font-weight: 800;
+          line-height: 15px;
+        }
+        .mw-minimal .mw-whisper {
+          margin: 6px 0 0;
+          font-size: 11px;
         }
         .mw-preset-list {
           display: grid;
@@ -1191,6 +1580,7 @@ function Content() {
                   <div className="mw-minimal-world-mood">
                     {ctx.moodIcon ? ctx.moodIcon + ' ' : ''}{currentMood}{ctx.vibeSentence ? ' · "' + ctx.vibeSentence + '"' : ctx.vibeHint ? ' · ' + ctx.vibeHint : ''}
                   </div>
+                  {gameWhisper ? <div className="mw-whisper">{gameWhisper}</div> : null}
                 </div>
               );
             }
@@ -1218,14 +1608,20 @@ function Content() {
           {djForTrack ? (
             <div className="mw-minimal-quote mw-minimal-quote-track">{djForTrack}</div>
           ) : null}
-          <div className="mw-minimal-playing">{(() => { const m2 = getActiveMode(now); return m2 === 'game' ? '🎮 正在陪你' : '📻 正在陪你'; })()}</div>
-          <div className="mw-minimal-track">{track.title || '未知歌曲'}{track.artist ? ' — ' + track.artist : ''}</div>
-          {playing ? <div className="mw-minimal-progress"><div className="mw-minimal-progress-fill" style={{width: `${Math.round(progressRatio * 100)}%`}} /></div> : null}
+          <div className="mw-minimal-vinyl-row">
+            {renderVinylRecord(true)}
+            <div className="mw-minimal-vinyl-copy">
+              <div className="mw-minimal-playing">{(() => { const m2 = getActiveMode(now); return m2 === 'game' ? '🎮 正在陪你' : '📻 正在陪你'; })()}</div>
+              <div className="mw-minimal-track">{track.title || '未知歌曲'}{track.artist ? ' — ' + track.artist : ''}</div>
+              {playing ? <div className="mw-minimal-progress"><div className="mw-minimal-progress-fill" style={{width: `${Math.round(progressRatio * 100)}%`}} /></div> : null}
+            </div>
+          </div>
           {(() => { const lyric = getCurrentLyric(track, progressRatio); return lyric ? <div className="mw-minimal-lyric">{lyric}</div> : null; })()}
           <div className="mw-minimal-transport">
             <button type="button" className="mw-button is-transport" disabled={busy} title="上一首" onClick={() => run('上一首', () => apiRequest(apiBase, '/api/prev', {}))}>⏮</button>
             <button type="button" className="mw-button is-transport" disabled={busy} title={playing ? '暂停' : '播放'} onClick={() => run(playing ? '暂停' : '播放', () => apiRequest(apiBase, playing ? '/api/pause' : '/api/play', {}))}>{playing ? '⏯' : '▶'}</button>
             <button type="button" className="mw-button is-transport" disabled={busy} title="下一首" onClick={() => run('下一首', () => apiRequest(apiBase, '/api/next', {}))}>⏭</button>
+            <button type="button" className={`mw-button is-transport${trackLiked ? ' is-favorite' : ''}`} disabled={busy || favoriteBusy || !canFavoriteTrack} title={trackLiked ? '取消网易云喜欢' : '收藏到网易云喜欢'} onClick={toggleTrackLiked}>{trackLiked ? '♥' : '♡'}</button>
           </div>
           <div className="mw-minimal-actions">
             <AppButton disabled={busy} onClick={handleMinimalNextBetter}>↻ 来点别的</AppButton>
@@ -1258,11 +1654,17 @@ function Content() {
 
       {page !== 'settings' && (
         <div className="mw-card mw-mini">
-          <div className="mw-mini-head">
-            <div className="mw-mini-title">{trackLine}</div>
-            <div className="mw-mini-state">{playing ? "📻 正在陪你" : '我在等你'}</div>
+          <div className="mw-mini-record">
+            {renderVinylRecord(false)}
+            <div className="mw-mini-copy">
+              <div className="mw-mini-head">
+                <div className="mw-mini-title">{trackLine}</div>
+                <div className="mw-mini-state">{playing ? "正在旋转" : '待落针'}</div>
+              </div>
+              {playing ? <div className="mw-progress-bar"><div className="mw-progress-bar-fill" style={{width: `${Math.round(progressRatio * 100)}%`}} /></div> : null}
+            </div>
           </div>
-          <div className="mw-grid">
+          <div className="mw-grid four">
             <button
               type="button"
               className="mw-button is-transport"
@@ -1290,8 +1692,16 @@ function Content() {
             >
               ›
             </button>
+            <button
+              type="button"
+              className={`mw-button is-transport${trackLiked ? ' is-favorite' : ''}`}
+              disabled={busy || favoriteBusy || !canFavoriteTrack}
+              title={trackLiked ? '取消网易云喜欢' : '收藏到网易云喜欢'}
+              onClick={toggleTrackLiked}
+            >
+              {trackLiked ? '♥' : '♡'}
+            </button>
           </div>
-          {playing ? <div className="mw-progress-bar"><div className="mw-progress-bar-fill" style={{width: `${Math.round(progressRatio * 100)}%`}} /></div> : null}
         </div>
       )}
 
@@ -1356,6 +1766,7 @@ function Content() {
               {gamePreset.preset.world?.length ? ` · ${gamePreset.preset.world.slice(0, 3).join(' / ')}` : ''}
             </div>
           )}
+          {gameWhisper ? <div className="mw-whisper">{gameWhisper}</div> : null}
           <div className="mw-card">
             <div className="mw-grid two">
               {gameSceneOptions.map((scene) => (
@@ -1379,8 +1790,8 @@ function Content() {
           </div>
           {gamePresetLoading && <div className="mw-section-hint">正在读取游戏氛围包...</div>}
           <div className="mw-action-row">
-            <AppButton active disabled={busy || !gameVibe} onClick={() => startGameRadio('电台启动中')}>▶ 开始电台</AppButton>
-            <AppButton disabled={busy || !gameVibe} onClick={() => startGameRadio('换个感觉')}>↻ 来点别的</AppButton>
+            <AppButton active disabled={busy || !gameVibe} onClick={() => startGameRadio('电台启动中', 'start')}>▶ 开始电台</AppButton>
+            <AppButton disabled={busy || !gameVibe} onClick={() => startGameRadio('换个感觉', 'next_radio')}>↻ 来点别的</AppButton>
           </div>
         </div>
       )}

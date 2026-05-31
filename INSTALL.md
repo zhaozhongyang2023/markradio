@@ -1,4 +1,4 @@
-# 🎵 MoodWave V6 — Steam Deck 完整安装手册
+# 🎵 MoodWave — Steam Deck 完整安装手册
 
 > 装好后，你的 Steam Deck 就多了一个长期陪伴的 AI DJ。🎧
 
@@ -339,7 +339,7 @@ git clone https://github.com/zhaozhongyang2023/markradio.git ~/moodwave
 cd ~/moodwave
 
 # 一键安装
-bash scripts/install-steamdeck.sh --repo https://github.com/zhaozhongyang2023/markradio.git
+bash scripts/remote-install-steamdeck.sh --repo https://github.com/zhaozhongyang2023/markradio.git
 ```
 
 ### 安装过程中会依次问你：
@@ -457,7 +457,7 @@ http://127.0.0.1:38080/api/health
 
 这是 MoodWave 的核心功能。AI 分析你的网易云听歌记录，生成专属 **Music DNA**，三种模式都会参考。
 
-V6 升级：Music DNA 从 3 维升级为 5 维——**核心情绪 / 聆听状态 / 音乐性格 / 游戏氛围 / 置信度**。DNA 直接参与选歌决策：匹配你口味的歌曲自动排到歌单前面，越用越精准。
+Music DNA 五维体系：**核心情绪 / 聆听状态 / 音乐性格 / 游戏氛围 / 置信度**。中文分词精确匹配加 DNA 加权搜索——匹配的关键词越多，歌曲排名越靠前；置信度越高权重越大（high=1.5x / medium=1.0x / low=0.5x）。越用越精准。
 
 ### 操作流程
 
@@ -519,10 +519,10 @@ curl -L https://github.com/SteamDeckHomebrew/decky-loader/raw/main/dist/install_
 点击进入，三个 Tab：
 
 - 🎧 **AI Radio** — 按心情开电台（参考 Music DNA + 情绪势能）
-- 🎮 **Game Radio** — 选游戏氛围配 BGM（注入 DJ 灵魂 + 游戏世界感）
+- 🎮 **Game Radio** — 选游戏氛围配 BGM，自动识别 5 款内置预设（巫师3/刺客信条影/赛博朋克2077/塞尔达/生化危机4）+ 10+ 款热门游戏 fallback，Game Whisper 系统自动生成对应世界观的独白短句
 - 🔍 **AI 寻歌** — 告诉 AI 想听什么（参考 Music DNA）
 
-> V6 新特性：Game Radio 输入游戏名（如「巫师3」），AI 自动感知**游戏世界氛围**，插件渲染**极简世界卡片**（天气+游戏+心情+vibe）。
+播放面板内支持 **网易云喜欢收藏**（♥ 一键收藏/取消），黑胶唱片转盘随歌旋转，播放时唱臂落针、暂停时回位。
 
 ---
 
@@ -573,6 +573,17 @@ systemctl --user restart moodwave.service
 
 > Decky 插件会自动跟随 Steam 重启加载最新版。如果没更新，游戏模式 → Decky → ⚙ → Reload Plugins。
 
+### 升级后验证 Game Whisper
+
+```bash
+curl -s http://127.0.0.1:38765/api/health
+curl -s -X POST http://127.0.0.1:38765/api/ai/game-whisper \
+  -H 'Content-Type: application/json' \
+  -d '{"presetId":"cyberpunk-2077","gameName":"赛博朋克2077","event":"start"}'
+```
+
+如果返回里有 `"source":"preset"` 和一段短句，说明内置游戏包低语已经生效。
+
 ---
 
 ## 卸载
@@ -599,6 +610,7 @@ bash ~/moodwave/scripts/uninstall-steamdeck.sh
 | 网页开了但没歌 | 检查 AI Key：`cat ~/.config/moodwave/config.env` |
 | Decky 找不到 MoodWave | 检查目录：`ls ~/homebrew/plugins/moodwave-deck-companion/` |
 | Game Radio 没反应 | 确认本地 API 还在跑：`curl http://127.0.0.1:38765/api/health` |
+| Game Whisper 没有游戏味 | 升级后重启服务，并确认返回来源：`curl -s -X POST http://127.0.0.1:38765/api/ai/game-whisper -H 'Content-Type: application/json' -d '{"presetId":"the-witcher-3","gameName":"巫师3","event":"start"}'` |
 | 装完显示 Demo 歌单 | 正常现象。配置网易云 API + 生成 Music DNA 后更精准 |
 | 怎么换 AI Key | 编辑 `~/.config/moodwave/config.env`，改 `AI_API_KEY=`，重启服务 |
 | 忘记 sudo 密码 | 桌面模式 → 系统设置 → 用户 → 改密码 |

@@ -18,6 +18,12 @@ export async function getLikedSongs(store, limit = 500) {
   return (res?.ids || []).map(String);
 }
 
+export function isNeteaseSongLiked(ids = [], songId = '') {
+  const target = String(songId || '').trim();
+  if (!target) return false;
+  return (Array.isArray(ids) ? ids : []).map(String).includes(target);
+}
+
 export async function getUserPlaylists(store) {
   const uid = await ensureNeteaseProfile(store);
   const res = await callNetease('/user/playlist', { uid: uid || '' }, store);

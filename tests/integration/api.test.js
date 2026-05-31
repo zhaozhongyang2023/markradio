@@ -164,6 +164,65 @@ test('POST /api/game/presets/reload', async () => {
   assert.ok(Array.isArray(body.presets));
 });
 
+test('POST /api/ai/game-whisper returns Witcher line', async () => {
+  const { status, body } = await api.post('/api/ai/game-whisper', {
+    gameName: '巫师3',
+    presetId: 'the-witcher-3',
+    event: 'start'
+  });
+  assert.equal(status, 200);
+  assert.equal(body.ok, true);
+  assert.equal(body.source, 'preset');
+  assert.ok(body.text);
+});
+
+test('POST /api/ai/game-whisper returns Assassin line', async () => {
+  const { status, body } = await api.post('/api/ai/game-whisper', {
+    gameName: '刺客信条·影',
+    presetId: 'assassins-creed-shadows',
+    event: 'night'
+  });
+  assert.equal(status, 200);
+  assert.equal(body.ok, true);
+  assert.equal(body.source, 'preset');
+  assert.ok(body.text);
+});
+
+test('POST /api/ai/game-whisper returns preset lines for all builtin game packs', async () => {
+  const cases = [
+    ['the-witcher-3', '巫师3'],
+    ['assassins-creed-shadows', '刺客信条·影'],
+    ['cyberpunk-2077', '赛博朋克2077'],
+    ['zelda-botw', '塞尔达传说·旷野之息'],
+    ['resident-evil-4', '生化危机4·重制版']
+  ];
+
+  for (const [presetId, gameName] of cases) {
+    const { status, body } = await api.post('/api/ai/game-whisper', {
+      gameName,
+      presetId,
+      event: 'start'
+    });
+    assert.equal(status, 200);
+    assert.equal(body.ok, true);
+    assert.equal(body.source, 'preset');
+    assert.equal(body.presetId, presetId);
+    assert.ok(body.text);
+  }
+});
+
+test('POST /api/ai/game-whisper returns fallback for unknown game', async () => {
+  const { status, body } = await api.post('/api/ai/game-whisper', {
+    gameName: '未知游戏',
+    gameVibe: '探索地图',
+    event: 'track_change'
+  });
+  assert.equal(status, 200);
+  assert.equal(body.ok, true);
+  assert.equal(body.source, 'fallback');
+  assert.ok(body.text);
+});
+
 test('PUT /api/mood', async () => {
   const { status, body } = await api.put('/api/mood', { mood: '开心' });
   assert.equal(status, 200);
@@ -188,6 +247,18 @@ test('PUT /api/taste', async () => {
   const { status, body } = await api.put('/api/taste', { taste: '摇滚', routines: '夜', moodRules: '开' });
   assert.equal(status, 200);
   assert.equal(body.taste, '摇滚');
+});
+
+test('GET /api/netease/liked rejects invalid id', async () => {
+  const { status, body } = await api.get('/api/netease/liked?id=abc');
+  assert.equal(status, 400);
+  assert.equal(body.ok, false);
+});
+
+test('GET /api/netease/liked returns 401 when not logged in', async () => {
+  const { status, body } = await api.get('/api/netease/liked?id=123');
+  assert.equal(status, 401);
+  assert.equal(body.ok, false);
 });
 
 test('GET /api/voice', async () => {

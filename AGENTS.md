@@ -161,6 +161,74 @@ switch-companion/ Switch 浏览器伴侣 (NRO 启动器 + HTML)
 - 构建：`npm run build`（Rollup），产物 `dist/`
 - 插件权限：`root:root`，目录 `/home/deck/homebrew/plugins/moodwave-deck-companion/`
 
+### Deck 伴侣开发规范
+
+#### 文件职责
+
+| 文件 | 职责 |
+|------|------|
+| `src/index.tsx` | 主组件（~1500 行）：状态管理、API 调用、三页 UI、黑胶动画 |
+| `main.py` | Decky 后端：API Base 解析（config.json > 环境变量 > 默认值） |
+| `test_main.py` | Python 单元测试：API Base 优先级 + plugin.json schema + TS 编译冒烟 |
+
+#### UI 微调原则
+
+- **CSS 变量优先**：布局、间距、动画参数一律用 CSS 变量，不动 JSX 结构
+- **复用已有数据**：不新增 API 调用，使用现有 `/api/now` 轮询数据
+- **动变量不动结构**：调 `gap`、`padding`、`deg` 等单值即可，避免大范围 DOM 改动
+- **纯 CSS 改动免测试**：只改 CSS 值不补单元测试
+
+#### 黑胶唱片 CSS 变量体系
+
+```css
+/* 默认（非极简） */
+--vinyl-disc-inset: 3px;   /* 唱片内缩 */
+--vinyl-label-size: 24px;  /* 中心标签大小 */
+--vinyl-arm-width: 32px;   /* 唱臂宽度 */
+--vinyl-arm-top: 4px;      /* 唱臂根部距顶部 */
+--vinyl-arm-right: -9px;   /* 唱臂右侧溢出 */
+--vinyl-arm-rest: 28deg;   /* 暂停时唱臂角度 */
+--vinyl-arm-play: -3deg;   /* 播放时唱臂角度 */
+
+/* 极简 (.is-minimal) */
+--vinyl-disc-inset: 4px;
+--vinyl-label-size: 30px;
+--vinyl-arm-width: 40px;
+--vinyl-arm-top: 6px;
+--vinyl-arm-right: -11px;
+--vinyl-arm-rest: 28deg;
+--vinyl-arm-play: -3deg;
+```
+
+**关键规则**：
+- 暂停时 `rest` 角度需确保唱头完全离开唱片外沿（当前 ~29.5px > 唱片半径 25px）
+- 播放时 `play` 角度需确保唱头落在黑色沟槽区（标签 12px ~ 边缘 25px 之间）
+- 调整角度时两个模式（默认/极简）同步修改
+
+#### 常用微调位置
+
+| 场景 | 变量 / 属性 | 位置 |
+|------|------------|------|
+| 唱臂暂停位置 | `--vinyl-arm-rest` | 两处 CSS 变量 |
+| 唱臂播放落针 | `--vinyl-arm-play` | 两处 CSS 变量 |
+| 唱臂根部高度 | `--vinyl-arm-top` | 两处 CSS 变量 |
+| 黑胶与歌曲间距 | `.mw-mini-record` `gap` / `.mw-minimal-vinyl-row` `gap` | grid 容器 |
+| 极简顶部间隙 | `.mw-minimal` `padding` | 单处 CSS |
+| 天气标签位置 | `.mw-brand-weather` 入 `mw-brand-bar`，`margin-left: auto` | brand bar 内 |
+| 进度条公式 | `setProgress(Math.min(90, Math.round(5 + elapsed * 10.6)))` | `run` 函数 |
+
+#### 开发&部署验证流水线
+
+```bash
+cd deck-companion
+npx tsc --noEmit      # TypeScript 编译检查
+npm run build         # Rollup 构建
+cd ..
+git add deck-companion/src/index.tsx
+git commit -m 'fix: 中文描述'
+bash deploy.sh        # 一键部署到树莓派 + Steam Deck
+```
+
 ### Switch 伴侣 (`switch-companion/`)
 
 - 纯 HTML/CSS/JS，无构建

@@ -5,6 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import {
   buildGameRadioRequest,
+  createGameWhisper,
   deleteCommunityPreset,
   findGamePreset,
   findGamePresetById,
@@ -191,6 +192,94 @@ test('buildGameRadioRequest reflects current scene only', () => {
   assert.match(text, /雨中城下町/);
   assert.match(text, /雨落在瓦上/);
   assert.doesNotMatch(text, /忍影潜行/);
+});
+
+test('createGameWhisper uses preset start lines first', () => {
+  const result = createGameWhisper({
+    presetId: 'the-witcher-3',
+    gameName: '巫师3',
+    event: 'start',
+    recent: [
+      '银剑先别收。'
+    ]
+  });
+
+  assert.equal(result.ok, true);
+  assert.equal(result.source, 'preset');
+  assert.equal(result.presetId, 'the-witcher-3');
+  assert.equal(result.text, '站稳了，猎魔人。');
+});
+
+test('createGameWhisper falls back when preset has no whispers', () => {
+  const result = createGameWhisper({
+    gameName: '未知游戏',
+    gameVibe: '探索地图',
+    event: 'start'
+  });
+
+  assert.equal(result.ok, true);
+  assert.equal(result.source, 'fallback');
+  assert.ok(result.text);
+});
+
+test('createGameWhisper can match rain and night groups', () => {
+  const rain = createGameWhisper({
+    presetId: 'the-witcher-3',
+    gameName: '巫师3',
+    event: 'rain',
+    weather: { condition: '雨' }
+  });
+  const night = createGameWhisper({
+    presetId: 'the-witcher-3',
+    gameName: '巫师3',
+    event: 'night',
+    now: new Date(2026, 4, 26, 23)
+  });
+
+  assert.equal(rain.source, 'preset');
+  assert.ok(rain.text.includes('雨') || rain.text.includes('斗篷'));
+  assert.equal(night.source, 'preset');
+  assert.ok(night.text.includes('夜') || night.text.includes('炉火'));
+});
+
+test('createGameWhisper falls back from invalid presetId to gameName', () => {
+  const result = createGameWhisper({
+    presetId: 'missing-preset',
+    gameName: '巫师3',
+    event: 'start'
+  });
+
+  assert.equal(result.source, 'preset');
+  assert.equal(result.presetId, 'the-witcher-3');
+  assert.ok(result.text);
+});
+
+test('createGameWhisper has preset whispers for all builtin game packs', () => {
+  const cases = [
+    ['the-witcher-3', '巫师3'],
+    ['assassins-creed-shadows', '刺客信条·影'],
+    ['cyberpunk-2077', '赛博朋克2077'],
+    ['zelda-botw', '塞尔达传说·旷野之息'],
+    ['resident-evil-4', '生化危机4·重制版']
+  ];
+
+  for (const [presetId, gameName] of cases) {
+    const result = createGameWhisper({ presetId, gameName, event: 'start' });
+    assert.equal(result.ok, true);
+    assert.equal(result.source, 'preset');
+    assert.equal(result.presetId, presetId);
+    assert.ok(result.text);
+  }
+});
+
+test('preset without whispers still loads', () => {
+  const preset = validatePresetInput({
+    id: 'no-whispers',
+    displayName: 'No Whispers',
+    scenes: [{ id: 'default', label: 'Default' }]
+  });
+
+  assert.deepEqual(preset.whispers, {});
 });
 
 test('findGamePreset matches fullwidth colon variant', () => {
